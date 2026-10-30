@@ -6,14 +6,14 @@ Déjà suivis ailleurs (roadmap ou commentaires `ponytail:`) et non repris ici :
 
 ## Bugs et inefficacités réels
 
-- [ ] **1. Les haulers font l'aller-retour entre les conteneurs** (`src/roles/hauler.js:19-21`)
+- [x] **1. Les haulers font l'aller-retour entre les conteneurs** (`src/roles/hauler.js:19-21`)
   - Chaque tick, le hauler vise le conteneur le plus plein et ne livre qu'une fois plein.
   - Il vide le conteneur A, qui devient le moins plein, et il part vers B. Il revient ensuite vers A, et ainsi de suite.
   - Les deux haulers d'une salle visent aussi le même conteneur.
   - Pendant ce temps, le spawn peut manquer d'énergie.
   - Correctif : garder la cible en mémoire, comme le fait le harvester (`targetId`), ou partir livrer dès que la cible est vide et que le hauler porte déjà de l'énergie.
 
-- [ ] **2. Corps plafonnés à 1 000 énergie** (`src/spawner.js:6`, `MAX_UNITS = 5`)
+- [x] **2. Corps plafonnés à 1 000 énergie** (`src/spawner.js:6`, `MAX_UNITS = 5`)
   - Les corps s'arrêtent à 15 parties, alors qu'un créep peut en avoir 50.
   - Du RCL 5 au RCL 8, la capacité monte de 1 800 à 12 900 énergie, mais les corps restent identiques. L'économie plafonne donc à partir du RCL 5.
   - Correctif : `Math.floor(50 / unit.length)` comme plafond.
@@ -34,7 +34,7 @@ Déjà suivis ailleurs (roadmap ou commentaires `ponytail:`) et non repris ici :
 
 ## CPU et mémoire
 
-- [ ] **6. `reusePath` reste à 5 par défaut** (`src/move.js`)
+- [x] **6. `reusePath` reste à 5 par défaut** (`src/move.js`)
   - Les chemins sont recalculés souvent.
   - Correctif en une ligne : `opts = Object.assign({ reusePath: 20 }, opts)`. La roadmap prévoit déjà ce point (phase 2).
 

@@ -23,7 +23,7 @@
 - [x] Routes entre spawn, sources et contrôleur
 - [x] Conteneurs au pied des sources et du contrôleur
 - [x] Mise en cache des sources (portée du module, conservée jusqu'au reset du global)
-- [ ] Mise en cache des chemins des créeps (`reusePath`), si le CPU le justifie
+- [x] Mise en cache des chemins des créeps (`reusePath` à 20 ticks)
 
 ## Phase 3 : récolte statique et logistique (RCL 3-4)
 

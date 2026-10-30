@@ -3,7 +3,6 @@ const defense = require('./defense');
 const intel = require('./intel');
 const expansion = require('./expansion');
 
-const MAX_UNITS = 5;
 const MAX_MINER_WORK = 5;
 // ponytail: récolteurs distants par source sans réservation (5 énergie/tick), à revoir avec un rôle reserver.
 const REMOTE_PER_SOURCE = 2;
@@ -59,10 +58,10 @@ function targets(room) {
   };
 }
 
-// Répète le motif autant que l'énergie le permet.
+// Répète le motif autant que l'énergie et la taille maximale d'un créep (50 parties) le permettent.
 function repeat(unit, energy) {
   const cost = unit.reduce((sum, part) => sum + BODYPART_COST[part], 0);
-  const units = Math.min(Math.floor(energy / cost), MAX_UNITS);
+  const units = Math.min(Math.floor(energy / cost), Math.floor(MAX_CREEP_SIZE / unit.length));
   const body = [];
   for (let i = 0; i < units; i++) body.push(...unit);
   return body;
