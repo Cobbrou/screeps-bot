@@ -13,6 +13,8 @@ const AWAY_BLOCKED_TICKS = 20;
 const MIN_WITHDRAW = 100;
 // RCL minimal pour aller récolter ailleurs : avant, les corps portent trop peu pour rentabiliser le trajet.
 const AWAY_MIN_RCL = 4;
+// Ticks entre deux recherches de conteneur ou de stockage quand le créep n'en a pas trouvé.
+const WITHDRAW_SCAN_INTERVAL = 10;
 
 // Identifiants des sources par salle et du conteneur de chaque source, gardés jusqu'au reset du global.
 const sourceIds = {};
@@ -157,12 +159,20 @@ function stepAway(creep) {
 }
 
 // Prend l'énergie dans un conteneur ou le stockage s'il en reste assez (retrait partiel accepté) ; récolte sinon.
+// La réserve est gardée en mémoire tant qu'elle suffit ; sans réserve, la salle n'est fouillée
+// qu'une fois tous les WITHDRAW_SCAN_INTERVAL ticks.
 function collect(creep) {
   const need = Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), MIN_WITHDRAW);
-  const store = creep.pos.findClosestByRange(FIND_STRUCTURES, {
-    filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_STORAGE)
-      && s.store[RESOURCE_ENERGY] >= need,
-  });
+  let store = Game.getObjectById(creep.memory.withdrawId);
+  if (!store || store.store[RESOURCE_ENERGY] < need) {
+    if (!store && Game.time - (creep.memory.withdrawScan || 0) < WITHDRAW_SCAN_INTERVAL) return harvest(creep);
+    store = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+      filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_STORAGE)
+        && s.store[RESOURCE_ENERGY] >= need,
+    });
+    creep.memory.withdrawId = store ? store.id : undefined;
+    creep.memory.withdrawScan = Game.time;
+  }
   if (!store) return harvest(creep);
   if (creep.withdraw(store, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, store);
 }

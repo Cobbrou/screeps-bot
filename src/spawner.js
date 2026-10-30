@@ -6,6 +6,7 @@ const expansion = require('./expansion');
 const MAX_MINER_WORK = 5;
 // ponytail: récolteurs distants par source sans réservation (5 énergie/tick), à revoir avec un rôle reserver.
 const REMOTE_PER_SOURCE = 2;
+const MAX_REMOTE_ROOMS = 2;
 // ponytail: un upgrader de plus par tranche d'énergie stockée, plafonné ; à revoir au RCL 8 (15 énergie/tick max).
 const ENERGY_PER_UPGRADER = 100000;
 // Avant le stockage : un upgrader de plus par tranche d'énergie en attente dans le conteneur du contrôleur.
@@ -39,11 +40,14 @@ function extraUpgraders(room) {
 }
 
 // Salles voisines où récolter : seulement depuis une salle qui a un stockage pour recevoir l'énergie.
+// Au plus MAX_REMOTE_ROOMS, celles qui ont le plus de sources, pour ne pas saturer le spawn.
 function remoteRooms(room) {
   if (!room.storage) return [];
   const exp = Memory.expansion;
   return Object.values(Game.map.describeExits(room.name))
-    .filter((name) => intel.safe(name) && intel.get(name).sources && (!exp || exp.target !== name));
+    .filter((name) => intel.safe(name) && intel.get(name).sources && (!exp || exp.target !== name))
+    .sort((a, b) => intel.get(b).sources - intel.get(a).sources)
+    .slice(0, MAX_REMOTE_ROOMS);
 }
 
 // Effectifs voulus par rôle, dans l'ordre de priorité.

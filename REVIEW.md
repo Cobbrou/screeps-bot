@@ -38,17 +38,17 @@ Déjà suivis ailleurs (roadmap ou commentaires `ponytail:`) et non repris ici :
   - Les chemins sont recalculés souvent.
   - Correctif en une ligne : `opts = Object.assign({ reusePath: 20 }, opts)`. La roadmap prévoit déjà ce point (phase 2).
 
-- [ ] **7. `creep.memory._stuck` est écrit à chaque déplacement** (`src/move.js:13`)
+- [x] **7. `creep.memory._stuck` est écrit à chaque déplacement** (`src/move.js:13`)
   - `Memory` grossit et se parse plus lentement.
   - Correctif : un objet global indexé par nom de créep suffit.
 
-- [ ] **8. Recherches sans cache dans `sources.collect`** (`src/sources.js:159`)
+- [x] **8. Recherches sans cache dans `sources.collect`** (`src/sources.js:159`)
   - `findClosestByRange(FIND_STRUCTURES)` tourne à chaque tick pour chaque upgrader ou builder en collecte.
   - Correctif : garder la cible en mémoire, comme pour le point 1.
 
 ## Logique de jeu
 
-- [ ] **9. Trop de créeps de remote mining** (`src/spawner.js:9`, `REMOTE_PER_SOURCE`)
+- [x] **9. Trop de créeps de remote mining** (`src/spawner.js:9`, `REMOTE_PER_SOURCE`)
   - 2 créeps par source dans chaque voisine sûre, soit jusqu'à environ 16 créeps de 15 parties.
   - Avec un seul spawn au RCL 4, le spawn est presque saturé.
   - Correctif : plafonner le nombre de salles distantes, par exemple 2.
