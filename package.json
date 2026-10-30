@@ -1,0 +1,16 @@
+{
+  "name": "screeps-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bot pour Screeps World",
+  "scripts": {
+    "build": "rollup -c",
+    "deploy": "rollup -c --environment DEPLOY",
+    "watch": "rollup -cw --environment DEPLOY"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^29.0.3",
+    "rollup": "^4.66.0",
+    "rollup-plugin-screeps": "^1.0.1"
+  }
+}

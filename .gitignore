@@ -1,0 +1,13 @@
+node_modules/
+dist/
+
+# Identifiants : ne jamais versionner
+secrets.json
+
+# Éditeurs et OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
