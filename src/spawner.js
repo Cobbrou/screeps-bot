@@ -88,8 +88,9 @@ module.exports.run = function () {
     const room = spawn.room;
     const roomCounts = counts[room.name] = counts[room.name] || {};
 
-    // Personne pour remplir spawn et extensions : récolteur avec l'énergie disponible.
-    const emergency = !roomCounts.harvester && !roomCounts.hauler;
+    // Personne pour remplir spawn et extensions (ou haulers sans mineur pour les alimenter) :
+    // récolteur avec l'énergie disponible.
+    const emergency = !roomCounts.harvester && (!roomCounts.hauler || !roomCounts.miner);
     const wanted = targets(room);
     const role = emergency ? 'harvester' : Object.keys(wanted).find((r) => (roomCounts[r] || 0) < wanted[r]);
     if (!role) continue;
