@@ -19,6 +19,12 @@ function collect(creep) {
     containers.sort((a, b) => b.store[RESOURCE_ENERGY] - a.store[RESOURCE_ENERGY]);
     target = containers[0];
   }
+  // Conteneurs vides et spawn ou extensions à remplir : on puise dans le stockage.
+  const storage = creep.room.storage;
+  if ((!target || !target.store[RESOURCE_ENERGY]) && storage && storage.store[RESOURCE_ENERGY]
+    && creep.room.energyAvailable < creep.room.energyCapacityAvailable) {
+    target = storage;
+  }
   if (target && creep.withdraw(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) creep.moveTo(target);
 }
 

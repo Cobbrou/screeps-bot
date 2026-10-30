@@ -27,7 +27,13 @@ module.exports.loop = function () {
     for (const name in Game.creeps) {
       const creep = Game.creeps[name];
       const role = roles[creep.memory.role];
-      if (role) role.run(creep);
+      if (!role) continue;
+      // Un créep en erreur ne doit pas empêcher les autres de jouer.
+      try {
+        role.run(creep);
+      } catch (e) {
+        console.log(`[${name}] ${e.stack || e}`);
+      }
     }
   });
   // Planification et expansion sautées quand le bucket est bas : non essentielles.

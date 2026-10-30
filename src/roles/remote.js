@@ -12,8 +12,12 @@ module.exports.run = function (creep) {
   // Hostiles vus sur place : la salle est notée dangereuse, ce qui déclenche le repli.
   if (creep.room.name === target && defense.threats(creep.room).length) intel.record(creep.room);
   if (creep.memory.working || !intel.safe(target)) {
-    const storage = Game.rooms[creep.memory.room].storage;
-    if (storage && creep.transfer(storage, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) creep.moveTo(storage);
+    // La salle d'origine peut ne plus être visible ; le créep vide doit aussi rentrer.
+    const home = Game.rooms[creep.memory.room];
+    const storage = home && home.storage;
+    if (!storage) creep.moveTo(new RoomPosition(25, 25, creep.memory.room), { range: 22 });
+    else if (!creep.pos.isNearTo(storage)) creep.moveTo(storage);
+    else if (creep.store[RESOURCE_ENERGY]) creep.transfer(storage, RESOURCE_ENERGY);
     return;
   }
   if (creep.room.name !== target) {

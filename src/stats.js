@@ -5,9 +5,14 @@ const LOW_BUCKET = 2000;
 let modules = {};
 
 // Exécute `fn` et note le CPU qu'il consomme sous `name`.
+// Une erreur est affichée sans interrompre le reste du tick.
 function measure(name, fn) {
   const start = Game.cpu.getUsed();
-  fn();
+  try {
+    fn();
+  } catch (e) {
+    console.log(`[${name}] ${e.stack || e}`);
+  }
   modules[name] = Game.cpu.getUsed() - start;
 }
 
