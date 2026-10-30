@@ -1,3 +1,4 @@
+const move = require('../move');
 const sources = require('../sources');
 
 // Alterne entre récolte et amélioration du contrôleur de la salle.
@@ -9,6 +10,6 @@ module.exports.run = function (creep) {
   if (!creep.memory.working) {
     sources.collect(creep);
   } else if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
-    creep.moveTo(creep.room.controller);
+    move.to(creep, creep.room.controller);
   }
 };

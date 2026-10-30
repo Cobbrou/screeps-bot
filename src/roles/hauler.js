@@ -1,3 +1,4 @@
+const move = require('../move');
 const sources = require('../sources');
 
 // Ramasse l'énergie au sol, dans les pierres tombales, les ruines puis les conteneurs des sources.
@@ -6,7 +7,7 @@ function collect(creep) {
     filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50,
   });
   if (dropped) {
-    if (creep.pickup(dropped) === ERR_NOT_IN_RANGE) creep.moveTo(dropped);
+    if (creep.pickup(dropped) === ERR_NOT_IN_RANGE) move.to(creep, dropped);
     return;
   }
 
@@ -25,7 +26,7 @@ function collect(creep) {
     && creep.room.energyAvailable < creep.room.energyCapacityAvailable) {
     target = storage;
   }
-  if (target && creep.withdraw(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) creep.moveTo(target);
+  if (target && creep.withdraw(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, target);
 }
 
 // Livre au spawn, aux extensions et aux tours, puis au conteneur du contrôleur, puis au stockage.
@@ -40,7 +41,7 @@ function deliver(creep) {
       filter: (s) => s.structureType === STRUCTURE_CONTAINER && s.store.getFreeCapacity(RESOURCE_ENERGY) > 0,
     })[0] || room.storage;
   }
-  if (target && creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) creep.moveTo(target);
+  if (target && creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, target);
 }
 
 module.exports.run = function (creep) {

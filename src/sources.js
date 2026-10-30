@@ -1,3 +1,4 @@
+const move = require('./move');
 const stats = require('./stats');
 const intel = require('./intel');
 const defense = require('./defense');
@@ -84,7 +85,7 @@ function harvestAway(creep) {
     return;
   }
   if (creep.room.name !== away.to) {
-    creep.moveTo(new RoomPosition(25, 25, away.to), { range: 22 });
+    move.to(creep, new RoomPosition(25, 25, away.to), { range: 22 });
     return;
   }
   const source = creep.pos.findClosestByRange(FIND_SOURCES_ACTIVE);
@@ -129,7 +130,7 @@ function goBack(creep) {
   const away = creep.memory.away;
   if (!away) return false;
   if (creep.room.name !== away.from) {
-    creep.moveTo(new RoomPosition(25, 25, away.from), { range: 22 });
+    move.to(creep, new RoomPosition(25, 25, away.from), { range: 22 });
     return true;
   }
   delete creep.memory.away;
@@ -140,7 +141,7 @@ function goBack(creep) {
 function harvestSource(creep, source) {
   const result = creep.harvest(source);
   if (result === OK) stats.recordHarvest(creep, source);
-  else if (result === ERR_NOT_IN_RANGE) creep.moveTo(source);
+  else if (result === ERR_NOT_IN_RANGE) move.to(creep, source);
 }
 
 // Écarte d'une case le créep collé à une source pour libérer la place aux récolteurs.
@@ -160,7 +161,7 @@ function collect(creep) {
       && s.store[RESOURCE_ENERGY] >= need,
   });
   if (!store) return harvest(creep);
-  if (creep.withdraw(store, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) creep.moveTo(store);
+  if (creep.withdraw(store, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, store);
 }
 
 module.exports = { list, container, harvest, harvestSource, collect, goBack, stepAway };

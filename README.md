@@ -58,6 +58,7 @@ screeps-bot/
 │   ├── expansion.js         # choix de la salle à revendiquer, pose de son premier spawn
 │   ├── intel.js             # renseignements sur les salles explorées (Memory.rooms[*].intel)
 │   ├── memory.js            # nettoyage de Memory (créeps morts)
+│   ├── move.js              # déplacements : moveTo avec contournement des créeps en cas de blocage
 │   ├── planner.js           # stockage, tours, extensions, routes, conteneurs, murs (tous les 100 ticks)
 │   ├── sources.js           # sources et conteneurs en cache, récolte et collecte d'énergie
 │   ├── spawner.js           # création des créeps selon les effectifs voulus

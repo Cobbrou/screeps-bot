@@ -1,6 +1,6 @@
 # Architecture
 
-> **À compléter** : ce document décrit l'architecture envisagée. Seuls `memory`, `sources`, `spawner`, `planner`, `defense`, `intel`, `expansion`, `stats` et les rôles `harvester`, `upgrader`, `builder`, `miner`, `hauler`, `defender`, `scout`, `claimer`, `pioneer` et `remote` sont implémentés.
+> **À compléter** : ce document décrit l'architecture envisagée. Seuls `memory`, `move`, `sources`, `spawner`, `planner`, `defense`, `intel`, `expansion`, `stats` et les rôles `harvester`, `upgrader`, `builder`, `miner`, `hauler`, `defender`, `scout`, `claimer`, `pioneer` et `remote` sont implémentés.
 
 ## Principes
 
@@ -22,6 +22,7 @@
 | Module | Rôle |
 |--------|------|
 | `memory` | Nettoyage de `Memory` : créeps morts à chaque tick, renseignements de plus de 50 000 ticks tous les 1 000 ticks |
+| `move` | Remplace `creep.moveTo` : après 2 ticks consécutifs sans bouger (hors fatigue), oublie le chemin en cache et en recalcule un qui contourne les créeps (`ignoreCreeps: false`) |
 | `sources` | Sources et conteneurs en cache, attribution des récolteurs, collecte d'énergie (conteneur ou stockage, récolte sinon). Dans nos salles, un créep dont la source est vide pour plus de 100 ticks ou entourée de créeps part récolter dans une salle voisine sûre (`creep.memory.away`, 2 créeps au plus par source de la salle voisine), puis rentre plein. Les `harvester` ne partent jamais |
 | `spawner` | Création des créeps selon les besoins de la salle : 2 `defender` si des hostiles dangereux sont présents, 2 `harvester` par source sans conteneur, 1 `miner` et 1 `hauler` par source avec conteneur ; 2 `upgrader`, plus 1 par tranche de 100 000 énergie stockée (3 de plus au maximum) ; 1 `scout` ; avec un stockage, 2 `remote` par source des salles voisines sûres ; pour la salle d'origine de l'expansion, 1 `claimer` puis 2 `pioneer` une fois la salle revendiquée |
 | `roles/*` | Comportement par rôle : `harvester`, `upgrader`, `builder`, `miner`, `hauler`, `defender`, `scout`, `claimer`, `pioneer`, `remote` |

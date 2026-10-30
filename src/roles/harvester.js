@@ -1,3 +1,4 @@
+const move = require('../move');
 const sources = require('../sources');
 
 // Récolte l'énergie et remplit spawn et extensions ; améliore le contrôleur s'ils sont pleins.
@@ -21,8 +22,8 @@ module.exports.run = function (creep) {
     creep.memory.targetId = target ? target.id : undefined;
   }
   if (target) {
-    if (creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) creep.moveTo(target);
+    if (creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, target);
   } else if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
-    creep.moveTo(creep.room.controller);
+    move.to(creep, creep.room.controller);
   }
 };

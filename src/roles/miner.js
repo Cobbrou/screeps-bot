@@ -1,3 +1,4 @@
+const move = require('../move');
 const sources = require('../sources');
 
 // Se poste sur le conteneur de sa source et récolte sans fin : l'énergie tombe dans le conteneur.
@@ -7,7 +8,7 @@ module.exports.run = function (creep) {
   if (!source) return;
   const container = sources.container(source);
   if (container && !creep.pos.isEqualTo(container.pos) && !container.pos.lookFor(LOOK_CREEPS).length) {
-    creep.moveTo(container);
+    move.to(creep, container);
   } else {
     sources.harvestSource(creep, source);
   }

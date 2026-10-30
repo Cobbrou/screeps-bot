@@ -1,3 +1,4 @@
+const move = require('../move');
 const sources = require('../sources');
 
 // Ordre de construction : le plus utile d'abord ; conteneurs (5000 points) et routes en dernier.
@@ -30,7 +31,7 @@ module.exports.run = function (creep) {
   if (site) {
     // Portée 3 : le créep peut construire en s'écartant de la source qu'il bloquerait.
     const result = creep.build(site);
-    if (result === ERR_NOT_IN_RANGE) creep.moveTo(site);
+    if (result === ERR_NOT_IN_RANGE) move.to(creep, site);
     else if (result === OK) sources.stepAway(creep);
     return;
   }
@@ -45,9 +46,9 @@ module.exports.run = function (creep) {
   }
   if (damaged) {
     const result = creep.repair(damaged);
-    if (result === ERR_NOT_IN_RANGE) creep.moveTo(damaged);
+    if (result === ERR_NOT_IN_RANGE) move.to(creep, damaged);
     else if (result === OK) sources.stepAway(creep);
   } else if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
-    creep.moveTo(creep.room.controller);
+    move.to(creep, creep.room.controller);
   }
 };

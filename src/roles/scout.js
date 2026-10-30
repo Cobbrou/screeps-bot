@@ -1,3 +1,4 @@
+const move = require('../move');
 const intel = require('../intel');
 
 // Explore les salles voisines, en allant toujours vers celle visitée il y a le plus longtemps.
@@ -17,7 +18,7 @@ module.exports.run = function (creep) {
   }
   if (!creep.memory.target) return;
   // Portée 22 depuis le centre : il suffit d'entrer dans la salle, la case centrale peut être un mur.
-  const result = creep.moveTo(new RoomPosition(25, 25, creep.memory.target), { range: 22, reusePath: 50 });
+  const result = move.to(creep, new RoomPosition(25, 25, creep.memory.target), { range: 22, reusePath: 50 });
   if (result === ERR_NO_PATH) {
     intel.skip(creep.memory.target);
     delete creep.memory.target;

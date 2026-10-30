@@ -1,3 +1,4 @@
+const move = require('../move');
 const sources = require('../sources');
 const intel = require('../intel');
 const defense = require('../defense');
@@ -15,13 +16,13 @@ module.exports.run = function (creep) {
     // La salle d'origine peut ne plus être visible ; le créep vide doit aussi rentrer.
     const home = Game.rooms[creep.memory.room];
     const storage = home && home.storage;
-    if (!storage) creep.moveTo(new RoomPosition(25, 25, creep.memory.room), { range: 22 });
-    else if (!creep.pos.isNearTo(storage)) creep.moveTo(storage);
+    if (!storage) move.to(creep, new RoomPosition(25, 25, creep.memory.room), { range: 22 });
+    else if (!creep.pos.isNearTo(storage)) move.to(creep, storage);
     else if (creep.store[RESOURCE_ENERGY]) creep.transfer(storage, RESOURCE_ENERGY);
     return;
   }
   if (creep.room.name !== target) {
-    creep.moveTo(new RoomPosition(25, 25, target), { range: 22 });
+    move.to(creep, new RoomPosition(25, 25, target), { range: 22 });
     return;
   }
   sources.harvest(creep);
