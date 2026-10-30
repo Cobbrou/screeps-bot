@@ -1,7 +1,8 @@
 const move = require('../move');
 const sources = require('../sources');
+const builder = require('./builder');
 
-// Récolte l'énergie et remplit spawn, extensions puis tours ; améliore le contrôleur s'ils sont pleins.
+// Récolte l'énergie et remplit spawn, extensions puis tours ; s'ils sont pleins, construit, sinon améliore le contrôleur.
 module.exports.run = function (creep) {
   if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) creep.memory.working = false;
   if (!creep.memory.working && creep.store.getFreeCapacity() === 0) creep.memory.working = true;
@@ -23,7 +24,11 @@ module.exports.run = function (creep) {
   }
   if (target) {
     if (creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, target);
-  } else if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
+    return;
+  }
+  // Tout est plein : le surplus construit les chantiers (extensions surtout) avant d'aller au contrôleur.
+  if (builder.build(creep)) return;
+  if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
     move.to(creep, creep.room.controller);
   }
 };

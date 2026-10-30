@@ -36,6 +36,26 @@ function repair(creep, ratio) {
   return true;
 }
 
+// Construit le chantier prioritaire de la salle (spawn, conteneurs, puis le moins de travail restant).
+// Vrai si le créep a un chantier. Utilisé aussi par les harvesters pour leur surplus.
+function build(creep) {
+  // Cibles gardées en mémoire tant qu'elles restent valides : évite un calcul de chemin à chaque tick.
+  // Un chantier bien plus court apparu entre-temps remplace la cible en cours.
+  let site = Game.getObjectById(creep.memory.siteId);
+  const sites = creep.room.find(FIND_MY_CONSTRUCTION_SITES);
+  const limit = Math.min(...sites.map(work)) * WORK_SPREAD;
+  if (!site || work(site) > limit) {
+    site = creep.pos.findClosestByPath(sites.filter((s) => work(s) <= limit));
+    creep.memory.siteId = site ? site.id : undefined;
+  }
+  if (!site) return false;
+  // Portée 3 : le créep peut construire en s'écartant de la source qu'il bloquerait.
+  const result = creep.build(site);
+  if (result === ERR_NOT_IN_RANGE) move.to(creep, site);
+  else if (result === OK) sources.stepAway(creep);
+  return true;
+}
+
 // Répare les structures très abîmées ; sinon construit les chantiers ; sinon répare le reste ;
 // sinon améliore le contrôleur.
 module.exports.run = function (creep) {
@@ -49,26 +69,11 @@ module.exports.run = function (creep) {
   }
 
   if (repair(creep, URGENT_RATIO)) return;
-
-  // Cibles gardées en mémoire tant qu'elles restent valides : évite un calcul de chemin à chaque tick.
-  // Un chantier bien plus court apparu entre-temps remplace la cible en cours.
-  let site = Game.getObjectById(creep.memory.siteId);
-  const sites = creep.room.find(FIND_MY_CONSTRUCTION_SITES);
-  const limit = Math.min(...sites.map(work)) * WORK_SPREAD;
-  if (!site || work(site) > limit) {
-    site = creep.pos.findClosestByPath(sites.filter((s) => work(s) <= limit));
-    creep.memory.siteId = site ? site.id : undefined;
-  }
-  if (site) {
-    // Portée 3 : le créep peut construire en s'écartant de la source qu'il bloquerait.
-    const result = creep.build(site);
-    if (result === ERR_NOT_IN_RANGE) move.to(creep, site);
-    else if (result === OK) sources.stepAway(creep);
-    return;
-  }
-
+  if (build(creep)) return;
   if (repair(creep, 1)) return;
   if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
     move.to(creep, creep.room.controller);
   }
 };
+
+module.exports.build = build;

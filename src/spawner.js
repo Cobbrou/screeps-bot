@@ -32,6 +32,11 @@ function haulersFor(room, source) {
   return Math.ceil((2 * route.length * SOURCE_ENERGY_CAPACITY) / ENERGY_REGEN_TIME / carry);
 }
 
+// Nombre de chantiers d'extension dans la salle.
+function extensionSites(room) {
+  return room.find(FIND_MY_CONSTRUCTION_SITES, { filter: (s) => s.structureType === STRUCTURE_EXTENSION }).length;
+}
+
 // Upgraders en plus des 2 de base, selon l'énergie stockée ou en attente au contrôleur.
 function extraUpgraders(room) {
   const stored = room.storage ? room.storage.store[RESOURCE_ENERGY] : 0;
@@ -73,7 +78,8 @@ function targets(room) {
     harvester: (total - mined.length) * 2,
     miner: mined.length,
     hauler: mined.reduce((sum, s) => sum + haulersFor(room, s), 0),
-    upgrader: 2 + extraUpgraders(room),
+    // Un seul upgrader de base tant que des extensions sont en chantier : l'énergie va d'abord à la capacité.
+    upgrader: (extensionSites(room) ? 1 : 2) + extraUpgraders(room),
     builder: room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 ? 2 : (needsRepair(room) ? 1 : 0),
     // Un éclaireur suffit à tenir les renseignements à jour.
     scout: 1,
