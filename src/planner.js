@@ -3,6 +3,19 @@ const sources = require('./sources');
 // Le plan est recalculé tous les INTERVAL ticks : les chantiers manquants sont recréés.
 const INTERVAL = 100;
 const MAX_RADIUS = 8;
+// Chantiers laissés libres sur le compte (MAX_CONSTRUCTION_SITES) pour le spawn d'expansion.
+const SITE_MARGIN = 20;
+
+// Chantiers que le planner peut encore poser sur ce passage.
+let budget = 0;
+
+// Pose un chantier dans la limite du budget.
+function place(room, ...args) {
+  if (budget <= 0) return ERR_FULL;
+  const result = room.createConstructionSite(...args);
+  if (result === OK) budget--;
+  return result;
+}
 
 // Coûts pour tracer les routes : réutilise routes et chantiers de route, contourne les autres structures.
 function costMatrix(room) {
@@ -35,7 +48,7 @@ function planAround(room, spawn, type, costs) {
         const y = spawn.pos.y + dy;
         if (x < 2 || x > 47 || y < 2 || y > 47 || terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
         if (avoid.some((o) => o.pos.getRangeTo(x, y) <= 2)) continue;
-        if (room.createConstructionSite(x, y, type) === OK) {
+        if (place(room, x, y, type) === OK) {
           costs.set(x, y, 255);
           missing--;
         }
@@ -64,9 +77,9 @@ function planRoute(room, spawn, target, range, costs) {
   }
   path = path.slice();
   const end = path.pop();
-  room.createConstructionSite(end, STRUCTURE_CONTAINER);
+  place(room, end, STRUCTURE_CONTAINER);
   for (const pos of path) {
-    room.createConstructionSite(pos, STRUCTURE_ROAD);
+    place(room, pos, STRUCTURE_ROAD);
     costs.set(pos.x, pos.y, 1);
   }
 }
@@ -98,13 +111,15 @@ function planWalls(room, costs) {
     for (const pos of ring.values()) {
       const cost = costs.get(pos.x, pos.y);
       if (cost === 255) continue;
-      room.createConstructionSite(pos, cost === 1 || pos.isEqualTo(gate) ? STRUCTURE_RAMPART : STRUCTURE_WALL);
+      place(room, pos, cost === 1 || pos.isEqualTo(gate) ? STRUCTURE_RAMPART : STRUCTURE_WALL);
     }
   }
 }
 
 module.exports.run = function () {
   if (Game.time % INTERVAL) return;
+  // Game.constructionSites ne compte pas les chantiers posés pendant le tick : décompte local.
+  budget = MAX_CONSTRUCTION_SITES - SITE_MARGIN - Object.keys(Game.constructionSites).length;
   for (const name in Game.rooms) {
     const room = Game.rooms[name];
     // Dès le RCL 1 : routes et conteneurs sont autorisés, extensions et stockage attendent leur RCL.

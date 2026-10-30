@@ -1,10 +1,15 @@
 const stats = require('./stats');
 const intel = require('./intel');
+const defense = require('./defense');
 
 // Attente maximale (en ticks) de la régénération d'une source avant d'aller récolter ailleurs.
 const AWAY_MIN_WAIT = 100;
 // Nombre maximal de créeps partis récolter dans une même salle voisine, par source de cette salle.
 const AWAY_PER_SOURCE = 2;
+// Ticks consécutifs sans case libre autour de la source avant d'aller récolter ailleurs.
+const AWAY_BLOCKED_TICKS = 20;
+// Retrait minimal dans un conteneur ou le stockage : en dessous, le créep récolte lui-même.
+const MIN_WITHDRAW = 100;
 
 // Identifiants des sources par salle et du conteneur de chaque source, gardés jusqu'au reset du global.
 const sourceIds = {};
@@ -16,7 +21,8 @@ function list(room) {
   return sourceIds[room.name].map((id) => Game.getObjectById(id)).filter(Boolean);
 }
 
-// Attribue au créep la source de sa salle qui a le moins de créeps assignés.
+// Attribue au créep la source de sa salle qui a le moins de créeps assignés,
+// en préférant les sources sans conteneur : celles qui en ont sont occupées par un mineur.
 function assign(creep) {
   const counts = {};
   for (const name in Game.creeps) {
@@ -24,8 +30,10 @@ function assign(creep) {
     if (id) counts[id] = (counts[id] || 0) + 1;
   }
   const roomSources = list(creep.room);
-  roomSources.sort((a, b) => (counts[a.id] || 0) - (counts[b.id] || 0));
-  if (roomSources.length) creep.memory.sourceId = roomSources[0].id;
+  const unmined = roomSources.filter((s) => !container(s));
+  const pool = unmined.length ? unmined : roomSources;
+  pool.sort((a, b) => (counts[a.id] || 0) - (counts[b.id] || 0));
+  if (pool.length) creep.memory.sourceId = pool[0].id;
 }
 
 // Conteneur adjacent à la source, s'il est construit.
@@ -41,25 +49,36 @@ function container(source) {
 }
 
 // Vrai si la source ne peut pas servir le créep avant longtemps : vide pour plus de AWAY_MIN_WAIT ticks,
-// ou toutes ses cases adjacentes praticables occupées par d'autres créeps.
+// ou toutes ses cases adjacentes praticables occupées par d'autres créeps pendant AWAY_BLOCKED_TICKS ticks.
 function unavailable(creep, source) {
   if (source.energy === 0 && source.ticksToRegeneration > AWAY_MIN_WAIT) return true;
-  if (creep.pos.isNearTo(source)) return false;
+  if (creep.pos.isNearTo(source)) {
+    delete creep.memory.blocked;
+    return false;
+  }
   const terrain = source.room.getTerrain();
   const { x, y } = source.pos;
   const occupied = new Set(source.room.lookForAtArea(LOOK_CREEPS, y - 1, x - 1, y + 1, x + 1, true)
     .map((o) => o.x * 50 + o.y));
   for (let dx = -1; dx <= 1; dx++) {
     for (let dy = -1; dy <= 1; dy++) {
-      if (terrain.get(x + dx, y + dy) !== TERRAIN_MASK_WALL && !occupied.has((x + dx) * 50 + y + dy)) return false;
+      if (terrain.get(x + dx, y + dy) !== TERRAIN_MASK_WALL && !occupied.has((x + dx) * 50 + y + dy)) {
+        delete creep.memory.blocked;
+        return false;
+      }
     }
   }
+  creep.memory.blocked = (creep.memory.blocked || 0) + 1;
+  if (creep.memory.blocked < AWAY_BLOCKED_TICKS) return false;
+  delete creep.memory.blocked;
   return true;
 }
 
 // Récolte dans la salle voisine notée dans `creep.memory.away` ; l'oublie si elle devient dangereuse.
 function harvestAway(creep) {
   const away = creep.memory.away;
+  // Sur place, le créep signale lui-même les hostiles : intel.safe le fera repartir.
+  if (creep.room.name === away.to && defense.threats(creep.room).length) intel.record(creep.room);
   if (!intel.safe(away.to)) {
     delete creep.memory.away;
     return;
@@ -124,9 +143,9 @@ function harvestSource(creep, source) {
   else if (result === ERR_NOT_IN_RANGE) creep.moveTo(source);
 }
 
-// Prend l'énergie dans un conteneur ou le stockage s'il en reste assez ; récolte sinon.
+// Prend l'énergie dans un conteneur ou le stockage s'il en reste assez (retrait partiel accepté) ; récolte sinon.
 function collect(creep) {
-  const need = creep.store.getFreeCapacity(RESOURCE_ENERGY);
+  const need = Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), MIN_WITHDRAW);
   const store = creep.pos.findClosestByRange(FIND_STRUCTURES, {
     filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_STORAGE)
       && s.store[RESOURCE_ENERGY] >= need,

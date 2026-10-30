@@ -52,8 +52,9 @@ function run() {
   Memory.stats.cpu = { used: Game.cpu.getUsed(), limit: Game.cpu.limit, bucket: Game.cpu.bucket, modules };
   modules = {};
 
-  // generatePixel n'existe que sur le serveur officiel.
-  if (typeof Game.cpu.generatePixel === 'function' && Game.cpu.bucket >= PIXEL_CPU_COST) {
+  // generatePixel n'existe que sur le serveur officiel. Pas de pixel pendant une expansion :
+  // il viderait le bucket et ferait sauter planner et expansion.
+  if (typeof Game.cpu.generatePixel === 'function' && Game.cpu.bucket >= PIXEL_CPU_COST && !Memory.expansion) {
     Game.cpu.generatePixel();
   }
 }

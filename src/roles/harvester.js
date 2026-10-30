@@ -11,10 +11,15 @@ module.exports.run = function (creep) {
     return;
   }
 
-  const target = creep.pos.findClosestByPath(FIND_MY_STRUCTURES, {
-    filter: (s) => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION)
-      && s.store.getFreeCapacity(RESOURCE_ENERGY) > 0,
-  });
+  // Cible gardée en mémoire tant qu'elle a de la place : évite un calcul de chemin à chaque tick.
+  let target = Game.getObjectById(creep.memory.targetId);
+  if (!target || !target.store.getFreeCapacity(RESOURCE_ENERGY)) {
+    target = creep.pos.findClosestByPath(FIND_MY_STRUCTURES, {
+      filter: (s) => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION)
+        && s.store.getFreeCapacity(RESOURCE_ENERGY) > 0,
+    });
+    creep.memory.targetId = target ? target.id : undefined;
+  }
   if (target) {
     if (creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) creep.moveTo(target);
   } else if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
