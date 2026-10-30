@@ -1,3 +1,5 @@
+const defense = require('./defense');
+
 // Sous ce seuil de bucket, les modules non essentiels (planner) sont sautés.
 const LOW_BUCKET = 2000;
 
@@ -57,9 +59,12 @@ function run() {
   Memory.stats.cpu = { used: Game.cpu.getUsed(), limit: Game.cpu.limit, bucket: Game.cpu.bucket, modules };
   modules = {};
 
-  // generatePixel n'existe que sur le serveur officiel. Pas de pixel pendant une expansion :
-  // il viderait le bucket et ferait sauter planner et expansion.
-  if (typeof Game.cpu.generatePixel === 'function' && Game.cpu.bucket >= PIXEL_CPU_COST && !Memory.expansion) {
+  // generatePixel n'existe que sur le serveur officiel. Il vide le bucket : pas de pixel pendant une expansion
+  // (planner et expansion seraient sautés) ni face à des hostiles (plus de réserve pour un pic de CPU).
+  const threatened = Object.values(Game.rooms)
+    .some((r) => r.controller && r.controller.my && defense.threats(r).length);
+  if (typeof Game.cpu.generatePixel === 'function' && Game.cpu.bucket >= PIXEL_CPU_COST && !Memory.expansion
+    && !threatened) {
     Game.cpu.generatePixel();
   }
 }

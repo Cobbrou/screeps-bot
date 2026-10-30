@@ -18,16 +18,16 @@ Déjà suivis ailleurs (roadmap ou commentaires `ponytail:`) et non repris ici :
   - Du RCL 5 au RCL 8, la capacité monte de 1 800 à 12 900 énergie, mais les corps restent identiques. L'économie plafonne donc à partir du RCL 5.
   - Correctif : `Math.floor(50 / unit.length)` comme plafond.
 
-- [ ] **3. Un seul hauler par source, quelle que soit la distance** (`src/spawner.js:37`)
+- [x] **3. Un seul hauler par source, quelle que soit la distance** (`src/spawner.js:37`)
   - Une source lointaine produit plus qu'un hauler de 500 de capacité ne peut transporter, et le conteneur déborde.
   - La longueur du trajet est déjà enregistrée dans `room.memory.routes[source.id].length`.
   - Correctif : `ceil(2 × longueur × 10 / capacité)` haulers par source.
 
-- [ ] **4. Les tours parcourent toutes les structures à chaque tick** (`src/defense.js:40`)
+- [x] **4. Les tours parcourent toutes les structures à chaque tick** (`src/defense.js:40`)
   - Quand aucun hostile ni aucun blessé n'est présent, les tours lancent `room.find(FIND_STRUCTURES)` et parcourent tout, ceinture de murs comprise.
   - Correctif : ne lancer ce calcul que tous les 10 ticks, avec l'`id` de la cible gardé en cache.
 
-- [ ] **5. Le pixel vide le bucket** (`src/stats.js:62`)
+- [x] **5. Le pixel vide le bucket** (`src/stats.js:62`)
   - `generatePixel` fait passer le bucket de 10 000 à 0. Il ne reste alors plus de réserve en cas de pic de CPU, par exemple pendant une attaque.
   - Le planner est aussi sauté tant que le bucket reste sous 2 000.
   - Correctif : ne générer un pixel que hors menace, ou accepter ce compromis en connaissance de cause.

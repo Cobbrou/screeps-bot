@@ -20,6 +20,15 @@ function minedSources(room) {
   return sources.list(room).filter((s) => sources.container(s));
 }
 
+// Haulers nécessaires pour suivre la production d'une source (10 énergie/tick) sur l'aller-retour spawn ↔ conteneur.
+// ponytail: distance de la route du planner, alors que les haulers livrent aussi aux tours et au contrôleur.
+function haulersFor(room, source) {
+  const route = room.memory.routes && room.memory.routes[source.id];
+  const carry = buildBody('hauler', room.energyCapacityAvailable).filter((p) => p === CARRY).length * CARRY_CAPACITY;
+  if (!route || !carry) return 1;
+  return Math.ceil((2 * route.length * SOURCE_ENERGY_CAPACITY) / ENERGY_REGEN_TIME / carry);
+}
+
 // Upgraders en plus des 2 de base, selon l'énergie stockée ou en attente au contrôleur.
 function extraUpgraders(room) {
   const stored = room.storage ? room.storage.store[RESOURCE_ENERGY] : 0;
@@ -41,13 +50,13 @@ function remoteRooms(room) {
 // ponytail: 2 récolteurs par source, à calculer selon les WORK et les cases libres quand les corps grossissent.
 function targets(room) {
   const total = sources.list(room).length;
-  const mined = minedSources(room).length;
+  const mined = minedSources(room);
   const expanding = Memory.expansion && Memory.expansion.from === room.name;
   return {
     defender: defense.threats(room).length ? 2 : 0,
-    harvester: (total - mined) * 2,
-    miner: mined,
-    hauler: mined,
+    harvester: (total - mined.length) * 2,
+    miner: mined.length,
+    hauler: mined.reduce((sum, s) => sum + haulersFor(room, s), 0),
     upgrader: 2 + extraUpgraders(room),
     builder: room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 ? 2 : 0,
     // Un éclaireur suffit à tenir les renseignements à jour.
