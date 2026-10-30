@@ -7,6 +7,9 @@ const MAX_UNITS = 5;
 const MAX_MINER_WORK = 5;
 // ponytail: récolteurs distants par source sans réservation (5 énergie/tick), à revoir avec un rôle reserver.
 const REMOTE_PER_SOURCE = 2;
+// ponytail: un upgrader de plus par tranche d'énergie stockée, plafonné ; à revoir au RCL 8 (15 énergie/tick max).
+const ENERGY_PER_UPGRADER = 100000;
+const MAX_EXTRA_UPGRADERS = 3;
 
 // Sources de la salle équipées d'un conteneur : récolte statique (miner + hauler).
 function minedSources(room) {
@@ -32,7 +35,8 @@ function targets(room) {
     harvester: (total - mined) * 2,
     miner: mined,
     hauler: mined,
-    upgrader: 2,
+    upgrader: 2 + Math.min(MAX_EXTRA_UPGRADERS,
+      Math.floor((room.storage ? room.storage.store[RESOURCE_ENERGY] : 0) / ENERGY_PER_UPGRADER)),
     builder: room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 ? 2 : 0,
     // Un éclaireur suffit à tenir les renseignements à jour.
     scout: 1,
@@ -106,7 +110,7 @@ module.exports.run = function () {
       const load = (name) => (remoteCounts[name] || 0) / intel.get(name).sources;
       memory.target = remoteRooms(room).reduce((a, b) => (load(b) < load(a) ? b : a));
     }
-    if (spawn.spawnCreep(body, `${role}-${Game.time}`, { memory }) === OK) {
+    if (spawn.spawnCreep(body, `${role}-${spawn.name}-${Game.time}`, { memory }) === OK) {
       roomCounts[role] = (roomCounts[role] || 0) + 1;
       if (memory.sourceId) minerSources.add(memory.sourceId);
       if (memory.target && role === 'remote') remoteCounts[memory.target] = (remoteCounts[memory.target] || 0) + 1;

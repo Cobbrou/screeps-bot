@@ -7,7 +7,7 @@ const INTERVAL = 100;
 const MIN_RCL = 4;
 // ponytail: distance à vol d'oiseau, sans vérifier le trajet réel (Game.map.findRoute si les claimers se perdent).
 const MAX_DISTANCE = 5;
-// Abandon de la cible si elle n'est pas revendiquée dans ce délai.
+// Abandon de la cible si elle n'est pas revendiquée, ou si son spawn n'est pas construit, dans ce délai.
 const GIVE_UP = 5000;
 
 function ownedRooms() {
@@ -74,8 +74,18 @@ module.exports.run = function () {
   const room = Game.rooms[exp.target];
   if (claimed()) {
     // Spawn construit : la salle se gère seule, l'expansion est terminée.
-    if (room.find(FIND_MY_SPAWNS).length) delete Memory.expansion;
-    else if (Game.time % INTERVAL === 0) placeSpawn(room);
+    if (room.find(FIND_MY_SPAWNS).length) {
+      delete Memory.expansion;
+      return;
+    }
+    if (!exp.claimedAt) exp.claimedAt = Game.time;
+    // Spawn jamais construit (pioneers tués) : la salle est rendue pour ne pas produire des pioneers sans fin.
+    if (Game.time - exp.claimedAt > GIVE_UP) {
+      room.controller.unclaim();
+      delete Memory.expansion;
+      return;
+    }
+    if (Game.time % INTERVAL === 0) placeSpawn(room);
     return;
   }
   // Prise ou réservée par un autre joueur, ou trop longue à atteindre : on change de cible.

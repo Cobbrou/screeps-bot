@@ -28,10 +28,10 @@ function roomStats(roomName) {
   return Memory.stats.rooms[roomName];
 }
 
-// Ajoute au cumul de la salle l'énergie qu'une récolte réussie va extraire.
+// Ajoute au cumul de la salle d'origine du créep l'énergie qu'une récolte réussie va extraire.
 function recordHarvest(creep, source) {
   const amount = Math.min(creep.getActiveBodyparts(WORK) * HARVEST_POWER, source.energy);
-  roomStats(source.room.name).harvested += amount;
+  roomStats(creep.memory.room || source.room.name).harvested += amount;
 }
 
 // Écrit les indicateurs du tick dans Memory.stats, puis génère un pixel si le bucket est plein.
@@ -47,6 +47,11 @@ function run() {
     s.energyAvailable = room.energyAvailable;
     s.energyCapacity = room.energyCapacityAvailable;
     s.storedEnergy = room.storage ? room.storage.store[RESOURCE_ENERGY] : 0;
+  }
+  // Salles qui ne sont plus à nous (ou fiches de remote mining d'avant) : fiche supprimée.
+  for (const name in Memory.stats.rooms) {
+    const room = Game.rooms[name];
+    if (!room || !room.controller || !room.controller.my) delete Memory.stats.rooms[name];
   }
   Memory.stats.time = Game.time;
   Memory.stats.cpu = { used: Game.cpu.getUsed(), limit: Game.cpu.limit, bucket: Game.cpu.bucket, modules };
