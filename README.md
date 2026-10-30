@@ -2,7 +2,7 @@
 
 Bot pour [Screeps World](https://screeps.com), le MMO de stratégie où l'on programme ses unités (les « créeps ») en JavaScript.
 
-L'objectif à terme est un bot autonome capable de gérer ses salles : récolte d'énergie, création de créeps, construction et défense. Pour l'instant, le bot se limite au strict minimum : il maintient 2 récolteurs et 2 améliorateurs par spawn.
+L'objectif à terme est un bot autonome capable de gérer ses salles : récolte d'énergie, création de créeps, construction et défense. Pour l'instant, le bot se limite au strict minimum : il maintient récolteurs, améliorateurs et constructeurs selon les besoins de chaque salle, avec des corps adaptés à l'énergie disponible.
 
 ## Prérequis
 
@@ -55,8 +55,10 @@ screeps-bot/
 ├── src/
 │   ├── main.js              # point d'entrée (loop exécutée à chaque tick)
 │   ├── memory.js            # nettoyage de Memory (créeps morts)
+│   ├── sources.js           # répartition des créeps entre les sources
 │   ├── spawner.js           # création des créeps selon les effectifs voulus
 │   └── roles/
+│       ├── builder.js       # construit les chantiers, répare sinon
 │       ├── harvester.js     # récolte et remplit spawn et extensions
 │       └── upgrader.js      # récolte et améliore le contrôleur
 ├── docs/

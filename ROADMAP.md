@@ -9,13 +9,13 @@
 - [x] Spawner à effectifs fixes : 2 `harvester`, 2 `upgrader`, corps `[WORK, CARRY, MOVE]`
 - [x] Rôles `harvester` et `upgrader`
 
-## Phase 1 : économie de base (RCL 1-2)
+## Phase 1 : économie de base (RCL 1-2) (fait)
 
-- [ ] Corps des créeps adaptés à `room.energyCapacityAvailable`
-- [ ] Rôle `builder` : construit les chantiers, répare sinon
-- [ ] Effectifs calculés selon la salle (nombre de sources, chantiers en cours)
-- [ ] Récupération d'urgence : si aucun `harvester`, spawn d'un créep minimal avec l'énergie disponible
-- [ ] Répartition des récolteurs entre les sources (`sources`)
+- [x] Corps des créeps adaptés à `room.energyCapacityAvailable`
+- [x] Rôle `builder` : construit les chantiers, répare sinon
+- [x] Effectifs calculés selon la salle (nombre de sources, chantiers en cours)
+- [x] Récupération d'urgence : si aucun `harvester`, spawn d'un créep minimal avec l'énergie disponible
+- [x] Répartition des récolteurs entre les sources (`sources`)
 
 ## Phase 2 : planification des structures (RCL 2-3)
 

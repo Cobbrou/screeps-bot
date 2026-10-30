@@ -5,6 +5,7 @@ const spawner = require('./spawner');
 const roles = {
   harvester: require('./roles/harvester'),
   upgrader: require('./roles/upgrader'),
+  builder: require('./roles/builder'),
 };
 
 module.exports.loop = function () {

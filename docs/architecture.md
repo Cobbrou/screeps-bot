@@ -1,6 +1,6 @@
 # Architecture
 
-> **À compléter** : ce document décrit l'architecture envisagée. Seuls `memory`, `spawner` et les rôles `harvester` et `upgrader` sont implémentés, dans une version minimale.
+> **À compléter** : ce document décrit l'architecture envisagée. Seuls `memory`, `sources`, `spawner` et les rôles `harvester`, `upgrader` et `builder` sont implémentés.
 
 ## Principes
 

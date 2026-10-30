@@ -1,8 +1,12 @@
+const sources = require('../sources');
+
 // Récolte l'énergie et remplit spawn et extensions ; améliore le contrôleur s'ils sont pleins.
 module.exports.run = function (creep) {
-  if (creep.store.getFreeCapacity() > 0) {
-    const source = creep.pos.findClosestByPath(FIND_SOURCES_ACTIVE);
-    if (source && creep.harvest(source) === ERR_NOT_IN_RANGE) creep.moveTo(source);
+  if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) creep.memory.working = false;
+  if (!creep.memory.working && creep.store.getFreeCapacity() === 0) creep.memory.working = true;
+
+  if (!creep.memory.working) {
+    sources.harvest(creep);
     return;
   }
 
