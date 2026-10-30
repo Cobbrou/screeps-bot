@@ -18,12 +18,12 @@ function costMatrix(room) {
   return costs;
 }
 
-// Extensions en damier autour du spawn : les cases libres en diagonale laissent passer les créeps.
-function planExtensions(room, spawn, costs) {
-  const max = CONTROLLER_STRUCTURES[STRUCTURE_EXTENSION][room.controller.level];
-  const isExtension = { filter: (s) => s.structureType === STRUCTURE_EXTENSION };
-  let missing = max - room.find(FIND_MY_STRUCTURES, isExtension).length
-    - room.find(FIND_MY_CONSTRUCTION_SITES, isExtension).length;
+// Structures (extensions, stockage) en damier autour du spawn : les cases libres en diagonale laissent passer les créeps.
+function planAround(room, spawn, type, costs) {
+  const max = CONTROLLER_STRUCTURES[type][room.controller.level];
+  const isType = { filter: (s) => s.structureType === type };
+  let missing = max - room.find(FIND_MY_STRUCTURES, isType).length
+    - room.find(FIND_MY_CONSTRUCTION_SITES, isType).length;
   const terrain = room.getTerrain();
   const avoid = [...sources.list(room), room.controller];
 
@@ -35,7 +35,7 @@ function planExtensions(room, spawn, costs) {
         const y = spawn.pos.y + dy;
         if (x < 2 || x > 47 || y < 2 || y > 47 || terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
         if (avoid.some((o) => o.pos.getRangeTo(x, y) <= 2)) continue;
-        if (room.createConstructionSite(x, y, STRUCTURE_EXTENSION) === OK) {
+        if (room.createConstructionSite(x, y, type) === OK) {
           costs.set(x, y, 255);
           missing--;
         }
@@ -70,7 +70,9 @@ module.exports.run = function () {
     if (!spawn) continue;
 
     const costs = costMatrix(room);
-    planExtensions(room, spawn, costs);
+    // Le stockage (RCL 4) passe avant les extensions pour rester au plus près du spawn.
+    planAround(room, spawn, STRUCTURE_STORAGE, costs);
+    planAround(room, spawn, STRUCTURE_EXTENSION, costs);
     for (const source of sources.list(room)) planRoute(room, spawn, source, 1, costs);
     // Portée 2 : le conteneur reste à portée d'amélioration (3) sans bloquer les abords du contrôleur.
     planRoute(room, spawn, room.controller, 2, costs);

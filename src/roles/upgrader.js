@@ -6,7 +6,7 @@ module.exports.run = function (creep) {
   if (!creep.memory.working && creep.store.getFreeCapacity() === 0) creep.memory.working = true;
 
   if (!creep.memory.working) {
-    sources.harvest(creep);
+    sources.collect(creep);
   } else if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
     creep.moveTo(creep.room.controller);
   }

@@ -1,5 +1,6 @@
-// Identifiants des sources par salle, gardés entre les ticks jusqu'au reset du global.
+// Identifiants des sources par salle et du conteneur de chaque source, gardés jusqu'au reset du global.
 const sourceIds = {};
+const containerIds = {};
 
 // Sources de la salle, sans relancer `find` à chaque tick.
 function list(room) {
@@ -19,10 +20,20 @@ function assign(creep) {
   if (roomSources.length) creep.memory.sourceId = roomSources[0].id;
 }
 
-module.exports.list = list;
+// Conteneur adjacent à la source, s'il est construit.
+function container(source) {
+  let found = containerIds[source.id] && Game.getObjectById(containerIds[source.id]);
+  if (!found) {
+    found = source.pos.findInRange(FIND_STRUCTURES, 1, {
+      filter: (s) => s.structureType === STRUCTURE_CONTAINER,
+    })[0];
+    if (found) containerIds[source.id] = found.id;
+  }
+  return found;
+}
 
 // Fait récolter le créep sur sa source attribuée.
-module.exports.harvest = function (creep) {
+function harvest(creep) {
   if (!creep.memory.sourceId) assign(creep);
   const source = Game.getObjectById(creep.memory.sourceId);
   if (!source) {
@@ -30,4 +41,17 @@ module.exports.harvest = function (creep) {
     return;
   }
   if (creep.harvest(source) === ERR_NOT_IN_RANGE) creep.moveTo(source);
-};
+}
+
+// Prend l'énergie dans un conteneur ou le stockage s'il en reste assez ; récolte sinon.
+function collect(creep) {
+  const need = creep.store.getFreeCapacity(RESOURCE_ENERGY);
+  const store = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+    filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_STORAGE)
+      && s.store[RESOURCE_ENERGY] >= need,
+  });
+  if (!store) return harvest(creep);
+  if (creep.withdraw(store, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) creep.moveTo(store);
+}
+
+module.exports = { list, container, harvest, collect };

@@ -1,35 +1,56 @@
 const sources = require('./sources');
 
-// Motif de corps répété autant que l'énergie le permet (200 énergie par motif).
-const BODY_UNIT = [WORK, CARRY, MOVE];
-const BODY_UNIT_COST = 200;
 const MAX_UNITS = 5;
+const MAX_MINER_WORK = 5;
+
+// Sources de la salle équipées d'un conteneur : récolte statique (miner + hauler).
+function minedSources(room) {
+  return sources.list(room).filter((s) => sources.container(s));
+}
 
 // Effectifs voulus par rôle, dans l'ordre de priorité.
 // ponytail: 2 récolteurs par source, à calculer selon les WORK et les cases libres quand les corps grossissent.
 function targets(room) {
+  const total = sources.list(room).length;
+  const mined = minedSources(room).length;
   return {
-    harvester: sources.list(room).length * 2,
+    harvester: (total - mined) * 2,
+    miner: mined,
+    hauler: mined,
     upgrader: 2,
     builder: room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 ? 2 : 0,
   };
 }
 
-function buildBody(energy) {
-  const units = Math.min(Math.floor(energy / BODY_UNIT_COST), MAX_UNITS);
+// Répète le motif autant que l'énergie le permet.
+function repeat(unit, energy) {
+  const cost = unit.reduce((sum, part) => sum + BODYPART_COST[part], 0);
+  const units = Math.min(Math.floor(energy / cost), MAX_UNITS);
   const body = [];
-  for (let i = 0; i < units; i++) body.push(...BODY_UNIT);
+  for (let i = 0; i < units; i++) body.push(...unit);
   return body;
 }
 
+function buildBody(role, energy) {
+  if (role === 'miner') {
+    // Un seul MOVE : le mineur ne se déplace qu'une fois jusqu'à son conteneur.
+    const work = Math.min(Math.floor((energy - BODYPART_COST[MOVE]) / BODYPART_COST[WORK]), MAX_MINER_WORK);
+    return work > 0 ? [...Array(work).fill(WORK), MOVE] : [];
+  }
+  if (role === 'hauler') return repeat([CARRY, CARRY, MOVE], energy);
+  return repeat([WORK, CARRY, MOVE], energy);
+}
+
 module.exports.run = function () {
-  // Effectifs actuels par salle puis par rôle.
+  // Effectifs actuels par salle puis par rôle, et sources déjà occupées par un mineur.
   const counts = {};
+  const minerSources = new Set();
   for (const name in Game.creeps) {
     const creep = Game.creeps[name];
     const room = creep.memory.room || creep.room.name;
     counts[room] = counts[room] || {};
     counts[room][creep.memory.role] = (counts[room][creep.memory.role] || 0) + 1;
+    if (creep.memory.role === 'miner') minerSources.add(creep.memory.sourceId);
   }
 
   for (const name in Game.spawns) {
@@ -37,18 +58,26 @@ module.exports.run = function () {
     if (spawn.spawning) continue;
     const room = spawn.room;
     const roomCounts = counts[room.name] = counts[room.name] || {};
+
+    // Personne pour remplir spawn et extensions : récolteur avec l'énergie disponible.
+    const emergency = !roomCounts.harvester && !roomCounts.hauler;
     const wanted = targets(room);
-    const role = Object.keys(wanted).find((r) => (roomCounts[r] || 0) < wanted[r]);
+    const role = emergency ? 'harvester' : Object.keys(wanted).find((r) => (roomCounts[r] || 0) < wanted[r]);
     if (!role) continue;
 
-    // Sans récolteur, la salle ne se remplit plus : on spawn avec l'énergie disponible.
-    const emergency = role === 'harvester' && !roomCounts.harvester;
-    const body = buildBody(emergency ? room.energyAvailable : room.energyCapacityAvailable);
+    const body = buildBody(role, emergency ? room.energyAvailable : room.energyCapacityAvailable);
     if (!body.length) continue;
 
     const memory = { role, room: room.name };
+    if (role === 'miner') {
+      // ponytail: pas de remplacement anticipé, la source chôme le temps du trajet du successeur.
+      const free = minedSources(room).find((s) => !minerSources.has(s.id));
+      if (!free) continue;
+      memory.sourceId = free.id;
+    }
     if (spawn.spawnCreep(body, `${role}-${Game.time}`, { memory }) === OK) {
       roomCounts[role] = (roomCounts[role] || 0) + 1;
+      if (memory.sourceId) minerSources.add(memory.sourceId);
     }
   }
 };

@@ -7,6 +7,8 @@ const roles = {
   harvester: require('./roles/harvester'),
   upgrader: require('./roles/upgrader'),
   builder: require('./roles/builder'),
+  miner: require('./roles/miner'),
+  hauler: require('./roles/hauler'),
 };
 
 module.exports.loop = function () {

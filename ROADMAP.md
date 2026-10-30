@@ -27,10 +27,11 @@
 
 ## Phase 3 : récolte statique et logistique (RCL 3-4)
 
-- [ ] Rôle `miner` : 5 `WORK`, posé sur le conteneur de sa source
-- [ ] Rôle `hauler` : transporte l'énergie des conteneurs vers spawn, extensions et tours
-- [ ] Construction du stockage (`STRUCTURE_STORAGE`) au RCL 4
-- [ ] Ramassage de l'énergie au sol et des pierres tombales
+- [x] Rôle `miner` : 5 `WORK`, posé sur le conteneur de sa source
+- [x] Rôle `hauler` : transporte l'énergie des conteneurs vers spawn, extensions et tours
+- [x] Construction du stockage (`STRUCTURE_STORAGE`) au RCL 4
+- [x] Ramassage de l'énergie au sol et des pierres tombales
+- [ ] Remplacement anticipé des mineurs avant leur mort, si la perte de récolte le justifie
 
 ## Phase 4 : défense (RCL 3+)
 
