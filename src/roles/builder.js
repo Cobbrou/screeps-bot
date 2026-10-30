@@ -18,7 +18,10 @@ module.exports.run = function (creep) {
     creep.memory.siteId = site ? site.id : undefined;
   }
   if (site) {
-    if (creep.build(site) === ERR_NOT_IN_RANGE) creep.moveTo(site);
+    // Portée 3 : le créep peut construire en s'écartant de la source qu'il bloquerait.
+    const result = creep.build(site);
+    if (result === ERR_NOT_IN_RANGE) creep.moveTo(site);
+    else if (result === OK) sources.stepAway(creep);
     return;
   }
 
@@ -31,7 +34,9 @@ module.exports.run = function (creep) {
     creep.memory.repairId = damaged ? damaged.id : undefined;
   }
   if (damaged) {
-    if (creep.repair(damaged) === ERR_NOT_IN_RANGE) creep.moveTo(damaged);
+    const result = creep.repair(damaged);
+    if (result === ERR_NOT_IN_RANGE) creep.moveTo(damaged);
+    else if (result === OK) sources.stepAway(creep);
   } else if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
     creep.moveTo(creep.room.controller);
   }

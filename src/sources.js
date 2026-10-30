@@ -143,6 +143,15 @@ function harvestSource(creep, source) {
   else if (result === ERR_NOT_IN_RANGE) creep.moveTo(source);
 }
 
+// Écarte d'une case le créep collé à une source pour libérer la place aux récolteurs.
+// Utile quand il travaille sur place (ex. : construire le conteneur de la source sur lequel il se tient).
+function stepAway(creep) {
+  const near = list(creep.room).filter((s) => creep.pos.isNearTo(s));
+  if (!near.length) return;
+  const result = PathFinder.search(creep.pos, near.map((s) => ({ pos: s.pos, range: 2 })), { flee: true, maxRooms: 1 });
+  if (result.path.length) creep.move(creep.pos.getDirectionTo(result.path[0]));
+}
+
 // Prend l'énergie dans un conteneur ou le stockage s'il en reste assez (retrait partiel accepté) ; récolte sinon.
 function collect(creep) {
   const need = Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), MIN_WITHDRAW);
@@ -154,4 +163,4 @@ function collect(creep) {
   if (creep.withdraw(store, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) creep.moveTo(store);
 }
 
-module.exports = { list, container, harvest, harvestSource, collect, goBack };
+module.exports = { list, container, harvest, harvestSource, collect, goBack, stepAway };
