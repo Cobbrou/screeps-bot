@@ -4,6 +4,7 @@ const memory = require('./memory');
 const spawner = require('./spawner');
 const planner = require('./planner');
 const defense = require('./defense');
+const expansion = require('./expansion');
 const stats = require('./stats');
 const roles = {
   harvester: require('./roles/harvester'),
@@ -12,6 +13,10 @@ const roles = {
   miner: require('./roles/miner'),
   hauler: require('./roles/hauler'),
   defender: require('./roles/defender'),
+  scout: require('./roles/scout'),
+  claimer: require('./roles/claimer'),
+  pioneer: require('./roles/pioneer'),
+  remote: require('./roles/remote'),
 };
 
 module.exports.loop = function () {
@@ -25,7 +30,10 @@ module.exports.loop = function () {
       if (role) role.run(creep);
     }
   });
-  // Planification sautée quand le bucket est bas : c'est le module le plus coûteux.
-  if (!stats.lowBucket()) stats.measure('planner', planner.run);
+  // Planification et expansion sautées quand le bucket est bas : non essentielles.
+  if (!stats.lowBucket()) {
+    stats.measure('planner', planner.run);
+    stats.measure('expansion', expansion.run);
+  }
   stats.run();
 };

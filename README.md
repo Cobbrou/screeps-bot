@@ -2,7 +2,7 @@
 
 Bot pour [Screeps World](https://screeps.com), le MMO de stratégie où l'on programme ses unités (les « créeps ») en JavaScript.
 
-L'objectif à terme est un bot autonome capable de gérer ses salles : récolte d'énergie, création de créeps, construction et défense. Pour l'instant, le bot se limite au strict minimum : il maintient récolteurs, améliorateurs et constructeurs selon les besoins de chaque salle, avec des corps adaptés à l'énergie disponible. Dès le RCL 1, il place lui-même routes et conteneurs, puis les extensions au RCL 2, les tours au RCL 3 et le stockage au RCL 4. Dès qu'une source a son conteneur, un mineur s'y installe et des transporteurs acheminent l'énergie. Les tours défendent, soignent et réparent ; des murs ferment les sorties, des défenseurs sont créés face aux hostiles et le mode sans échec sert de dernier recours.
+L'objectif à terme est un bot autonome capable de gérer ses salles : récolte d'énergie, création de créeps, construction et défense. Pour l'instant, le bot se limite au strict minimum : il maintient récolteurs, améliorateurs et constructeurs selon les besoins de chaque salle, avec des corps adaptés à l'énergie disponible. Dès le RCL 1, il place lui-même routes et conteneurs, puis les extensions au RCL 2, les tours au RCL 3 et le stockage au RCL 4. Dès qu'une source a son conteneur, un mineur s'y installe et des transporteurs acheminent l'énergie. Les tours défendent, soignent et réparent ; des murs ferment les sorties, des défenseurs sont créés face aux hostiles et le mode sans échec sert de dernier recours. Un éclaireur explore les salles voisines : leurs sources sont exploitées à distance, et le bot revendique une nouvelle salle dès que le GCL le permet.
 
 ## Prérequis
 
@@ -55,6 +55,8 @@ screeps-bot/
 ├── src/
 │   ├── main.js              # point d'entrée (loop exécutée à chaque tick)
 │   ├── defense.js           # tours, mode sans échec, détection des hostiles
+│   ├── expansion.js         # choix de la salle à revendiquer, pose de son premier spawn
+│   ├── intel.js             # renseignements sur les salles explorées (Memory.rooms[*].intel)
 │   ├── memory.js            # nettoyage de Memory (créeps morts)
 │   ├── planner.js           # stockage, tours, extensions, routes, conteneurs, murs (tous les 100 ticks)
 │   ├── sources.js           # sources et conteneurs en cache, récolte et collecte d'énergie
@@ -62,10 +64,14 @@ screeps-bot/
 │   ├── stats.js             # CPU par module, indicateurs dans Memory.stats, bucket bas, pixels
 │   └── roles/
 │       ├── builder.js       # construit les chantiers, répare sinon
+│       ├── claimer.js       # revendique le contrôleur de la salle visée
 │       ├── defender.js      # attaque les hostiles de la salle
 │       ├── harvester.js     # récolte et remplit spawn et extensions
 │       ├── hauler.js        # transporte l'énergie des conteneurs vers spawn, extensions, tours
 │       ├── miner.js         # récolte statique sur le conteneur d'une source
+│       ├── pioneer.js       # amorce la nouvelle salle (construit son spawn)
+│       ├── remote.js        # récolte dans une salle voisine, livre au stockage
+│       ├── scout.js         # explore les salles voisines
 │       └── upgrader.js      # puise l'énergie et améliore le contrôleur
 ├── docs/
 │   ├── architecture.md      # architecture prévue

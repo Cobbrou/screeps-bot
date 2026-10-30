@@ -1,12 +1,24 @@
 const sources = require('./sources');
 const defense = require('./defense');
+const intel = require('./intel');
+const expansion = require('./expansion');
 
 const MAX_UNITS = 5;
 const MAX_MINER_WORK = 5;
+// ponytail: récolteurs distants par source sans réservation (5 énergie/tick), à revoir avec un rôle reserver.
+const REMOTE_PER_SOURCE = 2;
 
 // Sources de la salle équipées d'un conteneur : récolte statique (miner + hauler).
 function minedSources(room) {
   return sources.list(room).filter((s) => sources.container(s));
+}
+
+// Salles voisines où récolter : seulement depuis une salle qui a un stockage pour recevoir l'énergie.
+function remoteRooms(room) {
+  if (!room.storage) return [];
+  const exp = Memory.expansion;
+  return Object.values(Game.map.describeExits(room.name))
+    .filter((name) => intel.safe(name) && intel.get(name).sources && (!exp || exp.target !== name));
 }
 
 // Effectifs voulus par rôle, dans l'ordre de priorité.
@@ -14,6 +26,7 @@ function minedSources(room) {
 function targets(room) {
   const total = sources.list(room).length;
   const mined = minedSources(room).length;
+  const expanding = Memory.expansion && Memory.expansion.from === room.name;
   return {
     defender: defense.threats(room).length ? 2 : 0,
     harvester: (total - mined) * 2,
@@ -21,6 +34,11 @@ function targets(room) {
     hauler: mined,
     upgrader: 2,
     builder: room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 ? 2 : 0,
+    // Un éclaireur suffit à tenir les renseignements à jour ; inutile avant le RCL 2.
+    scout: room.controller.level >= 2 ? 1 : 0,
+    claimer: expanding && !expansion.claimed() ? 1 : 0,
+    pioneer: expanding && expansion.claimed() ? 2 : 0,
+    remote: remoteRooms(room).reduce((sum, name) => sum + intel.get(name).sources * REMOTE_PER_SOURCE, 0),
   };
 }
 
@@ -41,6 +59,8 @@ function buildBody(role, energy) {
   }
   if (role === 'hauler') return repeat([CARRY, CARRY, MOVE], energy);
   if (role === 'defender') return repeat([ATTACK, MOVE], energy);
+  if (role === 'scout') return [MOVE];
+  if (role === 'claimer') return energy >= BODYPART_COST[CLAIM] + BODYPART_COST[MOVE] ? [CLAIM, MOVE] : [];
   return repeat([WORK, CARRY, MOVE], energy);
 }
 
@@ -48,12 +68,14 @@ module.exports.run = function () {
   // Effectifs actuels par salle puis par rôle, et sources déjà occupées par un mineur.
   const counts = {};
   const minerSources = new Set();
+  const remoteCounts = {};
   for (const name in Game.creeps) {
     const creep = Game.creeps[name];
     const room = creep.memory.room || creep.room.name;
     counts[room] = counts[room] || {};
     counts[room][creep.memory.role] = (counts[room][creep.memory.role] || 0) + 1;
     if (creep.memory.role === 'miner') minerSources.add(creep.memory.sourceId);
+    if (creep.memory.role === 'remote') remoteCounts[creep.memory.target] = (remoteCounts[creep.memory.target] || 0) + 1;
   }
 
   for (const name in Game.spawns) {
@@ -78,9 +100,16 @@ module.exports.run = function () {
       if (!free) continue;
       memory.sourceId = free.id;
     }
+    if (role === 'claimer' || role === 'pioneer') memory.target = Memory.expansion.target;
+    if (role === 'remote') {
+      // Salle voisine la moins pourvue par rapport à son nombre de sources.
+      const load = (name) => (remoteCounts[name] || 0) / intel.get(name).sources;
+      memory.target = remoteRooms(room).reduce((a, b) => (load(b) < load(a) ? b : a));
+    }
     if (spawn.spawnCreep(body, `${role}-${Game.time}`, { memory }) === OK) {
       roomCounts[role] = (roomCounts[role] || 0) + 1;
       if (memory.sourceId) minerSources.add(memory.sourceId);
+      if (memory.target && role === 'remote') remoteCounts[memory.target] = (remoteCounts[memory.target] || 0) + 1;
     }
   }
 };

@@ -46,13 +46,14 @@
 - [x] Désactivation des modules non essentiels quand le bucket est bas
 - [x] Génération de pixels quand le bucket est plein (serveur officiel)
 
-## Phase 6 : expansion
+## Phase 6 : expansion (fait)
 
-- [ ] Exploration des salles voisines (`scout`)
-- [ ] Choix d'une salle à revendiquer selon les sources et la distance
-- [ ] Rôle `claimer` et créeps d'amorçage de la nouvelle salle
-- [ ] Récolte dans les salles adjacentes non revendiquées (remote mining)
-- [ ] Gestion multi-salles : chaque salle possédée gérée indépendamment
+- [x] Exploration des salles voisines (`scout`)
+- [x] Choix d'une salle à revendiquer selon les sources et la distance
+- [x] Rôle `claimer` et créeps d'amorçage de la nouvelle salle (`pioneer`)
+- [x] Récolte dans les salles adjacentes non revendiquées (remote mining, rôle `remote`)
+- [x] Gestion multi-salles : chaque salle possédée gérée indépendamment
+- [ ] Réservation des salles de remote mining (`reserver`), si le rendement le justifie
 
 ## Plus tard
 
