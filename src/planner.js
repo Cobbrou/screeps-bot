@@ -45,17 +45,27 @@ function planAround(room, spawn, type, costs) {
 }
 
 // Route du spawn jusqu'à la cible, terminée par un conteneur.
+// Le chemin est gardé en mémoire (cases codées x * 50 + y) : le recalculer à chaque passage le ferait dévier
+// au gré des nouvelles structures et laisserait des tronçons orphelins. Il n'est recalculé que s'il est bloqué.
 function planRoute(room, spawn, target, range, costs) {
-  const result = PathFinder.search(spawn.pos, { pos: target.pos, range }, {
-    plainCost: 2,
-    swampCost: 10,
-    maxRooms: 1,
-    roomCallback: () => costs,
-  });
-  if (result.incomplete || !result.path.length) return;
-  const end = result.path.pop();
+  if (!room.memory.routes) room.memory.routes = {};
+  const saved = room.memory.routes[target.id];
+  let path = saved && saved.map((k) => new RoomPosition(Math.floor(k / 50), k % 50, room.name));
+  if (!path || path.some((pos) => costs.get(pos.x, pos.y) === 255)) {
+    const result = PathFinder.search(spawn.pos, { pos: target.pos, range }, {
+      plainCost: 2,
+      swampCost: 10,
+      maxRooms: 1,
+      roomCallback: () => costs,
+    });
+    if (result.incomplete || !result.path.length) return;
+    path = result.path;
+    room.memory.routes[target.id] = path.map((pos) => pos.x * 50 + pos.y);
+  }
+  path = path.slice();
+  const end = path.pop();
   room.createConstructionSite(end, STRUCTURE_CONTAINER);
-  for (const pos of result.path) {
+  for (const pos of path) {
     room.createConstructionSite(pos, STRUCTURE_ROAD);
     costs.set(pos.x, pos.y, 1);
   }
