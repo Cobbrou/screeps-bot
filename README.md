@@ -64,7 +64,7 @@ screeps-bot/
 │   ├── spawner.js           # création des créeps selon les effectifs voulus
 │   ├── stats.js             # CPU par module, indicateurs dans Memory.stats, bucket bas, pixels
 │   └── roles/
-│       ├── builder.js       # construit les chantiers, répare sinon
+│       ├── builder.js       # répare le très abîmé (< 50 %), construit, répare le reste sinon
 │       ├── claimer.js       # revendique le contrôleur de la salle visée
 │       ├── defender.js      # attaque les hostiles de la salle
 │       ├── harvester.js     # récolte et remplit spawn et extensions
