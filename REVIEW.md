@@ -79,16 +79,16 @@ Déroulé actuel au RCL 1 avec 2 sources : 4 harvesters, 2 upgraders, 2 builders
   - Après 20 ticks bloqués, upgraders et builders partent récolter dans une salle voisine pour 50 énergie (1 CARRY), soit des centaines de ticks de trajet.
   - Correctif : n'activer `away` que si le créep porte assez (par exemple ≥ 300 de capacité), ou à partir du RCL 4.
 
-- [ ] **15. Corps du RCL 1 sous-dimensionné** (`src/spawner.js:68`)
+- [x] **15. Corps du RCL 1 sous-dimensionné** (`src/spawner.js:68`)
   - Capacité 300 : `repeat` donne un seul `[WORK, CARRY, MOVE]` (200), 100 énergie inutilisées.
   - `[WORK, WORK, CARRY, MOVE]` (300) récolte deux fois plus vite pour la même place autour de la source.
 
-- [ ] **16. Miners créés avant d'avoir 550 de capacité** (`src/spawner.js:15`)
+- [x] **16. Miners créés avant d'avoir 550 de capacité** (`src/spawner.js:15`)
   - Dès qu'un conteneur existe, la source passe en récolte statique, même au RCL 1 (capacité 300 : miner à 2 WORK, 4 énergie/tick au lieu de 10).
   - Le miner garde ce petit corps pendant 1 500 ticks.
   - Correctif : ne compter une source comme minée que si `energyCapacityAvailable >= 550`.
 
-- [ ] **17. Le surplus d'énergie est perdu au RCL 3** (`src/spawner.js:38`, `src/roles/hauler.js:39-43`)
+- [x] **17. Le surplus d'énergie est perdu au RCL 3** (`src/spawner.js:38`, `src/roles/hauler.js:39-43`)
   - Les upgraders supplémentaires dépendent du stockage, qui n'existe qu'au RCL 4 : avant, toujours 2 upgraders.
   - Une fois le conteneur du contrôleur plein (2 000), le hauler n'a plus de cible et reste plein. Les conteneurs des sources débordent et l'énergie tombe au sol, où elle s'évapore.
   - Correctif : ajouter des upgraders quand le conteneur du contrôleur est presque plein (> 1 500 par exemple).

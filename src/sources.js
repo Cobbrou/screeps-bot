@@ -39,14 +39,14 @@ function assign(creep) {
   if (pool.length) creep.memory.sourceId = pool[0].id;
 }
 
-// Conteneur adjacent à la source, s'il est construit.
-function container(source) {
-  let found = containerIds[source.id] && Game.getObjectById(containerIds[source.id]);
+// Conteneur à portée `range` de la cible (adjacent pour une source, portée 2 pour le contrôleur), s'il est construit.
+function container(target, range = 1) {
+  let found = containerIds[target.id] && Game.getObjectById(containerIds[target.id]);
   if (!found) {
-    found = source.pos.findInRange(FIND_STRUCTURES, 1, {
+    found = target.pos.findInRange(FIND_STRUCTURES, range, {
       filter: (s) => s.structureType === STRUCTURE_CONTAINER,
     })[0];
-    if (found) containerIds[source.id] = found.id;
+    if (found) containerIds[target.id] = found.id;
   }
   return found;
 }

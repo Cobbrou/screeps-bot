@@ -9,11 +9,25 @@ const MAX_MINER_WORK = 5;
 const REMOTE_PER_SOURCE = 2;
 // ponytail: un upgrader de plus par tranche d'énergie stockée, plafonné ; à revoir au RCL 8 (15 énergie/tick max).
 const ENERGY_PER_UPGRADER = 100000;
+// Avant le stockage : un upgrader de plus par tranche d'énergie en attente dans le conteneur du contrôleur.
+const CONTAINER_ENERGY_PER_UPGRADER = 1000;
 const MAX_EXTRA_UPGRADERS = 3;
+// Coût d'un mineur complet : en dessous, les harvesters récoltent plus qu'un petit mineur.
+const MINER_MIN_ENERGY = MAX_MINER_WORK * BODYPART_COST[WORK] + BODYPART_COST[MOVE];
 
-// Sources de la salle équipées d'un conteneur : récolte statique (miner + hauler).
+// Sources de la salle équipées d'un conteneur, une fois un mineur complet finançable : récolte statique (miner + hauler).
 function minedSources(room) {
+  if (room.energyCapacityAvailable < MINER_MIN_ENERGY) return [];
   return sources.list(room).filter((s) => sources.container(s));
+}
+
+// Upgraders en plus des 2 de base, selon l'énergie stockée ou en attente au contrôleur.
+function extraUpgraders(room) {
+  const stored = room.storage ? room.storage.store[RESOURCE_ENERGY] : 0;
+  const waiting = sources.container(room.controller, 2);
+  const extra = Math.floor(stored / ENERGY_PER_UPGRADER)
+    + Math.floor((waiting ? waiting.store[RESOURCE_ENERGY] : 0) / CONTAINER_ENERGY_PER_UPGRADER);
+  return Math.min(MAX_EXTRA_UPGRADERS, extra);
 }
 
 // Salles voisines où récolter : seulement depuis une salle qui a un stockage pour recevoir l'énergie.
@@ -35,8 +49,7 @@ function targets(room) {
     harvester: (total - mined) * 2,
     miner: mined,
     hauler: mined,
-    upgrader: 2 + Math.min(MAX_EXTRA_UPGRADERS,
-      Math.floor((room.storage ? room.storage.store[RESOURCE_ENERGY] : 0) / ENERGY_PER_UPGRADER)),
+    upgrader: 2 + extraUpgraders(room),
     builder: room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 ? 2 : 0,
     // Un éclaireur suffit à tenir les renseignements à jour.
     scout: 1,
@@ -65,6 +78,8 @@ function buildBody(role, energy) {
   if (role === 'defender') return repeat([ATTACK, MOVE], energy);
   if (role === 'scout') return [MOVE];
   if (role === 'claimer') return energy >= BODYPART_COST[CLAIM] + BODYPART_COST[MOVE] ? [CLAIM, MOVE] : [];
+  // Entre 300 et 399 (RCL 1) : un second WORK plutôt que 100 énergie inutilisées.
+  if (energy >= 300 && energy < 400) return [WORK, WORK, CARRY, MOVE];
   return repeat([WORK, CARRY, MOVE], energy);
 }
 

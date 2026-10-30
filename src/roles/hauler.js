@@ -16,7 +16,7 @@ function collect(creep) {
   let target = creep.pos.findClosestByRange(remains);
   if (!target) {
     // Le conteneur le plus plein, pour éviter qu'il déborde.
-    const containers = sources.list(creep.room).map(sources.container).filter(Boolean);
+    const containers = sources.list(creep.room).map((s) => sources.container(s)).filter(Boolean);
     containers.sort((a, b) => b.store[RESOURCE_ENERGY] - a.store[RESOURCE_ENERGY]);
     target = containers[0];
   }
