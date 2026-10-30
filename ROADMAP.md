@@ -19,10 +19,11 @@
 
 ## Phase 2 : planification des structures (RCL 2-3)
 
-- [ ] `planner` : placement automatique des extensions autour du spawn
-- [ ] Routes entre spawn, sources et contrôleur
-- [ ] Conteneurs au pied des sources et du contrôleur
-- [ ] Mise en cache des chemins et des résultats de `find` (objet `global`)
+- [x] `planner` : placement automatique des extensions autour du spawn
+- [x] Routes entre spawn, sources et contrôleur
+- [x] Conteneurs au pied des sources et du contrôleur
+- [x] Mise en cache des sources (portée du module, conservée jusqu'au reset du global)
+- [ ] Mise en cache des chemins des créeps (`reusePath`), si le CPU le justifie
 
 ## Phase 3 : récolte statique et logistique (RCL 3-4)
 

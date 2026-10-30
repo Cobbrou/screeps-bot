@@ -1,3 +1,5 @@
+const sources = require('./sources');
+
 // Motif de corps répété autant que l'énergie le permet (200 énergie par motif).
 const BODY_UNIT = [WORK, CARRY, MOVE];
 const BODY_UNIT_COST = 200;
@@ -7,7 +9,7 @@ const MAX_UNITS = 5;
 // ponytail: 2 récolteurs par source, à calculer selon les WORK et les cases libres quand les corps grossissent.
 function targets(room) {
   return {
-    harvester: room.find(FIND_SOURCES).length * 2,
+    harvester: sources.list(room).length * 2,
     upgrader: 2,
     builder: room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 ? 2 : 0,
   };

@@ -2,6 +2,7 @@
 // Garder cette fonction légère et déléguer la logique aux modules dédiés.
 const memory = require('./memory');
 const spawner = require('./spawner');
+const planner = require('./planner');
 const roles = {
   harvester: require('./roles/harvester'),
   upgrader: require('./roles/upgrader'),
@@ -16,4 +17,5 @@ module.exports.loop = function () {
     const role = roles[creep.memory.role];
     if (role) role.run(creep);
   }
+  planner.run();
 };

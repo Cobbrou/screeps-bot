@@ -1,6 +1,6 @@
 # Architecture
 
-> **À compléter** : ce document décrit l'architecture envisagée. Seuls `memory`, `sources`, `spawner` et les rôles `harvester`, `upgrader` et `builder` sont implémentés.
+> **À compléter** : ce document décrit l'architecture envisagée. Seuls `memory`, `sources`, `spawner`, `planner` et les rôles `harvester`, `upgrader` et `builder` sont implémentés.
 
 ## Principes
 
@@ -25,7 +25,7 @@
 | `sources` | Inventaire des sources d'énergie et attribution des récolteurs |
 | `spawner` | File de création des créeps selon les besoins de la salle |
 | `roles/*` | Comportement par rôle : `harvester`, `upgrader`, `builder`, etc. |
-| `planner` | Placement des structures (extensions, routes, conteneurs) |
+| `planner` | Placement des structures tous les 100 ticks dès le RCL 2 : extensions en damier autour du spawn, route spawn → chaque source et spawn → contrôleur, conteneur en bout de route |
 | `defense` | Tours et réaction aux hostiles |
 | `stats` | Suivi du CPU et des indicateurs |
 
