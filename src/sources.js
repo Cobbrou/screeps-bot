@@ -3,6 +3,8 @@ const intel = require('./intel');
 
 // Attente maximale (en ticks) de la régénération d'une source avant d'aller récolter ailleurs.
 const AWAY_MIN_WAIT = 100;
+// Nombre maximal de créeps partis récolter dans une même salle voisine, par source de cette salle.
+const AWAY_PER_SOURCE = 2;
 
 // Identifiants des sources par salle et du conteneur de chaque source, gardés jusqu'au reset du global.
 const sourceIds = {};
@@ -70,8 +72,20 @@ function harvestAway(creep) {
   if (source) harvestSource(creep, source);
 }
 
+// Salle voisine sûre qui a encore de la place pour un créep de plus, ou undefined.
+function awayRoom(room) {
+  const counts = {};
+  for (const name in Game.creeps) {
+    const away = Game.creeps[name].memory.away;
+    if (away) counts[away.to] = (counts[away.to] || 0) + 1;
+  }
+  return Object.values(Game.map.describeExits(room.name))
+    .find((name) => intel.safe(name) && (counts[name] || 0) < (intel.get(name).sources || 0) * AWAY_PER_SOURCE);
+}
+
 // Fait récolter le créep sur sa source attribuée.
-// Dans nos salles, si cette source est indisponible, il part récolter dans une salle voisine sûre.
+// Dans nos salles, si cette source est indisponible, il part récolter dans une salle voisine sûre
+// qui a de la place. Les harvesters restent toujours sur leur source : ils remplissent le spawn.
 function harvest(creep) {
   if (creep.memory.away) return harvestAway(creep);
   if (!creep.memory.sourceId) assign(creep);
@@ -80,9 +94,9 @@ function harvest(creep) {
     delete creep.memory.sourceId;
     return;
   }
-  if (creep.room.controller && creep.room.controller.my && unavailable(creep, source)) {
-    const to = Object.values(Game.map.describeExits(creep.room.name))
-      .find((name) => intel.safe(name) && intel.get(name).sources);
+  if (creep.memory.role !== 'harvester' && creep.room.controller && creep.room.controller.my
+    && unavailable(creep, source)) {
+    const to = awayRoom(creep.room);
     if (to) {
       creep.memory.away = { from: creep.room.name, to };
       return harvestAway(creep);

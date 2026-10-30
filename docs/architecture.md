@@ -22,7 +22,7 @@
 | Module | Rôle |
 |--------|------|
 | `memory` | Nettoyage et initialisation de `Memory` |
-| `sources` | Sources et conteneurs en cache, attribution des récolteurs, collecte d'énergie (conteneur ou stockage, récolte sinon). Dans nos salles, un créep dont la source est vide pour plus de 100 ticks ou entourée de créeps part récolter dans une salle voisine sûre (`creep.memory.away`), puis rentre plein |
+| `sources` | Sources et conteneurs en cache, attribution des récolteurs, collecte d'énergie (conteneur ou stockage, récolte sinon). Dans nos salles, un créep dont la source est vide pour plus de 100 ticks ou entourée de créeps part récolter dans une salle voisine sûre (`creep.memory.away`, 2 créeps au plus par source de la salle voisine), puis rentre plein. Les `harvester` ne partent jamais |
 | `spawner` | Création des créeps selon les besoins de la salle : 2 `defender` si des hostiles dangereux sont présents, 2 `harvester` par source sans conteneur, 1 `miner` et 1 `hauler` par source avec conteneur ; 1 `scout` ; avec un stockage, 2 `remote` par source des salles voisines sûres ; pour la salle d'origine de l'expansion, 1 `claimer` puis 2 `pioneer` une fois la salle revendiquée |
 | `roles/*` | Comportement par rôle : `harvester`, `upgrader`, `builder`, `miner`, `hauler`, `defender`, `scout`, `claimer`, `pioneer`, `remote` |
 | `intel` | Renseignements par salle dans `Memory.rooms[nom].intel` (sources, contrôleur, propriétaire, réservation, dernier passage d'hostiles), écrits par le `scout` et par les `remote` qui croisent des hostiles. Une salle est sûre si son contrôleur est libre et sans hostiles depuis 1 500 ticks |
