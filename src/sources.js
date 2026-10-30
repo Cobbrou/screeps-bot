@@ -12,6 +12,7 @@ const AWAY_BLOCKED_TICKS = 20;
 // Retrait minimal dans un conteneur ou le stockage : en dessous, le créep récolte lui-même.
 const MIN_WITHDRAW = 100;
 // RCL minimal pour aller récolter ailleurs : avant, les corps portent trop peu pour rentabiliser le trajet.
+// Sauf dans une salle à une seule source : encombrée dès le début, elle a besoin de ses voisines quel que soit le RCL.
 const AWAY_MIN_RCL = 4;
 // Ticks entre deux recherches de conteneur ou de stockage quand le créep n'en a pas trouvé.
 const WITHDRAW_SCAN_INTERVAL = 10;
@@ -108,8 +109,8 @@ function awayRoom(room) {
 }
 
 // Fait récolter le créep sur sa source attribuée.
-// Dans nos salles à partir du RCL AWAY_MIN_RCL, si cette source est indisponible, il part récolter
-// dans une salle voisine sûre qui a de la place. Les harvesters restent toujours sur leur source : ils remplissent le spawn.
+// Dans nos salles à partir du RCL AWAY_MIN_RCL (ou dès le RCL 1 avec une seule source), si cette source est indisponible,
+// il part récolter dans une salle voisine sûre qui a de la place. Les harvesters restent toujours sur leur source : ils remplissent le spawn.
 function harvest(creep) {
   if (creep.memory.away) return harvestAway(creep);
   if (!creep.memory.sourceId) assign(creep);
@@ -119,8 +120,8 @@ function harvest(creep) {
     return;
   }
   const controller = creep.room.controller;
-  if (creep.memory.role !== 'harvester' && controller && controller.my && controller.level >= AWAY_MIN_RCL
-    && unavailable(creep, source)) {
+  const canLeave = controller && controller.my && (controller.level >= AWAY_MIN_RCL || list(creep.room).length < 2);
+  if (creep.memory.role !== 'harvester' && canLeave && unavailable(creep, source)) {
     const to = awayRoom(creep.room);
     if (to) {
       creep.memory.away = { from: creep.room.name, to };
