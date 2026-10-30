@@ -6,8 +6,13 @@ const sources = require('../sources');
 // assez serré pour séparer extensions (3000 points) et conteneurs (5000 points).
 const WORK_SPREAD = 1.5;
 
-// Travail restant d'un chantier : les plus courts d'abord (routes, puis extensions…). Le spawn passe avant tout.
-const work = (site) => (site.structureType === STRUCTURE_SPAWN ? 0 : site.progressTotal - site.progress);
+// Travail restant d'un chantier : les plus courts d'abord (routes, puis extensions…).
+// Le spawn passe avant tout, puis les conteneurs : ils débloquent la récolte statique (miners et haulers).
+function work(site) {
+  if (site.structureType === STRUCTURE_SPAWN) return 0;
+  if (site.structureType === STRUCTURE_CONTAINER) return 1;
+  return site.progressTotal - site.progress;
+}
 
 // Sous cette part de ses points de vie, une structure est réparée avant toute construction (usure, decay).
 const URGENT_RATIO = 0.5;

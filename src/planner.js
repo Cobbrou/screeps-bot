@@ -135,8 +135,10 @@ module.exports.run = function () {
     for (const source of sources.list(room)) planRoute(room, spawn, source, 1, costs);
     // Portée 2 : le conteneur reste à portée d'amélioration (3) sans bloquer les abords du contrôleur.
     planRoute(room, spawn, room.controller, 2, costs);
-    // Murs seulement une fois une tour construite : elle seule les entretient.
-    if (room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length) {
+    // Murs seulement une fois une tour construite (elle seule les entretient) et le stockage aussi (RCL 4) :
+    // avant, les remonter à leur plafond prendrait l'essentiel de l'énergie de la salle.
+    if (room.storage
+      && room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length) {
       planWalls(room, costs);
     }
   }
