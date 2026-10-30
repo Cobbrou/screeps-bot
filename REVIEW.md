@@ -69,7 +69,7 @@ Déroulé actuel au RCL 1 avec 2 sources : 4 harvesters, 2 upgraders, 2 builders
   - Or les conteneurs débloquent miners et haulers, le plus gros gain économique de l'early.
   - Correctif : les conteneurs des sources passent juste après le spawn dans `work`.
 
-- [ ] **13. Les routes sont posées trop tôt** (`src/planner.js:135-137`)
+- [x] **13. Les routes sont posées trop tôt** (`src/planner.js:135-137`)
   - Au RCL 1, les trois routes représentent environ 75 cases × 300 = ~22 500 énergie (1 500 par case de marais), alors que le RCL 2 ne demande que 200 points.
   - Un corps `[WORK, CARRY, MOVE]` vide avance déjà d'une case par tick en plaine ; la route ne sert qu'à vitesse pleine chargé.
   - Correctif : conteneurs dès le RCL 1, routes à partir du RCL 3 (ou une fois les extensions finies).

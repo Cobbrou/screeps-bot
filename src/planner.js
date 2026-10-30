@@ -5,6 +5,8 @@ const INTERVAL = 100;
 const MAX_RADIUS = 8;
 // Chantiers laissés libres sur le compte (MAX_CONSTRUCTION_SITES) pour le spawn d'expansion.
 const SITE_MARGIN = 20;
+// RCL à partir duquel les routes sont posées (les conteneurs le sont dès le RCL 1).
+const ROAD_MIN_RCL = 3;
 
 // Chantiers que le planner peut encore poser sur ce passage.
 let budget = 0;
@@ -78,6 +80,16 @@ function planRoute(room, spawn, target, range, costs) {
   path = path.slice();
   const end = path.pop();
   place(room, end, STRUCTURE_CONTAINER);
+  // Avant ROAD_MIN_RCL, les routes coûtent plus qu'elles ne rapportent aux petits corps :
+  // conteneur seul, et les chantiers de route pas encore entamés sont retirés.
+  if (room.controller.level < ROAD_MIN_RCL) {
+    for (const pos of path) {
+      for (const site of pos.lookFor(LOOK_CONSTRUCTION_SITES)) {
+        if (site.my && site.structureType === STRUCTURE_ROAD && !site.progress) site.remove();
+      }
+    }
+    return;
+  }
   for (const pos of path) {
     place(room, pos, STRUCTURE_ROAD);
     costs.set(pos.x, pos.y, 1);
