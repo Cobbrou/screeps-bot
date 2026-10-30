@@ -59,6 +59,7 @@ screeps-bot/
 │   ├── planner.js           # stockage, tours, extensions, routes, conteneurs, murs (tous les 100 ticks)
 │   ├── sources.js           # sources et conteneurs en cache, récolte et collecte d'énergie
 │   ├── spawner.js           # création des créeps selon les effectifs voulus
+│   ├── stats.js             # CPU par module, indicateurs dans Memory.stats, bucket bas, pixels
 │   └── roles/
 │       ├── builder.js       # construit les chantiers, répare sinon
 │       ├── defender.js      # attaque les hostiles de la salle

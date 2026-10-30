@@ -40,11 +40,11 @@
 - [x] Activation du mode sans échec (`safeMode`) en dernier recours
 - [x] Défenseurs créés quand des hostiles sont présents
 
-## Phase 5 : suivi et optimisation
+## Phase 5 : suivi et optimisation (fait)
 
-- [ ] `stats` : CPU par module, bucket, énergie récoltée, progression du RCL
-- [ ] Désactivation des modules non essentiels quand le bucket est bas
-- [ ] Génération de pixels quand le bucket est plein (serveur officiel)
+- [x] `stats` : CPU par module, bucket, énergie récoltée, progression du RCL
+- [x] Désactivation des modules non essentiels quand le bucket est bas
+- [x] Génération de pixels quand le bucket est plein (serveur officiel)
 
 ## Phase 6 : expansion
 

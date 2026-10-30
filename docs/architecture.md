@@ -1,6 +1,6 @@
 # Architecture
 
-> **À compléter** : ce document décrit l'architecture envisagée. Seuls `memory`, `sources`, `spawner`, `planner`, `defense` et les rôles `harvester`, `upgrader`, `builder`, `miner`, `hauler` et `defender` sont implémentés.
+> **À compléter** : ce document décrit l'architecture envisagée. Seuls `memory`, `sources`, `spawner`, `planner`, `defense`, `stats` et les rôles `harvester`, `upgrader`, `builder`, `miner`, `hauler` et `defender` sont implémentés.
 
 ## Principes
 
@@ -27,7 +27,7 @@
 | `roles/*` | Comportement par rôle : `harvester`, `upgrader`, `builder`, `miner`, `hauler`, `defender` |
 | `planner` | Placement des structures tous les 100 ticks dès le RCL 1 : stockage (RCL 4), tours (RCL 3) puis extensions (RCL 2) en damier autour du spawn, route spawn → chaque source et spawn → contrôleur, conteneur en bout de route ; dès qu'une tour existe, ceinture de murs à 2 cases des sorties avec remparts sur les routes et au milieu de chaque côté |
 | `defense` | Tours (attaque, soin, puis réparation au-dessus de 50 % d'énergie, murs plafonnés à 10 000 × RCL) ; mode sans échec si un spawn ou une tour passe sous 50 % de ses points de vie en présence d'hostiles |
-| `stats` | Suivi du CPU et des indicateurs |
+| `stats` | Écrit `Memory.stats` à chaque tick : CPU par module (`defense`, `spawner`, `creeps`, `planner`), limite et bucket ; par salle, RCL, progression, énergie disponible et stockée, cumul d'énergie récoltée. Sous 2 000 de bucket, `planner` est sauté. Bucket plein (`PIXEL_CPU_COST`) : génération d'un pixel sur le serveur officiel |
 
 ## Questions ouvertes
 

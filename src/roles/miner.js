@@ -7,7 +7,7 @@ module.exports.run = function (creep) {
   const container = sources.container(source);
   if (container && !creep.pos.isEqualTo(container.pos)) {
     creep.moveTo(container);
-  } else if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
-    creep.moveTo(source);
+  } else {
+    sources.harvestSource(creep, source);
   }
 };

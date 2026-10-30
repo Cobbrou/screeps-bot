@@ -4,6 +4,7 @@ const memory = require('./memory');
 const spawner = require('./spawner');
 const planner = require('./planner');
 const defense = require('./defense');
+const stats = require('./stats');
 const roles = {
   harvester: require('./roles/harvester'),
   upgrader: require('./roles/upgrader'),
@@ -15,12 +16,16 @@ const roles = {
 
 module.exports.loop = function () {
   memory.cleanup();
-  defense.run();
-  spawner.run();
-  for (const name in Game.creeps) {
-    const creep = Game.creeps[name];
-    const role = roles[creep.memory.role];
-    if (role) role.run(creep);
-  }
-  planner.run();
+  stats.measure('defense', defense.run);
+  stats.measure('spawner', spawner.run);
+  stats.measure('creeps', () => {
+    for (const name in Game.creeps) {
+      const creep = Game.creeps[name];
+      const role = roles[creep.memory.role];
+      if (role) role.run(creep);
+    }
+  });
+  // Planification sautée quand le bucket est bas : c'est le module le plus coûteux.
+  if (!stats.lowBucket()) stats.measure('planner', planner.run);
+  stats.run();
 };

@@ -1,3 +1,5 @@
+const stats = require('./stats');
+
 // Identifiants des sources par salle et du conteneur de chaque source, gardés jusqu'au reset du global.
 const sourceIds = {};
 const containerIds = {};
@@ -40,7 +42,14 @@ function harvest(creep) {
     delete creep.memory.sourceId;
     return;
   }
-  if (creep.harvest(source) === ERR_NOT_IN_RANGE) creep.moveTo(source);
+  harvestSource(creep, source);
+}
+
+// Récolte la source en comptant l'énergie extraite ; s'en approche si elle est hors de portée.
+function harvestSource(creep, source) {
+  const result = creep.harvest(source);
+  if (result === OK) stats.recordHarvest(creep, source);
+  else if (result === ERR_NOT_IN_RANGE) creep.moveTo(source);
 }
 
 // Prend l'énergie dans un conteneur ou le stockage s'il en reste assez ; récolte sinon.
@@ -54,4 +63,4 @@ function collect(creep) {
   if (creep.withdraw(store, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) creep.moveTo(store);
 }
 
-module.exports = { list, container, harvest, collect };
+module.exports = { list, container, harvest, harvestSource, collect };
