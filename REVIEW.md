@@ -53,11 +53,11 @@ Déjà suivis ailleurs (roadmap ou commentaires `ponytail:`) et non repris ici :
   - Avec un seul spawn au RCL 4, le spawn est presque saturé.
   - Correctif : plafonner le nombre de salles distantes, par exemple 2.
 
-- [ ] **10. Personne ne répare avant les tours** (`src/spawner.js:40`)
+- [x] **10. Personne ne répare avant les tours** (`src/spawner.js:40`)
   - Les builders ne sont créés que s'il existe des chantiers. Au RCL 1-2, les routes et conteneurs s'usent sans entretien.
   - Un conteneur détruit est replanifié, mais son contenu est perdu.
 
-- [ ] **11. Le claimer insiste sur une cible abandonnée** (`src/roles/claimer.js`)
+- [x] **11. Le claimer insiste sur une cible abandonnée** (`src/roles/claimer.js`)
   - Quand l'expansion change de cible, le claimer garde l'ancienne `memory.target` et réessaie jusqu'à sa mort. C'est mineur.
 
 ## Early game (RCL 1-3)

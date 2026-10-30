@@ -7,6 +7,8 @@ const MAX_MINER_WORK = 5;
 // ponytail: récolteurs distants par source sans réservation (5 énergie/tick), à revoir avec un rôle reserver.
 const REMOTE_PER_SOURCE = 2;
 const MAX_REMOTE_ROOMS = 2;
+// Sans tour, un builder est créé dès qu'une structure passe sous cette part de ses points de vie (comme l'urgence du builder).
+const REPAIR_RATIO = 0.5;
 // ponytail: un upgrader de plus par tranche d'énergie stockée, plafonné ; à revoir au RCL 8 (15 énergie/tick max).
 const ENERGY_PER_UPGRADER = 100000;
 // Avant le stockage : un upgrader de plus par tranche d'énergie en attente dans le conteneur du contrôleur.
@@ -39,6 +41,16 @@ function extraUpgraders(room) {
   return Math.min(MAX_EXTRA_UPGRADERS, extra);
 }
 
+// Vrai si une structure (hors murs et remparts) est sous REPAIR_RATIO de ses points de vie et qu'aucune tour
+// ne l'entretiendra : un builder vient alors la réparer.
+function needsRepair(room) {
+  if (room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length) return false;
+  return room.find(FIND_STRUCTURES, {
+    filter: (s) => s.hits < s.hitsMax * REPAIR_RATIO
+      && s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART,
+  }).length > 0;
+}
+
 // Salles voisines où récolter : seulement depuis une salle qui a un stockage pour recevoir l'énergie.
 // Au plus MAX_REMOTE_ROOMS, celles qui ont le plus de sources, pour ne pas saturer le spawn.
 function remoteRooms(room) {
@@ -62,7 +74,7 @@ function targets(room) {
     miner: mined.length,
     hauler: mined.reduce((sum, s) => sum + haulersFor(room, s), 0),
     upgrader: 2 + extraUpgraders(room),
-    builder: room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 ? 2 : 0,
+    builder: room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 ? 2 : (needsRepair(room) ? 1 : 0),
     // Un éclaireur suffit à tenir les renseignements à jour.
     scout: 1,
     claimer: expanding && !expansion.claimed() ? 1 : 0,
