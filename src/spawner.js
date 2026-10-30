@@ -34,8 +34,8 @@ function targets(room) {
     hauler: mined,
     upgrader: 2,
     builder: room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 ? 2 : 0,
-    // Un éclaireur suffit à tenir les renseignements à jour ; inutile avant le RCL 2.
-    scout: room.controller.level >= 2 ? 1 : 0,
+    // Un éclaireur suffit à tenir les renseignements à jour.
+    scout: 1,
     claimer: expanding && !expansion.claimed() ? 1 : 0,
     pioneer: expanding && expansion.claimed() ? 2 : 0,
     remote: remoteRooms(room).reduce((sum, name) => sum + intel.get(name).sources * REMOTE_PER_SOURCE, 0),
