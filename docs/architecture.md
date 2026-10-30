@@ -1,6 +1,6 @@
 # Architecture
 
-> **À compléter** : ce document décrit l'architecture envisagée. Rien n'est encore implémenté.
+> **À compléter** : ce document décrit l'architecture envisagée. Seuls `memory`, `spawner` et les rôles `harvester` et `upgrader` sont implémentés, dans une version minimale.
 
 ## Principes
 
