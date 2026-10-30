@@ -53,10 +53,33 @@
 - [x] Rôle `claimer` et créeps d'amorçage de la nouvelle salle (`pioneer`)
 - [x] Récolte dans les salles adjacentes non revendiquées (remote mining, rôle `remote`)
 - [x] Gestion multi-salles : chaque salle possédée gérée indépendamment
+- [x] Créeps inoccupés (source vide ou encombrée) envoyés récolter dans une salle voisine sûre
 - [ ] Réservation des salles de remote mining (`reserver`), si le rendement le justifie
 
-## Plus tard
+## Phase 7 : logistique avancée (RCL 5-6)
 
-- Liens (`STRUCTURE_LINK`), laboratoires et terminal (RCL 5+)
-- Marché et échanges entre salles
-- Minerais, boosts et puissance
+- [ ] Liens (`STRUCTURE_LINK`) : source → stockage → contrôleur, moins de transporteurs
+- [ ] Remplacement des `harvester` par un `filler` dédié au spawn et aux extensions depuis le stockage
+- [ ] Nombre d'`upgrader` et taille des corps selon l'énergie stockée
+- [ ] Extracteur et mineur de minerai (RCL 6)
+- [ ] Terminal (RCL 6) : équilibrage de l'énergie entre nos salles
+
+## Phase 8 : économie et marché (RCL 6+)
+
+- [ ] Vente des surplus de minerai sur le marché
+- [ ] Achat d'énergie ou de minerais manquants quand les crédits le permettent
+- [ ] Laboratoires : réactions de base
+
+## Phase 9 : défense et attaque avancées (RCL 7+)
+
+- [ ] Remparts autour des structures clés au lieu d'une simple ceinture
+- [ ] Défense des salles de remote mining (créeps distants, tours de garde)
+- [ ] Boosts des défenseurs depuis les laboratoires
+- [ ] Escouades d'attaque (soin + attaque) contre les salles hostiles voisines
+
+## Phase 10 : fin de partie (RCL 8)
+
+- [ ] Power spawn et traitement de la puissance
+- [ ] Récolte des power banks dans les couloirs
+- [ ] Usines (`STRUCTURE_FACTORY`) et commodités
+- [ ] Nouvelles expansions automatiques selon le GCL et le CPU disponible
