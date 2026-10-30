@@ -2,7 +2,7 @@
 
 Bot pour [Screeps World](https://screeps.com), le MMO de stratégie où l'on programme ses unités (les « créeps ») en JavaScript.
 
-L'objectif à terme est un bot autonome capable de gérer ses salles : récolte d'énergie, création de créeps, construction et défense. Pour l'instant, le bot se limite au strict minimum : il maintient récolteurs, améliorateurs et constructeurs selon les besoins de chaque salle, avec des corps adaptés à l'énergie disponible. À partir du RCL 2, il place lui-même extensions, routes et conteneurs, puis le stockage au RCL 4. Dès qu'une source a son conteneur, un mineur s'y installe et des transporteurs acheminent l'énergie.
+L'objectif à terme est un bot autonome capable de gérer ses salles : récolte d'énergie, création de créeps, construction et défense. Pour l'instant, le bot se limite au strict minimum : il maintient récolteurs, améliorateurs et constructeurs selon les besoins de chaque salle, avec des corps adaptés à l'énergie disponible. Dès le RCL 1, il place lui-même routes et conteneurs, puis les extensions au RCL 2, les tours au RCL 3 et le stockage au RCL 4. Dès qu'une source a son conteneur, un mineur s'y installe et des transporteurs acheminent l'énergie. Les tours défendent, soignent et réparent ; des murs ferment les sorties, des défenseurs sont créés face aux hostiles et le mode sans échec sert de dernier recours.
 
 ## Prérequis
 
@@ -54,12 +54,14 @@ Sans `secrets.json`, `deploy` et `watch` se contentent du build et affichent un 
 screeps-bot/
 ├── src/
 │   ├── main.js              # point d'entrée (loop exécutée à chaque tick)
+│   ├── defense.js           # tours, mode sans échec, détection des hostiles
 │   ├── memory.js            # nettoyage de Memory (créeps morts)
-│   ├── planner.js           # stockage, extensions, routes et conteneurs (tous les 100 ticks)
+│   ├── planner.js           # stockage, tours, extensions, routes, conteneurs, murs (tous les 100 ticks)
 │   ├── sources.js           # sources et conteneurs en cache, récolte et collecte d'énergie
 │   ├── spawner.js           # création des créeps selon les effectifs voulus
 │   └── roles/
 │       ├── builder.js       # construit les chantiers, répare sinon
+│       ├── defender.js      # attaque les hostiles de la salle
 │       ├── harvester.js     # récolte et remplit spawn et extensions
 │       ├── hauler.js        # transporte l'énergie des conteneurs vers spawn, extensions, tours
 │       ├── miner.js         # récolte statique sur le conteneur d'une source

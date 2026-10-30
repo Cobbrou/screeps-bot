@@ -33,12 +33,12 @@
 - [x] Ramassage de l'énergie au sol et des pierres tombales
 - [ ] Remplacement anticipé des mineurs avant leur mort, si la perte de récolte le justifie
 
-## Phase 4 : défense (RCL 3+)
+## Phase 4 : défense (RCL 3+) (fait)
 
-- [ ] `defense` : tours qui attaquent les hostiles, soignent, puis réparent
-- [ ] Murs et remparts aux sorties de la salle
-- [ ] Activation du mode sans échec (`safeMode`) en dernier recours
-- [ ] Défenseurs créés quand des hostiles sont présents
+- [x] `defense` : tours qui attaquent les hostiles, soignent, puis réparent
+- [x] Murs et remparts aux sorties de la salle, une fois une tour construite
+- [x] Activation du mode sans échec (`safeMode`) en dernier recours
+- [x] Défenseurs créés quand des hostiles sont présents
 
 ## Phase 5 : suivi et optimisation
 

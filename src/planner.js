@@ -61,20 +61,58 @@ function planRoute(room, spawn, target, range, costs) {
   }
 }
 
+// Ceinture de murs à 2 cases des sorties : tout chemin depuis une sortie la traverse.
+// Remparts sur les routes et au milieu de chaque côté pour laisser passer nos créeps.
+function planWalls(room, costs) {
+  const terrain = room.getTerrain();
+  const near = new Set();
+  for (const e of room.find(FIND_EXIT)) {
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) near.add((e.x + dx) * 50 + e.y + dy);
+  }
+  for (const side of [FIND_EXIT_TOP, FIND_EXIT_RIGHT, FIND_EXIT_BOTTOM, FIND_EXIT_LEFT]) {
+    const exits = room.find(side);
+    if (!exits.length) continue;
+    const ring = new Map();
+    for (const e of exits) {
+      for (let dx = -2; dx <= 2; dx++) {
+        for (let dy = -2; dy <= 2; dy++) {
+          const x = e.x + dx;
+          const y = e.y + dy;
+          const key = x * 50 + y;
+          if (x < 1 || x > 48 || y < 1 || y > 48 || near.has(key) || ring.has(key)) continue;
+          if (terrain.get(x, y) !== TERRAIN_MASK_WALL) ring.set(key, new RoomPosition(x, y, room.name));
+        }
+      }
+    }
+    const gate = exits[Math.floor(exits.length / 2)].findClosestByRange([...ring.values()]);
+    for (const pos of ring.values()) {
+      const cost = costs.get(pos.x, pos.y);
+      if (cost === 255) continue;
+      room.createConstructionSite(pos, cost === 1 || pos.isEqualTo(gate) ? STRUCTURE_RAMPART : STRUCTURE_WALL);
+    }
+  }
+}
+
 module.exports.run = function () {
   if (Game.time % INTERVAL) return;
   for (const name in Game.rooms) {
     const room = Game.rooms[name];
-    if (!room.controller || !room.controller.my || room.controller.level < 2) continue;
+    // Dès le RCL 1 : routes et conteneurs sont autorisés, extensions et stockage attendent leur RCL.
+    if (!room.controller || !room.controller.my) continue;
     const spawn = room.find(FIND_MY_SPAWNS)[0];
     if (!spawn) continue;
 
     const costs = costMatrix(room);
     // Le stockage (RCL 4) passe avant les extensions pour rester au plus près du spawn.
     planAround(room, spawn, STRUCTURE_STORAGE, costs);
+    planAround(room, spawn, STRUCTURE_TOWER, costs);
     planAround(room, spawn, STRUCTURE_EXTENSION, costs);
     for (const source of sources.list(room)) planRoute(room, spawn, source, 1, costs);
     // Portée 2 : le conteneur reste à portée d'amélioration (3) sans bloquer les abords du contrôleur.
     planRoute(room, spawn, room.controller, 2, costs);
+    // Murs seulement une fois une tour construite : elle seule les entretient.
+    if (room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length) {
+      planWalls(room, costs);
+    }
   }
 };

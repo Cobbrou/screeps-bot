@@ -1,4 +1,5 @@
 const sources = require('./sources');
+const defense = require('./defense');
 
 const MAX_UNITS = 5;
 const MAX_MINER_WORK = 5;
@@ -14,6 +15,7 @@ function targets(room) {
   const total = sources.list(room).length;
   const mined = minedSources(room).length;
   return {
+    defender: defense.threats(room).length ? 2 : 0,
     harvester: (total - mined) * 2,
     miner: mined,
     hauler: mined,
@@ -38,6 +40,7 @@ function buildBody(role, energy) {
     return work > 0 ? [...Array(work).fill(WORK), MOVE] : [];
   }
   if (role === 'hauler') return repeat([CARRY, CARRY, MOVE], energy);
+  if (role === 'defender') return repeat([ATTACK, MOVE], energy);
   return repeat([WORK, CARRY, MOVE], energy);
 }
 
