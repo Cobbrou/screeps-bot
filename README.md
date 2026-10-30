@@ -67,6 +67,7 @@ screeps-bot/
 ├── AGENTS.md                # consignes pour les agents IA
 ├── package.json
 ├── rollup.config.js         # configuration du build et du déploiement
+├── ROADMAP.md               # étapes de développement prévues
 ├── secrets.example.json     # modèle d'identifiants
 └── README.md
 ```
@@ -74,5 +75,6 @@ screeps-bot/
 ## Documentation
 
 - [AGENTS.md](AGENTS.md) : règles à suivre pour les agents IA travaillant sur le dépôt
+- [ROADMAP.md](ROADMAP.md) : étapes de développement prévues
 - [docs/architecture.md](docs/architecture.md) : architecture prévue
 - [docs/screeps-reference.md](docs/screeps-reference.md) : concepts de base de Screeps
