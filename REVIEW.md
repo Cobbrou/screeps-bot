@@ -98,7 +98,7 @@ Déroulé actuel au RCL 1 avec 2 sources : 4 harvesters, 2 upgraders, 2 builders
   - Pour ~100 pièces : 3 M points / 80 points par énergie = ~37 500 énergie, prise sur l'énergie que les haulers livrent aux tours en priorité.
   - Correctif : attendre le RCL 4 et le stockage, ou viser beaucoup moins de points au RCL 3.
 
-- [ ] **19. Tours jamais remplies sans haulers** (`src/roles/harvester.js:19`)
+- [x] **19. Tours jamais remplies sans haulers** (`src/roles/harvester.js:19`)
   - Le harvester ne remplit que le spawn et les extensions ; seuls les haulers livrent aux tours.
   - Au RCL 3 sans conteneur de source fini (voir point 12), la tour reste vide et ne défend pas.
   - Correctif : ajouter `STRUCTURE_TOWER` au filtre du harvester.
