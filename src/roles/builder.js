@@ -1,5 +1,12 @@
 const sources = require('../sources');
 
+// Ordre de construction : le plus utile d'abord ; conteneurs (5000 points) et routes en dernier.
+const PRIORITY = {
+  [STRUCTURE_SPAWN]: 0, [STRUCTURE_EXTENSION]: 1, [STRUCTURE_TOWER]: 2,
+  [STRUCTURE_STORAGE]: 3, [STRUCTURE_CONTAINER]: 5, [STRUCTURE_ROAD]: 6,
+};
+const rank = (site) => (PRIORITY[site.structureType] !== undefined ? PRIORITY[site.structureType] : 4);
+
 // Construit les chantiers ; sinon répare (hors murs et remparts) ; sinon améliore le contrôleur.
 module.exports.run = function (creep) {
   if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) creep.memory.working = false;
@@ -12,9 +19,12 @@ module.exports.run = function (creep) {
   }
 
   // Cibles gardées en mémoire tant qu'elles restent valides : évite un calcul de chemin à chaque tick.
+  // Un chantier plus prioritaire apparu entre-temps remplace la cible en cours.
   let site = Game.getObjectById(creep.memory.siteId);
-  if (!site) {
-    site = creep.pos.findClosestByPath(FIND_MY_CONSTRUCTION_SITES);
+  const sites = creep.room.find(FIND_MY_CONSTRUCTION_SITES);
+  const best = Math.min(...sites.map(rank));
+  if (!site || rank(site) > best) {
+    site = creep.pos.findClosestByPath(sites.filter((s) => rank(s) === best));
     creep.memory.siteId = site ? site.id : undefined;
   }
   if (site) {
