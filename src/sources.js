@@ -54,6 +54,20 @@ function container(target, range = 1) {
   return found;
 }
 
+// Sources occupées par un mineur vivant, recalculées une fois par tick.
+let minedTick = -1;
+let minedIds = new Set();
+
+// Vrai si un mineur travaille sur cette source (son conteneur est alors construit).
+function mined(source) {
+  if (minedTick !== Game.time) {
+    minedTick = Game.time;
+    minedIds = new Set(Object.values(Game.creeps)
+      .filter((c) => c.memory.role === 'miner').map((c) => c.memory.sourceId));
+  }
+  return minedIds.has(source.id) && !!container(source);
+}
+
 // Vrai si la source ne peut pas servir le créep avant longtemps : vide pour plus de AWAY_MIN_WAIT ticks,
 // ou toutes ses cases adjacentes praticables occupées par d'autres créeps pendant AWAY_BLOCKED_TICKS ticks.
 function unavailable(creep, source) {
@@ -121,6 +135,22 @@ function harvest(creep) {
   }
   const controller = creep.room.controller;
   const canLeave = controller && controller.my && (controller.level >= AWAY_MIN_RCL || list(creep.room).length < 2);
+  // Source tenue par un mineur : on puise dans son conteneur au lieu de lui prendre la place.
+  if (mined(source)) {
+    const box = container(source);
+    if (box.store[RESOURCE_ENERGY] > 0) {
+      if (creep.withdraw(box, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, box);
+      return;
+    }
+    const to = creep.memory.role !== 'harvester' && canLeave && awayRoom(creep.room);
+    if (to) {
+      creep.memory.away = { from: creep.room.name, to };
+      return harvestAway(creep);
+    }
+    // Conteneur vide : on attend à l'écart que le mineur le remplisse.
+    stepAway(creep);
+    return;
+  }
   if (creep.memory.role !== 'harvester' && canLeave && unavailable(creep, source)) {
     const to = awayRoom(creep.room);
     if (to) {
