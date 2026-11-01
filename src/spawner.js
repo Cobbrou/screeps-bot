@@ -14,22 +14,25 @@ const ENERGY_PER_UPGRADER = 100000;
 // Avant le stockage : un upgrader de plus par tranche d'énergie en attente dans le conteneur du contrôleur.
 const CONTAINER_ENERGY_PER_UPGRADER = 1000;
 const MAX_EXTRA_UPGRADERS = 3;
-// Coût d'un mineur complet : en dessous, les harvesters récoltent plus qu'un petit mineur.
-const MINER_MIN_ENERGY = MAX_MINER_WORK * BODYPART_COST[WORK] + BODYPART_COST[MOVE];
 
-// Sources de la salle équipées d'un conteneur, une fois un mineur complet finançable : récolte statique (miner + hauler).
-function minedSources(room) {
-  if (room.energyCapacityAvailable < MINER_MIN_ENERGY) return [];
-  return sources.list(room).filter((s) => sources.container(s));
+// Récolte statique dès le RCL 1 : même un mineur à 2 WORK posé sur la source (4 énergie/tick en continu)
+// rapporte bien plus qu'un harvester qui fait l'aller-retour. Sans conteneur, il pose l'énergie au sol.
+// Vrai s'il manque un mineur sur la source : moins de MAX_MINER_WORK au total et une case libre pour un de plus.
+function needsMiner(source, miners) {
+  const m = miners[source.id] || { work: 0, count: 0 };
+  return m.work < MAX_MINER_WORK && m.count < sources.spots(source);
 }
 
-// Haulers nécessaires pour suivre la production d'une source (10 énergie/tick) sur l'aller-retour spawn ↔ conteneur.
+// Haulers nécessaires pour suivre la production réelle des mineurs de la source (2 énergie/tick par WORK,
+// 10 au plus) sur l'aller-retour spawn ↔ source.
 // ponytail: distance de la route du planner, alors que les haulers livrent aussi aux tours et au contrôleur.
-function haulersFor(room, source) {
+function haulersFor(room, source, work) {
+  if (!work) return 0;
+  const rate = Math.min(work, MAX_MINER_WORK) * HARVEST_POWER;
   const route = room.memory.routes && room.memory.routes[source.id];
   const carry = buildBody('hauler', room.energyCapacityAvailable).filter((p) => p === CARRY).length * CARRY_CAPACITY;
   if (!route || !carry) return 1;
-  return Math.ceil((2 * route.length * SOURCE_ENERGY_CAPACITY) / ENERGY_REGEN_TIME / carry);
+  return Math.ceil((2 * route.length * rate) / carry);
 }
 
 // Nombre de chantiers d'extension dans la salle.
@@ -67,17 +70,16 @@ function remoteRooms(room) {
     .slice(0, MAX_REMOTE_ROOMS);
 }
 
-// Effectifs voulus par rôle, dans l'ordre de priorité.
-// ponytail: 2 récolteurs par source, à calculer selon les WORK et les cases libres quand les corps grossissent.
-function targets(room) {
-  const total = sources.list(room).length;
-  const mined = minedSources(room);
+// Effectifs voulus par rôle, dans l'ordre de priorité. Les harvesters ne servent plus qu'en urgence (voir run).
+// Haulers avant mineurs : ils suivent les WORK déjà posés, ce qui alterne mineur et hauler au démarrage
+// au lieu de payer tous les mineurs avant de pouvoir transporter.
+function targets(room, roomCounts, miners) {
+  const list = sources.list(room);
   const expanding = Memory.expansion && Memory.expansion.from === room.name;
   return {
     defender: defense.threats(room).length ? 2 : 0,
-    harvester: (total - mined.length) * 2,
-    miner: mined.length,
-    hauler: mined.reduce((sum, s) => sum + haulersFor(room, s), 0),
+    hauler: list.reduce((sum, s) => sum + haulersFor(room, s, (miners[s.id] || {}).work), 0),
+    miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
     // Un seul upgrader de base tant que des extensions sont en chantier : l'énergie va d'abord à la capacité.
     upgrader: (extensionSites(room) ? 1 : 2) + extraUpgraders(room),
     builder: room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 ? 2 : (needsRepair(room) ? 1 : 0),
@@ -114,16 +116,21 @@ function buildBody(role, energy) {
 }
 
 module.exports.run = function () {
-  // Effectifs actuels par salle puis par rôle, et sources déjà occupées par un mineur.
+  // Effectifs actuels par salle puis par rôle, et WORK et nombre de mineurs par source.
   const counts = {};
-  const minerSources = new Set();
+  const miners = {};
   const remoteCounts = {};
+  const addMiner = (sourceId, body) => {
+    const m = miners[sourceId] = miners[sourceId] || { work: 0, count: 0 };
+    m.work += body.filter((p) => (p.type || p) === WORK).length;
+    m.count++;
+  };
   for (const name in Game.creeps) {
     const creep = Game.creeps[name];
     const room = creep.memory.room || creep.room.name;
     counts[room] = counts[room] || {};
     counts[room][creep.memory.role] = (counts[room][creep.memory.role] || 0) + 1;
-    if (creep.memory.role === 'miner') minerSources.add(creep.memory.sourceId);
+    if (creep.memory.role === 'miner') addMiner(creep.memory.sourceId, creep.body);
     if (creep.memory.role === 'remote') remoteCounts[creep.memory.target] = (remoteCounts[creep.memory.target] || 0) + 1;
   }
 
@@ -136,7 +143,7 @@ module.exports.run = function () {
     // Personne pour remplir spawn et extensions (ou haulers sans mineur pour les alimenter) :
     // récolteur avec l'énergie disponible.
     const emergency = !roomCounts.harvester && (!roomCounts.hauler || !roomCounts.miner);
-    const wanted = targets(room);
+    const wanted = targets(room, roomCounts, miners);
     const role = emergency ? 'harvester' : Object.keys(wanted).find((r) => (roomCounts[r] || 0) < wanted[r]);
     if (!role) continue;
 
@@ -146,7 +153,7 @@ module.exports.run = function () {
     const memory = { role, room: room.name };
     if (role === 'miner') {
       // ponytail: pas de remplacement anticipé, la source chôme le temps du trajet du successeur.
-      const free = minedSources(room).find((s) => !minerSources.has(s.id));
+      const free = sources.list(room).find((s) => needsMiner(s, miners));
       if (!free) continue;
       memory.sourceId = free.id;
     }
@@ -158,7 +165,7 @@ module.exports.run = function () {
     }
     if (spawn.spawnCreep(body, `${role}-${spawn.name}-${Game.time}`, { memory }) === OK) {
       roomCounts[role] = (roomCounts[role] || 0) + 1;
-      if (memory.sourceId) minerSources.add(memory.sourceId);
+      if (memory.sourceId) addMiner(memory.sourceId, body);
       if (memory.target && role === 'remote') remoteCounts[memory.target] = (remoteCounts[memory.target] || 0) + 1;
     }
   }

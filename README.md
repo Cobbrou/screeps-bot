@@ -69,7 +69,7 @@ screeps-bot/
 │       ├── defender.js      # attaque les hostiles de la salle
 │       ├── harvester.js     # récolte et remplit spawn, extensions et tours, construit le surplus
 │       ├── hauler.js        # transporte l'énergie des conteneurs vers spawn, extensions, tours
-│       ├── miner.js         # récolte statique sur le conteneur d'une source
+│       ├── miner.js         # récolte statique sur une source (conteneur, ou au sol)
 │       ├── pioneer.js       # amorce la nouvelle salle (construit son spawn)
 │       ├── remote.js        # récolte dans une salle voisine, livre au stockage
 │       ├── scout.js         # explore les salles voisines

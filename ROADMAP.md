@@ -56,6 +56,17 @@
 - [x] Créeps inoccupés (source vide ou encombrée) envoyés récolter dans une salle voisine sûre
 - [ ] Réservation des salles de remote mining (`reserver`), si le rendement le justifie
 
+## Retravail des bases (RCL 1-3) (en cours)
+
+Priorité actuelle, avant les phases avancées : tirer le maximum des premiers RCL.
+
+- [x] Récolte statique dès le RCL 1 : mineurs au sol sans conteneur, haulers dès le départ
+- [x] Effectifs calculés : 5 `WORK` par source plafonnés aux cases libres, haulers selon le débit réel
+- [ ] Ordre des chantiers : RCL 2 d'abord, puis conteneurs des sources, conteneur du contrôleur après les extensions
+- [ ] Upgraders selon le surplus d'énergie plutôt qu'en nombre fixe
+- [ ] Corps par rôle (upgrader riche en `WORK`) et sans énergie inutilisée
+- [ ] Planner relancé dès la montée de RCL
+
 ## Phase 7 : logistique avancée (RCL 5-6)
 
 - [ ] Liens (`STRUCTURE_LINK`) : source → stockage → contrôleur, moins de transporteurs

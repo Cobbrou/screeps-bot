@@ -20,6 +20,8 @@ const WITHDRAW_SCAN_INTERVAL = 10;
 // Identifiants des sources par salle et du conteneur de chaque source, gardés jusqu'au reset du global.
 const sourceIds = {};
 const containerIds = {};
+// Nombre de cases praticables autour de chaque source (le terrain ne change pas).
+const spotCounts = {};
 
 // Sources de la salle, sans relancer `find` à chaque tick.
 function list(room) {
@@ -27,8 +29,23 @@ function list(room) {
   return sourceIds[room.name].map((id) => Game.getObjectById(id)).filter(Boolean);
 }
 
+// Cases praticables adjacentes à la source : autant de créeps au plus peuvent la récolter en même temps.
+function spots(source) {
+  if (spotCounts[source.id] === undefined) {
+    const terrain = source.room.getTerrain();
+    let n = 0;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        if ((dx || dy) && terrain.get(source.pos.x + dx, source.pos.y + dy) !== TERRAIN_MASK_WALL) n++;
+      }
+    }
+    spotCounts[source.id] = n;
+  }
+  return spotCounts[source.id];
+}
+
 // Attribue au créep la source de sa salle qui a le moins de créeps assignés,
-// en préférant les sources sans conteneur : celles qui en ont sont occupées par un mineur.
+// en préférant les sources sans mineur.
 function assign(creep) {
   const counts = {};
   for (const name in Game.creeps) {
@@ -36,7 +53,7 @@ function assign(creep) {
     if (id) counts[id] = (counts[id] || 0) + 1;
   }
   const roomSources = list(creep.room);
-  const unmined = roomSources.filter((s) => !container(s));
+  const unmined = roomSources.filter((s) => !mined(s));
   const pool = unmined.length ? unmined : roomSources;
   pool.sort((a, b) => (counts[a.id] || 0) - (counts[b.id] || 0));
   if (pool.length) creep.memory.sourceId = pool[0].id;
@@ -58,14 +75,14 @@ function container(target, range = 1) {
 let minedTick = -1;
 let minedIds = new Set();
 
-// Vrai si un mineur travaille sur cette source (son conteneur est alors construit).
+// Vrai si un mineur travaille sur cette source : il pose l'énergie dans son conteneur, ou au sol s'il n'y en a pas.
 function mined(source) {
   if (minedTick !== Game.time) {
     minedTick = Game.time;
     minedIds = new Set(Object.values(Game.creeps)
       .filter((c) => c.memory.role === 'miner').map((c) => c.memory.sourceId));
   }
-  return minedIds.has(source.id) && !!container(source);
+  return minedIds.has(source.id);
 }
 
 // Vrai si la source ne peut pas servir le créep avant longtemps : vide pour plus de AWAY_MIN_WAIT ticks,
@@ -135,11 +152,19 @@ function harvest(creep) {
   }
   const controller = creep.room.controller;
   const canLeave = controller && controller.my && (controller.level >= AWAY_MIN_RCL || list(creep.room).length < 2);
-  // Source tenue par un mineur : on puise dans son conteneur au lieu de lui prendre la place.
+  // Source tenue par un mineur : on puise dans son conteneur, ou on ramasse ce qu'il a posé au sol,
+  // au lieu de lui prendre la place.
   if (mined(source)) {
     const box = container(source);
-    if (box.store[RESOURCE_ENERGY] > 0) {
+    if (box && box.store[RESOURCE_ENERGY] > 0) {
       if (creep.withdraw(box, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, box);
+      return;
+    }
+    const pile = source.pos.findInRange(FIND_DROPPED_RESOURCES, 1, {
+      filter: (r) => r.resourceType === RESOURCE_ENERGY,
+    })[0];
+    if (pile) {
+      if (creep.pickup(pile) === ERR_NOT_IN_RANGE) move.to(creep, pile);
       return;
     }
     const to = creep.memory.role !== 'harvester' && canLeave && awayRoom(creep.room);
@@ -147,7 +172,7 @@ function harvest(creep) {
       creep.memory.away = { from: creep.room.name, to };
       return harvestAway(creep);
     }
-    // Conteneur vide : on attend à l'écart que le mineur le remplisse.
+    // Rien à prendre : on attend à l'écart que le mineur produise.
     stepAway(creep);
     return;
   }
@@ -208,4 +233,4 @@ function collect(creep) {
   if (creep.withdraw(store, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, store);
 }
 
-module.exports = { list, container, harvest, harvestSource, collect, goBack, stepAway };
+module.exports = { list, spots, container, harvest, harvestSource, collect, goBack, stepAway };
