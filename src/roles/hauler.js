@@ -7,7 +7,10 @@ function collect(creep) {
     filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50,
   });
   if (dropped) {
-    if (creep.pickup(dropped) === ERR_NOT_IN_RANGE) move.to(creep, dropped);
+    if (creep.pickup(dropped) === ERR_NOT_IN_RANGE) {
+      fillNearby(creep);
+      move.to(creep, dropped);
+    }
     return;
   }
 
@@ -33,7 +36,33 @@ function collect(creep) {
     }
     creep.memory.pickupId = target ? target.id : undefined;
   }
-  if (target && creep.withdraw(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, target);
+  // Le remplissage en passant n'a lieu qu'en chemin : transfer et withdraw au même tick ne sont pas garantis.
+  if (target && creep.withdraw(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+    fillNearby(creep);
+    move.to(creep, target);
+  }
+}
+
+// Spawn, extension ou tour qui manque d'énergie.
+const needsEnergy = (s) => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION
+  || s.structureType === STRUCTURE_TOWER) && s.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
+
+// En chemin vers sa collecte, le hauler qui porte encore de l'énergie remplit la structure adjacente qui en manque
+// (un seul transfer par tick, compatible avec le déplacement).
+function fillNearby(creep) {
+  if (!creep.store[RESOURCE_ENERGY]) return;
+  const near = creep.pos.findInRange(FIND_MY_STRUCTURES, 1, { filter: needsEnergy })[0];
+  if (near) creep.transfer(near, RESOURCE_ENERGY);
+}
+
+// En chemin vers sa livraison, ramasse l'énergie au sol adjacente s'il reste de la place (pickup, transfer
+// et déplacement passent au même tick).
+function pickupNearby(creep) {
+  if (!creep.store.getFreeCapacity(RESOURCE_ENERGY)) return;
+  const pile = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, {
+    filter: (r) => r.resourceType === RESOURCE_ENERGY,
+  })[0];
+  if (pile) creep.pickup(pile);
 }
 
 // Conteneur de source le plus plein, pour éviter qu'il déborde, en laissant aux autres haulers ceux qu'ils visent déjà.
@@ -49,18 +78,28 @@ function fullestContainer(creep) {
 }
 
 // Livre au spawn, aux extensions et aux tours, puis au conteneur du contrôleur, puis au stockage.
-function deliver(creep) {
+// `skip` : structure qu'on vient de remplir ce tick, à ne plus viser.
+function deliveryTarget(creep, skip) {
   const room = creep.room;
-  let target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
-    filter: (s) => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION
-      || s.structureType === STRUCTURE_TOWER) && s.store.getFreeCapacity(RESOURCE_ENERGY) > 0,
-  });
-  if (!target) {
-    target = room.controller.pos.findInRange(FIND_STRUCTURES, 2, {
+  return creep.pos.findClosestByRange(FIND_MY_STRUCTURES, { filter: (s) => s !== skip && needsEnergy(s) })
+    || room.controller.pos.findInRange(FIND_STRUCTURES, 2, {
       filter: (s) => s.structureType === STRUCTURE_CONTAINER && s.store.getFreeCapacity(RESOURCE_ENERGY) > 0,
     })[0] || room.storage;
+}
+
+// Livre la cible. Si le transfer la remplit et qu'il reste de l'énergie, le hauler part déjà vers la suivante
+// au lieu de perdre un tick sur place.
+function deliver(creep) {
+  const target = deliveryTarget(creep);
+  if (!target) return;
+  const result = creep.transfer(target, RESOURCE_ENERGY);
+  if (result === ERR_NOT_IN_RANGE) {
+    pickupNearby(creep);
+    move.to(creep, target);
+  } else if (result === OK && creep.store[RESOURCE_ENERGY] > target.store.getFreeCapacity(RESOURCE_ENERGY)) {
+    const next = deliveryTarget(creep, target);
+    if (next && next !== target && !creep.pos.isNearTo(next)) move.to(creep, next);
   }
-  if (target && creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, target);
 }
 
 module.exports.run = function (creep) {
