@@ -102,28 +102,38 @@ function targets(room, roomCounts, miners) {
   };
 }
 
-// Répète le motif autant que l'énergie et la taille maximale d'un créep (50 parties) le permettent.
-function repeat(unit, energy) {
-  const cost = unit.reduce((sum, part) => sum + BODYPART_COST[part], 0);
-  const units = Math.min(Math.floor(energy / cost), Math.floor(MAX_CREEP_SIZE / unit.length));
+const cost = (parts) => parts.reduce((sum, part) => sum + BODYPART_COST[part], 0);
+
+// Répète le motif autant que l'énergie et la taille maximale d'un créep (50 parties) le permettent,
+// puis complète avec le premier reste de `rest` qui rentre encore : pas d'énergie inutilisée.
+function repeat(unit, energy, rest = []) {
+  const units = Math.min(Math.floor(energy / cost(unit)), Math.floor(MAX_CREEP_SIZE / unit.length));
   const body = [];
   for (let i = 0; i < units; i++) body.push(...unit);
+  const left = energy - units * cost(unit);
+  const extra = rest.find((parts) => cost(parts) <= left && body.length + parts.length <= MAX_CREEP_SIZE);
+  if (body.length && extra) body.push(...extra);
   return body;
 }
 
-function buildBody(role, energy) {
+// Corps du rôle pour `energy` ; `room` sert à adapter l'upgrader à sa salle.
+function buildBody(role, energy, room) {
   if (role === 'miner') {
     // Un seul MOVE : le mineur ne se déplace qu'une fois jusqu'à son conteneur.
     const work = Math.min(Math.floor((energy - BODYPART_COST[MOVE]) / BODYPART_COST[WORK]), MAX_MINER_WORK);
     return work > 0 ? [...Array(work).fill(WORK), MOVE] : [];
   }
-  if (role === 'hauler') return repeat([CARRY, CARRY, MOVE], energy);
+  if (role === 'hauler') return repeat([CARRY, CARRY, MOVE], energy, [[CARRY, MOVE]]);
   if (role === 'defender') return repeat([ATTACK, MOVE], energy);
   if (role === 'scout') return [MOVE];
   if (role === 'claimer') return energy >= BODYPART_COST[CLAIM] + BODYPART_COST[MOVE] ? [CLAIM, MOVE] : [];
-  // Entre 300 et 399 (RCL 1) : un second WORK plutôt que 100 énergie inutilisées.
-  if (energy >= 300 && energy < 400) return [WORK, WORK, CARRY, MOVE];
-  return repeat([WORK, CARRY, MOVE], energy);
+  // Upgrader nourri par le conteneur du contrôleur : il ne fait que des pas entre conteneur et contrôleur,
+  // donc surtout des WORK, un seul CARRY et un MOVE pour deux WORK (550 → 4 WORK, 800 → 6 WORK).
+  if (role === 'upgrader' && room && sources.container(room.controller, 2) && energy >= BODYPART_COST[CARRY] + 250) {
+    return [CARRY, ...repeat([WORK, WORK, MOVE], energy - BODYPART_COST[CARRY], [[WORK, MOVE]])].slice(0, MAX_CREEP_SIZE);
+  }
+  // Polyvalent : le reste devient un WORK de plus (300 → 2 WORK, 550 → 3 WORK).
+  return repeat([WORK, CARRY, MOVE], energy, [[WORK, MOVE], [WORK]]);
 }
 
 module.exports.run = function () {
@@ -158,7 +168,7 @@ module.exports.run = function () {
     const role = emergency ? 'harvester' : Object.keys(wanted).find((r) => (roomCounts[r] || 0) < wanted[r]);
     if (!role) continue;
 
-    const body = buildBody(role, emergency ? room.energyAvailable : room.energyCapacityAvailable);
+    const body = buildBody(role, emergency ? room.energyAvailable : room.energyCapacityAvailable, room);
     if (!body.length) continue;
 
     const memory = { role, room: room.name };

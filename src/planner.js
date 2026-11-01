@@ -12,6 +12,8 @@ const CONTAINER_MIN_RCL = 2;
 
 // Chantiers que le planner peut encore poser sur ce passage.
 let budget = 0;
+// RCL de chaque salle lors de sa dernière planification, gardé jusqu'au reset du global.
+const plannedLevel = {};
 
 // Pose un chantier dans la limite du budget.
 function place(room, ...args) {
@@ -138,13 +140,16 @@ function planWalls(room, costs) {
 }
 
 module.exports.run = function () {
-  if (Game.time % INTERVAL) return;
+  // Tous les INTERVAL ticks, et dès qu'une salle change de RCL : ses nouvelles structures sont posées aussitôt.
+  // Après un reset du global, chaque salle est replanifiée une fois.
+  const due = Game.time % INTERVAL === 0;
+  const rooms = Object.values(Game.rooms).filter((room) => room.controller && room.controller.my
+    && (due || plannedLevel[room.name] !== room.controller.level));
+  if (!rooms.length) return;
   // Game.constructionSites ne compte pas les chantiers posés pendant le tick : décompte local.
   budget = MAX_CONSTRUCTION_SITES - SITE_MARGIN - Object.keys(Game.constructionSites).length;
-  for (const name in Game.rooms) {
-    const room = Game.rooms[name];
-    // Dès le RCL 1 : routes et conteneurs sont autorisés, extensions et stockage attendent leur RCL.
-    if (!room.controller || !room.controller.my) continue;
+  for (const room of rooms) {
+    plannedLevel[room.name] = room.controller.level;
     const spawn = room.find(FIND_MY_SPAWNS)[0];
     if (!spawn) continue;
 

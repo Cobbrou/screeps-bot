@@ -59,7 +59,7 @@ screeps-bot/
 │   ├── intel.js             # renseignements sur les salles explorées (Memory.rooms[*].intel)
 │   ├── memory.js            # nettoyage de Memory (créeps morts)
 │   ├── move.js              # déplacements : moveTo avec contournement des créeps en cas de blocage
-│   ├── planner.js           # stockage, tours, extensions, routes, conteneurs, murs (tous les 100 ticks)
+│   ├── planner.js           # stockage, tours, extensions, routes, conteneurs, murs (tous les 100 ticks et à chaque montée de RCL)
 │   ├── sources.js           # sources et conteneurs en cache, récolte et collecte d'énergie
 │   ├── spawner.js           # création des créeps selon les effectifs voulus
 │   ├── stats.js             # CPU par module, indicateurs dans Memory.stats, bucket bas, pixels
