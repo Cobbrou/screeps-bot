@@ -15,6 +15,8 @@ const ENERGY_PER_UPGRADER = 100000;
 // ponytail: stock instantané et non débit, plafonné ; les créeps vivant 1500 ticks, un pic passager en laisse trop.
 const WAITING_ENERGY_PER_UPGRADER = 500;
 const MAX_EXTRA_UPGRADERS = 6;
+// Renseignements sur une salle voisine jugés périmés après ce nombre de ticks : un éclaireur va les rafraîchir.
+const SCOUT_REFRESH = 5000;
 
 // Récolte statique dès le RCL 1 : même un mineur à 2 WORK posé sur la source (4 énergie/tick en continu)
 // rapporte bien plus qu'un harvester qui fait l'aller-retour. Sans conteneur, il pose l'énergie au sol.
@@ -81,6 +83,18 @@ function remoteRooms(room) {
     .slice(0, MAX_REMOTE_ROOMS);
 }
 
+// Vrai si un éclaireur sert encore : une voisine est sûre (récolte distante), inconnue ou pas revue depuis
+// SCOUT_REFRESH ticks, ou une expansion est possible (il cherche alors des cibles plus loin).
+// Sinon toutes les voisines sont dangereuses ou prises : l'éclaireur y mourrait pour rien.
+function needsScout(room) {
+  const owned = Object.values(Game.rooms).filter((r) => r.controller && r.controller.my).length;
+  if (owned < Game.gcl.level) return true;
+  return Object.values(Game.map.describeExits(room.name)).some((name) => {
+    const i = intel.get(name);
+    return !i || Game.time - i.time > SCOUT_REFRESH || intel.safe(name);
+  });
+}
+
 // Effectifs voulus par rôle, dans l'ordre de priorité. Les harvesters ne servent plus qu'en urgence (voir run).
 // Haulers avant mineurs : ils suivent les WORK déjà posés, ce qui alterne mineur et hauler au démarrage
 // au lieu de payer tous les mineurs avant de pouvoir transporter.
@@ -95,8 +109,8 @@ function targets(room, roomCounts, miners) {
     // Un seul upgrader de base tant que des extensions sont en chantier : l'énergie va d'abord à la capacité.
     upgrader: (extensionSites(room) ? 1 : 2) + extraUpgraders(room),
     builder: room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 ? 2 : (needsRepair(room) ? 1 : 0),
-    // Un éclaireur suffit à tenir les renseignements à jour.
-    scout: 1,
+    // Un éclaireur suffit à tenir les renseignements à jour, et seulement s'il a encore une utilité.
+    scout: needsScout(room) ? 1 : 0,
     claimer: expanding && !expansion.claimed() ? 1 : 0,
     pioneer: expanding && expansion.claimed() ? 2 : 0,
     remote: remoteRooms(room).reduce((sum, name) => sum + intel.get(name).sources * REMOTE_PER_SOURCE, 0),
