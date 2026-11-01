@@ -29,7 +29,11 @@ function run(creep) {
   if (creep.memory.working && sources.goBack(creep)) return;
 
   if (!creep.memory.working) {
-    if (paused(creep.room)) return;
+    if (paused(creep.room)) {
+      // Il dépense ce qu'il porte déjà au lieu de rester planté avec.
+      if (creep.store[RESOURCE_ENERGY]) creep.memory.working = true;
+      return;
+    }
     // Le conteneur du contrôleur passe avant tout : sinon le withdrawId de collect reste collé
     // au conteneur d'une source, toujours plein, loin du contrôleur.
     const box = sources.container(creep.room.controller, 2);

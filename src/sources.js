@@ -17,11 +17,32 @@ const AWAY_MIN_RCL = 4;
 // Ticks entre deux recherches de conteneur ou de stockage quand le créep n'en a pas trouvé.
 const WITHDRAW_SCAN_INTERVAL = 10;
 
+// Ticks consécutifs sans gagner d'énergie (file d'attente, source vide, mineur lent) avant de partir travailler
+// avec la charge partielle, si elle atteint STALL_MIN_LOAD de la capacité (en dessous, le trajet ne vaut pas le coup).
+const STALL_TICKS = 5;
+const STALL_MIN_LOAD = 0.25;
+
 // Identifiants des sources par salle et du conteneur de chaque source, gardés jusqu'au reset du global.
 const sourceIds = {};
 const containerIds = {};
 // Nombre de cases praticables autour de chaque source (le terrain ne change pas).
 const spotCounts = {};
+// Énergie portée au dernier tick de récolte de chaque créep, hors `Memory` comme dans move.js.
+const lastFill = {};
+
+// Vrai si le créep porte une charge utile mais n'en gagne plus depuis STALL_TICKS ticks.
+function stalled(creep) {
+  const energy = creep.store[RESOURCE_ENERGY];
+  const last = lastFill[creep.name];
+  const n = last && last.time === Game.time - 1 && last.energy === energy ? last.n + 1 : 0;
+  lastFill[creep.name] = { energy, time: Game.time, n };
+  return n >= STALL_TICKS && energy >= creep.store.getCapacity() * STALL_MIN_LOAD;
+}
+
+// Oublie un créep mort.
+function forget(name) {
+  delete lastFill[name];
+}
 
 // Sources de la salle, sans relancer `find` à chaque tick.
 function list(room) {
@@ -143,6 +164,11 @@ function awayRoom(room) {
 // Dans nos salles à partir du RCL AWAY_MIN_RCL (ou dès le RCL 1 avec une seule source), si cette source est indisponible,
 // il part récolter dans une salle voisine sûre qui a de la place. Les harvesters restent toujours sur leur source : ils remplissent le spawn.
 function harvest(creep) {
+  // Bloqué avec de l'énergie : il part la dépenser au lieu d'attendre d'être plein (effet au tick suivant).
+  if (stalled(creep)) {
+    creep.memory.working = true;
+    return;
+  }
   if (creep.memory.away) return harvestAway(creep);
   if (!creep.memory.sourceId) assign(creep);
   const source = Game.getObjectById(creep.memory.sourceId);
@@ -233,4 +259,4 @@ function collect(creep) {
   if (creep.withdraw(store, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, store);
 }
 
-module.exports = { list, spots, container, harvest, harvestSource, collect, goBack, stepAway };
+module.exports = { list, spots, container, harvest, harvestSource, collect, goBack, stepAway, forget };

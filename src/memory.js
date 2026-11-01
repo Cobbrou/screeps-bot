@@ -1,4 +1,5 @@
 const move = require('./move');
+const sources = require('./sources');
 
 // Renseignements plus vieux que ce délai supprimés, vérifiés tous les INTEL_CHECK ticks.
 const INTEL_TTL = 50000;
@@ -10,6 +11,7 @@ module.exports.cleanup = function () {
     if (!Game.creeps[name]) {
       delete Memory.creeps[name];
       move.forget(name);
+      sources.forget(name);
     }
   }
   if (Game.time % INTEL_CHECK) return;
