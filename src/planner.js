@@ -5,7 +5,7 @@ const INTERVAL = 100;
 const MAX_RADIUS = 8;
 // Chantiers laissés libres sur le compte (MAX_CONSTRUCTION_SITES) pour le spawn d'expansion.
 const SITE_MARGIN = 20;
-// RCL à partir duquel les routes sont posées.
+// RCL à partir duquel les routes sont posées sans condition ; avant, seulement une fois la salle équipée.
 const ROAD_MIN_RCL = 3;
 // RCL à partir duquel les conteneurs sont posés.
 const CONTAINER_MIN_RCL = 2;
@@ -90,7 +90,7 @@ function planContainer(room, target, range, end, wanted) {
 // Le chemin est gardé en mémoire (cases codées x * 50 + y) : le recalculer à chaque passage le ferait dévier
 // au gré des nouvelles structures et laisserait des tronçons orphelins. Il n'est recalculé que s'il est bloqué.
 // Il est calculé même sans conteneur ni route : le spawner s'en sert pour dimensionner les haulers.
-function planRoute(room, spawn, target, range, costs, withContainer) {
+function planRoute(room, spawn, target, range, costs, withContainer, withRoad) {
   if (!room.memory.routes) room.memory.routes = {};
   const saved = room.memory.routes[target.id];
   let path = saved && saved.map((k) => new RoomPosition(Math.floor(k / 50), k % 50, room.name));
@@ -108,9 +108,8 @@ function planRoute(room, spawn, target, range, costs, withContainer) {
   path = path.slice();
   const end = path.pop();
   planContainer(room, target, range, end, withContainer);
-  // Avant ROAD_MIN_RCL, les routes coûtent plus qu'elles ne rapportent aux petits corps :
-  // pas de route, et les chantiers de route pas encore entamés sont retirés.
-  if (room.controller.level < ROAD_MIN_RCL) {
+  // Sans route voulue, les chantiers de route pas encore entamés sont retirés.
+  if (!withRoad) {
     removeSites(path, STRUCTURE_ROAD);
     return;
   }
@@ -174,12 +173,18 @@ module.exports.run = function () {
     // Pas de conteneur au RCL 1 : le passage au RCL 2 ne coûte que 200 énergie, un conteneur 5000.
     // Les mineurs posent l'énergie au sol en attendant.
     const containers = room.controller.level >= CONTAINER_MIN_RCL;
-    for (const source of sources.list(room)) planRoute(room, spawn, source, 1, costs, containers);
-    // Conteneur du contrôleur une fois toutes les extensions du RCL construites : la capacité passe avant.
-    // Portée 2 : le conteneur reste à portée d'amélioration (3) sans bloquer les abords du contrôleur.
     const extensions = room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_EXTENSION });
     const extensionsDone = extensions.length >= CONTROLLER_STRUCTURES[STRUCTURE_EXTENSION][room.controller.level];
-    planRoute(room, spawn, room.controller, 2, costs, containers && extensionsDone);
+    // Routes dès le RCL ROAD_MIN_RCL, ou plus tôt une fois la salle équipée : extensions et conteneurs
+    // (un par source et celui du contrôleur) construits, aucun autre chantier en cours.
+    const builtContainers = room.find(FIND_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_CONTAINER });
+    const otherSites = room.find(FIND_MY_CONSTRUCTION_SITES, { filter: (s) => s.structureType !== STRUCTURE_ROAD });
+    const roads = room.controller.level >= ROAD_MIN_RCL || (containers && extensionsDone && !otherSites.length
+      && builtContainers.length >= sources.list(room).length + 1);
+    for (const source of sources.list(room)) planRoute(room, spawn, source, 1, costs, containers, roads);
+    // Conteneur du contrôleur une fois toutes les extensions du RCL construites : la capacité passe avant.
+    // Portée 2 : le conteneur reste à portée d'amélioration (3) sans bloquer les abords du contrôleur.
+    planRoute(room, spawn, room.controller, 2, costs, containers && extensionsDone, roads);
     // Murs seulement une fois une tour construite (elle seule les entretient) et le stockage aussi (RCL 4) :
     // avant, les remonter à leur plafond prendrait l'essentiel de l'énergie de la salle.
     if (room.storage
