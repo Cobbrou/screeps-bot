@@ -25,7 +25,7 @@ const STALL_MIN_LOAD = 0.25;
 // Identifiants des sources par salle et du conteneur de chaque source, gardés jusqu'au reset du global.
 const sourceIds = {};
 const containerIds = {};
-// Nombre de cases praticables autour de chaque source (le terrain ne change pas).
+// Nombre de cases praticables autour de chaque source, avec le tick du calcul.
 const spotCounts = {};
 // Énergie portée au dernier tick de récolte de chaque créep, hors `Memory` comme dans move.js.
 const lastFill = {};
@@ -50,19 +50,24 @@ function list(room) {
   return sourceIds[room.name].map((id) => Game.getObjectById(id)).filter(Boolean);
 }
 
-// Cases praticables adjacentes à la source : autant de créeps au plus peuvent la récolter en même temps.
+// Cases praticables adjacentes à la source (ni mur naturel, ni structure bloquante) : autant de créeps au plus
+// peuvent la récolter en même temps. Recalculé une fois par tick : des structures peuvent apparaître ou disparaître.
 function spots(source) {
-  if (spotCounts[source.id] === undefined) {
-    const terrain = source.room.getTerrain();
-    let n = 0;
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        if ((dx || dy) && terrain.get(source.pos.x + dx, source.pos.y + dy) !== TERRAIN_MASK_WALL) n++;
-      }
+  const cached = spotCounts[source.id];
+  if (cached && cached.time === Game.time) return cached.n;
+  const terrain = source.room.getTerrain();
+  const { x, y } = source.pos;
+  const blocked = new Set(source.room.lookForAtArea(LOOK_STRUCTURES, y - 1, x - 1, y + 1, x + 1, true)
+    .filter((o) => OBSTACLE_OBJECT_TYPES.includes(o.structure.structureType))
+    .map((o) => o.x * 50 + o.y));
+  let n = 0;
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      if ((dx || dy) && terrain.get(x + dx, y + dy) !== TERRAIN_MASK_WALL && !blocked.has((x + dx) * 50 + y + dy)) n++;
     }
-    spotCounts[source.id] = n;
   }
-  return spotCounts[source.id];
+  spotCounts[source.id] = { time: Game.time, n };
+  return n;
 }
 
 // Attribue au créep la source de sa salle qui a le moins de créeps assignés,

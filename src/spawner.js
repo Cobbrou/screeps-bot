@@ -26,9 +26,12 @@ const DOWNGRADE_HIGH = 0.2;
 // Récolte statique dès le RCL 1 : même un mineur à 2 WORK posé sur la source (4 énergie/tick en continu)
 // rapporte bien plus qu'un harvester qui fait l'aller-retour. Sans conteneur, il pose l'énergie au sol.
 // Vrai s'il manque un mineur sur la source : moins de MAX_MINER_WORK au total et une case libre pour un de plus.
+// `count` ignore les mineurs en fin de vie (leur successeur est lancé à l'avance), `total` les compte :
+// au plus un mineur de plus que de cases, le temps que le mourant laisse sa place.
 function needsMiner(source, miners) {
-  const m = miners[source.id] || { work: 0, count: 0 };
-  return m.work < MAX_MINER_WORK && m.count < sources.spots(source);
+  const m = miners[source.id] || { work: 0, count: 0, total: 0 };
+  const spots = sources.spots(source);
+  return m.work < MAX_MINER_WORK && m.count < spots && m.total <= spots;
 }
 
 // Capacité de transport (CARRY × 50) nécessaire pour suivre la production réelle des mineurs de la source
@@ -183,8 +186,10 @@ module.exports.run = function () {
   };
   const miners = {};
   const remoteCounts = {};
-  const addMiner = (sourceId, body) => {
-    const m = miners[sourceId] = miners[sourceId] || { work: 0, count: 0 };
+  const addMiner = (sourceId, body, dying) => {
+    const m = miners[sourceId] = miners[sourceId] || { work: 0, count: 0, total: 0 };
+    m.total++;
+    if (dying) return;
     m.work += body.filter((p) => (p.type || p) === WORK).length;
     m.count++;
   };
@@ -200,7 +205,7 @@ module.exports.run = function () {
     if (!(dying && creep.memory.role === 'upgrader')) {
       counts[room][creep.memory.role] = (counts[room][creep.memory.role] || 0) + 1;
     }
-    if (creep.memory.role === 'miner' && !dying) addMiner(creep.memory.sourceId, creep.body);
+    if (creep.memory.role === 'miner') addMiner(creep.memory.sourceId, creep.body, dying);
     if (creep.memory.role === 'hauler' && !dying) addCarry(room, creep.body);
     if (creep.memory.role === 'remote') remoteCounts[creep.memory.target] = (remoteCounts[creep.memory.target] || 0) + 1;
   }
