@@ -192,13 +192,16 @@ module.exports.run = function () {
     const creep = Game.creeps[name];
     const room = creep.memory.room || creep.room.name;
     counts[room] = counts[room] || {};
-    counts[room][creep.memory.role] = (counts[room][creep.memory.role] || 0) + 1;
-    // Mineur en fin de vie (il lui reste moins que le trajet plus la durée de spawn) : déjà compté comme absent,
-    // pour que son successeur arrive quand il meurt au lieu de laisser la source chômer.
-    const dying = creep.memory.travel !== undefined
-      && creep.ticksToLive <= creep.memory.travel + creep.body.length * CREEP_SPAWN_TIME;
+    // Créep en fin de vie (il lui reste moins que le trajet plus la durée de spawn) : déjà compté comme absent,
+    // pour que son successeur arrive quand il meurt au lieu de laisser son poste vide.
+    // Trajet noté à l'arrivée par le mineur et l'upgrader ; le hauler n'a pas de poste fixe, seule la durée de spawn compte.
+    const lead = creep.memory.role === 'hauler' ? 0 : creep.memory.travel;
+    const dying = lead !== undefined && creep.ticksToLive <= lead + creep.body.length * CREEP_SPAWN_TIME;
+    if (!(dying && creep.memory.role === 'upgrader')) {
+      counts[room][creep.memory.role] = (counts[room][creep.memory.role] || 0) + 1;
+    }
     if (creep.memory.role === 'miner' && !dying) addMiner(creep.memory.sourceId, creep.body);
-    if (creep.memory.role === 'hauler') addCarry(room, creep.body);
+    if (creep.memory.role === 'hauler' && !dying) addCarry(room, creep.body);
     if (creep.memory.role === 'remote') remoteCounts[creep.memory.target] = (remoteCounts[creep.memory.target] || 0) + 1;
   }
 

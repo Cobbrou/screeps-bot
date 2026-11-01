@@ -18,6 +18,12 @@ function paused(room) {
 // Alterne entre récolte et amélioration du contrôleur de la salle.
 // En pause, l'upgrader finit l'énergie qu'il porte mais n'en reprend pas.
 function run(creep) {
+  // Temps de trajet depuis le spawn, noté à la première arrivée au contrôleur : le spawner lance le successeur
+  // assez tôt pour qu'il arrive quand cet upgrader meurt.
+  // ponytail: sans conteneur au contrôleur, le premier trajet passe par une source et surestime : remplaçant un peu tôt.
+  if (creep.memory.travel === undefined && creep.pos.inRangeTo(creep.room.controller, 3)) {
+    creep.memory.travel = CREEP_LIFE_TIME - creep.ticksToLive;
+  }
   if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) creep.memory.working = false;
   if (!creep.memory.working && creep.store.getFreeCapacity() === 0) creep.memory.working = true;
   if (creep.memory.working && sources.goBack(creep)) return;

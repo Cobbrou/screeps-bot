@@ -73,7 +73,7 @@ Priorité actuelle, avant les phases avancées : tirer le maximum des premiers R
 - [x] Garde-fou de rétrogradation : sous 10 % de `CONTROLLER_DOWNGRADE`, priorité à l'amélioration (avec hystérésis pour ne pas osciller)
 - [x] Transporteurs qui remplissent les structures adjacentes en passant et ramassent l'énergie croisée en chemin
 - [x] Upgraders en pause quand le stockage est bas ou la salle attaquée, sauf risque de rétrogradation
-- [ ] Remplacement anticipé étendu aux upgraders et aux haulers
+- [x] Remplacement anticipé étendu aux upgraders (trajet noté au contrôleur) et aux haulers (durée de spawn)
 - [ ] Chantiers non entamés depuis longtemps retirés
 
 ## Phase 7 : logistique avancée (RCL 5-6)
