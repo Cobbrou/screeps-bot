@@ -25,13 +25,13 @@
 - [x] Mise en cache des sources (portée du module, conservée jusqu'au reset du global)
 - [x] Mise en cache des chemins des créeps (`reusePath` à 20 ticks)
 
-## Phase 3 : récolte statique et logistique (RCL 3-4)
+## Phase 3 : récolte statique et logistique (RCL 3-4) (fait)
 
 - [x] Rôle `miner` : 5 `WORK`, posé sur le conteneur de sa source
 - [x] Rôle `hauler` : transporte l'énergie des conteneurs vers spawn, extensions et tours
 - [x] Construction du stockage (`STRUCTURE_STORAGE`) au RCL 4
 - [x] Ramassage de l'énergie au sol et des pierres tombales
-- [ ] Remplacement anticipé des mineurs avant leur mort, si la perte de récolte le justifie
+- [x] Remplacement anticipé des mineurs : temps de trajet noté à l'arrivée, successeur lancé pour arriver à la mort du précédent
 
 ## Phase 4 : défense (RCL 3+) (fait)
 
@@ -55,8 +55,10 @@
 - [x] Gestion multi-salles : chaque salle possédée gérée indépendamment
 - [x] Créeps inoccupés (source vide ou encombrée) envoyés récolter dans une salle voisine sûre
 - [ ] Réservation des salles de remote mining (`reserver`), si le rendement le justifie
+- [ ] Mineur distant avec 1 `CARRY` qui construit et entretient son conteneur, transporteurs appelés selon le stock
+- [ ] Détection d'enfermement : une seule salle depuis longtemps, voisines hostiles ; adapter la stratégie
 
-## Retravail des bases (RCL 1-3) (fait)
+## Retravail des bases (RCL 1-3)
 
 Priorité actuelle, avant les phases avancées : tirer le maximum des premiers RCL.
 
@@ -66,8 +68,18 @@ Priorité actuelle, avant les phases avancées : tirer le maximum des premiers R
 - [x] Upgraders selon le surplus d'énergie plutôt qu'en nombre fixe
 - [x] Corps par rôle (upgrader riche en `WORK`) et sans énergie inutilisée
 - [x] Planner relancé dès la montée de RCL
+- [x] Routes dès le RCL 2 une fois extensions et conteneurs construits
+- [x] Éclaireur seulement s'il reste une voisine utile à explorer
+- [ ] Garde-fou de rétrogradation : sous 10 % de `CONTROLLER_DOWNGRADE`, priorité à l'amélioration (avec hystérésis pour ne pas osciller)
+- [ ] Transporteurs qui remplissent les structures adjacentes en passant et ramassent l'énergie croisée en chemin
+- [ ] Upgraders en pause quand le stockage est bas ou la salle attaquée, sauf risque de rétrogradation
+- [ ] Remplacement anticipé étendu aux upgraders et aux haulers
+- [ ] Chantiers non entamés depuis longtemps retirés
 
 ## Phase 7 : logistique avancée (RCL 5-6)
+
+- [ ] Plan de base pré-calculé : upgrader fixe au contrôleur, stockage à côté, `filler` fixe au stockage ; structures posées le long des chemins pré-calculés
+- [ ] Créeps sur chemins pré-calculés et mis en cache dans la salle : moins de pathfinding
 
 - [ ] Liens (`STRUCTURE_LINK`) : source → stockage → contrôleur, moins de transporteurs
 - [ ] Remplacement des `harvester` par un `filler` dédié au spawn et aux extensions depuis le stockage

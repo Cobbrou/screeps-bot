@@ -6,6 +6,11 @@ const sources = require('../sources');
 module.exports.run = function (creep) {
   const source = Game.getObjectById(creep.memory.sourceId);
   if (!source) return;
+  // Temps de trajet depuis le spawn, noté à l'arrivée : le spawner lance le successeur assez tôt
+  // pour qu'il arrive quand ce mineur meurt.
+  if (creep.memory.travel === undefined && creep.pos.isNearTo(source)) {
+    creep.memory.travel = CREEP_LIFE_TIME - creep.ticksToLive;
+  }
   const container = sources.container(source);
   if (container && !creep.pos.isEqualTo(container.pos) && !container.pos.lookFor(LOOK_CREEPS).length) {
     move.to(creep, container);

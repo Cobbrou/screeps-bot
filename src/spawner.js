@@ -166,7 +166,11 @@ module.exports.run = function () {
     const room = creep.memory.room || creep.room.name;
     counts[room] = counts[room] || {};
     counts[room][creep.memory.role] = (counts[room][creep.memory.role] || 0) + 1;
-    if (creep.memory.role === 'miner') addMiner(creep.memory.sourceId, creep.body);
+    // Mineur en fin de vie (il lui reste moins que le trajet plus la durée de spawn) : déjà compté comme absent,
+    // pour que son successeur arrive quand il meurt au lieu de laisser la source chômer.
+    const dying = creep.memory.travel !== undefined
+      && creep.ticksToLive <= creep.memory.travel + creep.body.length * CREEP_SPAWN_TIME;
+    if (creep.memory.role === 'miner' && !dying) addMiner(creep.memory.sourceId, creep.body);
     if (creep.memory.role === 'remote') remoteCounts[creep.memory.target] = (remoteCounts[creep.memory.target] || 0) + 1;
   }
 
@@ -188,7 +192,6 @@ module.exports.run = function () {
 
     const memory = { role, room: room.name };
     if (role === 'miner') {
-      // ponytail: pas de remplacement anticipé, la source chôme le temps du trajet du successeur.
       // Source la moins équipée d'abord : sinon la première source de la liste prend tous les mineurs
       // (jusqu'à MAX_MINER_WORK ou ses cases libres) avant que la seconde n'en reçoive un.
       const work = (s) => (miners[s.id] || { work: 0 }).work;
