@@ -68,9 +68,12 @@ module.exports.run = function (creep) {
     return;
   }
 
-  if (repair(creep, URGENT_RATIO)) return;
-  if (build(creep)) return;
-  if (repair(creep, 1)) return;
+  // Rétrogradation proche (drapeau posé par le spawner) : droit au contrôleur.
+  if (!creep.room.memory.downgrade) {
+    if (repair(creep, URGENT_RATIO)) return;
+    if (build(creep)) return;
+    if (repair(creep, 1)) return;
+  }
   if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
     move.to(creep, creep.room.controller);
   }

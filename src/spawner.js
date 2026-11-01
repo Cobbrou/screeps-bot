@@ -17,6 +17,10 @@ const WAITING_ENERGY_PER_UPGRADER = 500;
 const MAX_EXTRA_UPGRADERS = 6;
 // Renseignements sur une salle voisine jugés périmés après ce nombre de ticks : un éclaireur va les rafraîchir.
 const SCOUT_REFRESH = 5000;
+// Garde-fou de rétrogradation : priorité à l'amélioration sous DOWNGRADE_LOW de CONTROLLER_DOWNGRADE,
+// levée au-dessus de DOWNGRADE_HIGH (hystérésis : chaque amélioration ne rend que 100 ticks).
+const DOWNGRADE_LOW = 0.1;
+const DOWNGRADE_HIGH = 0.2;
 
 // Récolte statique dès le RCL 1 : même un mineur à 2 WORK posé sur la source (4 énergie/tick en continu)
 // rapporte bien plus qu'un harvester qui fait l'aller-retour. Sans conteneur, il pose l'énergie au sol.
@@ -95,19 +99,32 @@ function needsScout(room) {
   });
 }
 
+// Vrai si le contrôleur risque de rétrograder. L'état est gardé dans room.memory.downgrade
+// (lu aussi par les builders) pour ne pas osciller autour du seuil.
+function downgrading(room) {
+  const ratio = room.controller.ticksToDowngrade / CONTROLLER_DOWNGRADE[room.controller.level];
+  if (ratio < DOWNGRADE_LOW) room.memory.downgrade = true;
+  else if (ratio > DOWNGRADE_HIGH) delete room.memory.downgrade;
+  return !!room.memory.downgrade;
+}
+
 // Effectifs voulus par rôle, dans l'ordre de priorité. Les harvesters ne servent plus qu'en urgence (voir run).
 // Haulers avant mineurs : ils suivent les WORK déjà posés, ce qui alterne mineur et hauler au démarrage
 // au lieu de payer tous les mineurs avant de pouvoir transporter.
 function targets(room, roomCounts, miners) {
   const list = sources.list(room);
   const expanding = Memory.expansion && Memory.expansion.from === room.name;
+  const upgrader = (extensionSites(room) ? 1 : 2) + extraUpgraders(room);
   return {
     // En mode sans échec, les hostiles ne peuvent rien contre la salle : pas de défenseur.
     defender: !room.controller.safeMode && defense.threats(room).length ? 2 : 0,
+    // Rétrogradation proche : les upgraders passent avant l'économie (une clé déjà posée garde sa place).
+    // ponytail: tous les upgraders voulus passent en tête, pas seulement le premier ; l'urgence harvester couvre la famine.
+    ...(downgrading(room) ? { upgrader } : {}),
     hauler: list.reduce((sum, s) => sum + haulersFor(room, s, (miners[s.id] || {}).work), 0),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
     // Un seul upgrader de base tant que des extensions sont en chantier : l'énergie va d'abord à la capacité.
-    upgrader: (extensionSites(room) ? 1 : 2) + extraUpgraders(room),
+    upgrader,
     builder: room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 ? 2 : (needsRepair(room) ? 1 : 0),
     // Un éclaireur suffit à tenir les renseignements à jour, et seulement s'il a encore une utilité.
     scout: needsScout(room) ? 1 : 0,
