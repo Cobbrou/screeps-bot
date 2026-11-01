@@ -31,16 +31,17 @@ function needsMiner(source, miners) {
   return m.work < MAX_MINER_WORK && m.count < sources.spots(source);
 }
 
-// Haulers nécessaires pour suivre la production réelle des mineurs de la source (2 énergie/tick par WORK,
-// 10 au plus) sur l'aller-retour spawn ↔ source.
+// Capacité de transport (CARRY × 50) nécessaire pour suivre la production réelle des mineurs de la source
+// (2 énergie/tick par WORK, 10 au plus) sur l'aller-retour spawn ↔ source. Comparée à la capacité des haulers
+// vivants, et non à leur nombre : ceux nés avant les extensions portent moins qu'un corps neuf.
 // ponytail: distance de la route du planner, alors que les haulers livrent aussi aux tours et au contrôleur.
-function haulersFor(room, source, work) {
+function haulCapacity(room, source, work) {
   if (!work) return 0;
   const rate = Math.min(work, MAX_MINER_WORK) * HARVEST_POWER;
   const route = room.memory.routes && room.memory.routes[source.id];
-  const carry = buildBody('hauler', room.energyCapacityAvailable).filter((p) => p === CARRY).length * CARRY_CAPACITY;
-  if (!route || !carry) return 1;
-  return Math.ceil((2 * route.length * rate) / carry);
+  // Sans route connue : la capacité d'un hauler neuf.
+  if (!route) return buildBody('hauler', room.energyCapacityAvailable).filter((p) => p === CARRY).length * CARRY_CAPACITY;
+  return 2 * route.length * rate;
 }
 
 // Nombre de chantiers d'extension dans la salle.
@@ -112,7 +113,7 @@ function downgrading(room) {
 // Effectifs voulus par rôle, dans l'ordre de priorité. Les harvesters ne servent plus qu'en urgence (voir run).
 // Haulers avant mineurs : ils suivent les WORK déjà posés, ce qui alterne mineur et hauler au démarrage
 // au lieu de payer tous les mineurs avant de pouvoir transporter.
-function targets(room, roomCounts, miners) {
+function targets(room, roomCounts, miners, carry) {
   const list = sources.list(room);
   const expanding = Memory.expansion && Memory.expansion.from === room.name;
   // downgrading avant paused : il pose le drapeau qui lève la pause.
@@ -124,7 +125,9 @@ function targets(room, roomCounts, miners) {
     // Rétrogradation proche : les upgraders passent avant l'économie (une clé déjà posée garde sa place).
     // ponytail: tous les upgraders voulus passent en tête, pas seulement le premier ; l'urgence harvester couvre la famine.
     ...(urgent ? { upgrader } : {}),
-    hauler: list.reduce((sum, s) => sum + haulersFor(room, s, (miners[s.id] || {}).work), 0),
+    // Un hauler de plus tant que la capacité des haulers vivants reste sous le besoin.
+    hauler: (roomCounts.hauler || 0)
+      + (list.reduce((sum, s) => sum + haulCapacity(room, s, (miners[s.id] || {}).work), 0) > (carry || 0) ? 1 : 0),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
     // Un seul upgrader de base tant que des extensions sont en chantier : l'énergie va d'abord à la capacité.
     upgrader,
@@ -172,8 +175,12 @@ function buildBody(role, energy, room) {
 }
 
 module.exports.run = function () {
-  // Effectifs actuels par salle puis par rôle, et WORK et nombre de mineurs par source.
+  // Effectifs actuels par salle puis par rôle, WORK et nombre de mineurs par source, capacité des haulers par salle.
   const counts = {};
+  const carry = {};
+  const addCarry = (room, body) => {
+    carry[room] = (carry[room] || 0) + body.filter((p) => (p.type || p) === CARRY).length * CARRY_CAPACITY;
+  };
   const miners = {};
   const remoteCounts = {};
   const addMiner = (sourceId, body) => {
@@ -191,6 +198,7 @@ module.exports.run = function () {
     const dying = creep.memory.travel !== undefined
       && creep.ticksToLive <= creep.memory.travel + creep.body.length * CREEP_SPAWN_TIME;
     if (creep.memory.role === 'miner' && !dying) addMiner(creep.memory.sourceId, creep.body);
+    if (creep.memory.role === 'hauler') addCarry(room, creep.body);
     if (creep.memory.role === 'remote') remoteCounts[creep.memory.target] = (remoteCounts[creep.memory.target] || 0) + 1;
   }
 
@@ -203,7 +211,7 @@ module.exports.run = function () {
     // Personne pour remplir spawn et extensions (ou haulers sans mineur pour les alimenter) :
     // récolteur avec l'énergie disponible.
     const emergency = !roomCounts.harvester && (!roomCounts.hauler || !roomCounts.miner);
-    const wanted = targets(room, roomCounts, miners);
+    const wanted = targets(room, roomCounts, miners, carry[room.name]);
     const role = emergency ? 'harvester' : Object.keys(wanted).find((r) => (roomCounts[r] || 0) < wanted[r]);
     if (!role) continue;
 
@@ -228,6 +236,7 @@ module.exports.run = function () {
     if (spawn.spawnCreep(body, `${role}-${spawn.name}-${Game.time}`, { memory }) === OK) {
       roomCounts[role] = (roomCounts[role] || 0) + 1;
       if (memory.sourceId) addMiner(memory.sourceId, body);
+      if (role === 'hauler') addCarry(room.name, body);
       if (memory.target && role === 'remote') remoteCounts[memory.target] = (remoteCounts[memory.target] || 0) + 1;
     }
   }
