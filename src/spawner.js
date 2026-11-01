@@ -88,7 +88,8 @@ function targets(room, roomCounts, miners) {
   const list = sources.list(room);
   const expanding = Memory.expansion && Memory.expansion.from === room.name;
   return {
-    defender: defense.threats(room).length ? 2 : 0,
+    // En mode sans échec, les hostiles ne peuvent rien contre la salle : pas de défenseur.
+    defender: !room.controller.safeMode && defense.threats(room).length ? 2 : 0,
     hauler: list.reduce((sum, s) => sum + haulersFor(room, s, (miners[s.id] || {}).work), 0),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
     // Un seul upgrader de base tant que des extensions sont en chantier : l'énergie va d'abord à la capacité.

@@ -72,6 +72,20 @@ function removeSites(positions, type) {
   }
 }
 
+// Un seul conteneur à portée `range` de la cible. Un chemin recalculé change de bout : sans ce contrôle,
+// un second conteneur serait posé à côté du premier.
+// Conteneur déjà construit (ou pas voulu) : les chantiers de conteneur non entamés autour sont retirés ;
+// sinon on garde le chantier le plus avancé, ou on en pose un au bout du chemin.
+function planContainer(room, target, range, end, wanted) {
+  const isContainer = { filter: (s) => s.structureType === STRUCTURE_CONTAINER };
+  const built = target.pos.findInRange(FIND_STRUCTURES, range, isContainer).length > 0;
+  const sites = target.pos.findInRange(FIND_MY_CONSTRUCTION_SITES, range, isContainer)
+    .sort((a, b) => b.progress - a.progress);
+  const keep = wanted && !built ? sites.slice(0, 1) : [];
+  for (const site of sites) if (!keep.includes(site) && !site.progress) site.remove();
+  if (wanted && !built && !sites.length) place(room, end, STRUCTURE_CONTAINER);
+}
+
 // Route du spawn jusqu'à la cible, terminée par un conteneur si `withContainer`.
 // Le chemin est gardé en mémoire (cases codées x * 50 + y) : le recalculer à chaque passage le ferait dévier
 // au gré des nouvelles structures et laisserait des tronçons orphelins. Il n'est recalculé que s'il est bloqué.
@@ -93,8 +107,7 @@ function planRoute(room, spawn, target, range, costs, withContainer) {
   }
   path = path.slice();
   const end = path.pop();
-  if (withContainer) place(room, end, STRUCTURE_CONTAINER);
-  else removeSites([end], STRUCTURE_CONTAINER);
+  planContainer(room, target, range, end, withContainer);
   // Avant ROAD_MIN_RCL, les routes coûtent plus qu'elles ne rapportent aux petits corps :
   // pas de route, et les chantiers de route pas encore entamés sont retirés.
   if (room.controller.level < ROAD_MIN_RCL) {
