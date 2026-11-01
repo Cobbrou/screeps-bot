@@ -175,7 +175,10 @@ module.exports.run = function () {
     const memory = { role, room: room.name };
     if (role === 'miner') {
       // ponytail: pas de remplacement anticipé, la source chôme le temps du trajet du successeur.
-      const free = sources.list(room).find((s) => needsMiner(s, miners));
+      // Source la moins équipée d'abord : sinon la première source de la liste prend tous les mineurs
+      // (jusqu'à MAX_MINER_WORK ou ses cases libres) avant que la seconde n'en reçoive un.
+      const work = (s) => (miners[s.id] || { work: 0 }).work;
+      const free = sources.list(room).filter((s) => needsMiner(s, miners)).sort((a, b) => work(a) - work(b))[0];
       if (!free) continue;
       memory.sourceId = free.id;
     }
