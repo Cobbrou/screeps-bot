@@ -64,14 +64,6 @@ module.exports.run = function (creep) {
   if (creep.memory.working && sources.goBack(creep)) return;
 
   if (!creep.memory.working) {
-    // L'énergie au sol passe avant les conteneurs et la récolte : elle se perd (decay) si personne ne la ramasse.
-    const pile = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
-      filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50,
-    });
-    if (pile) {
-      if (creep.pickup(pile) === ERR_NOT_IN_RANGE) move.to(creep, pile);
-      return;
-    }
     sources.collect(creep);
     return;
   }

@@ -240,10 +240,18 @@ function stepAway(creep) {
   if (result.path.length) creep.move(creep.pos.getDirectionTo(result.path[0]));
 }
 
-// Prend l'énergie dans un conteneur ou le stockage s'il en reste assez (retrait partiel accepté) ; récolte sinon.
+// Ramasse l'énergie au sol (tas d'au moins 50) ; sinon prend dans un conteneur ou le stockage s'il en reste assez
+// (retrait partiel accepté) ; récolte sinon. L'énergie au sol passe en premier : elle se perd si personne ne la ramasse.
 // La réserve est gardée en mémoire tant qu'elle suffit ; sans réserve, la salle n'est fouillée
 // qu'une fois tous les WITHDRAW_SCAN_INTERVAL ticks.
 function collect(creep) {
+  const pile = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
+    filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50,
+  });
+  if (pile) {
+    if (creep.pickup(pile) === ERR_NOT_IN_RANGE) move.to(creep, pile);
+    return;
+  }
   const need = Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), MIN_WITHDRAW);
   let store = Game.getObjectById(creep.memory.withdrawId);
   if (!store || store.store[RESOURCE_ENERGY] < need) {
