@@ -33,12 +33,17 @@
 - [x] Ramassage de l'énergie au sol et des pierres tombales
 - [x] Remplacement anticipé des mineurs : temps de trajet noté à l'arrivée, successeur lancé pour arriver à la mort du précédent
 
-## Phase 4 : défense (RCL 3+) (fait)
+## Phase 4 : défense (RCL 3+)
 
 - [x] `defense` : tours qui attaquent les hostiles, soignent, puis réparent
 - [x] Murs et remparts aux sorties de la salle, une fois une tour construite
 - [x] Activation du mode sans échec (`safeMode`) en dernier recours
 - [x] Défenseurs créés quand des hostiles sont présents
+- [ ] Priorité de tir des tours : soigneur, puis claimer hostile (`attackController` bloque l'amélioration), puis cible presque morte, puis la plus proche
+- [ ] Protection contre le vidage des tours : ne tirer que si les dégâts estimés (selon la portée) dépassent le soin hostile
+- [ ] Défenseurs selon la menace : aucun si les tours suffisent, sinon selon les parties `ATTACK`/`RANGED_ATTACK`/`HEAL` hostiles (aujourd'hui 2 fixes)
+- [ ] Défenseur posté sur le rempart le plus proche de l'ennemi, à distance (`RANGED_ATTACK`), au lieu de l'attendre près du spawn
+- [ ] Mode sans échec aussi quand un claimer hostile attaque le contrôleur
 
 ## Phase 5 : suivi et optimisation (fait)
 
@@ -67,6 +72,7 @@ Priorité actuelle, avant les phases avancées : tirer le maximum des premiers R
 - [x] Ordre des chantiers : RCL 2 d'abord, puis extensions, conteneurs des sources, conteneur du contrôleur après les extensions
 - [x] Upgraders selon le surplus d'énergie plutôt qu'en nombre fixe
 - [x] Corps par rôle (upgrader riche en `WORK`) et sans énergie inutilisée
+- [ ] Haulers qui ne visent une tour que s'il lui manque assez d'énergie (~200), sauf hostiles présents : pas de détour pour quelques points
 - [x] Planner relancé dès la montée de RCL
 - [x] Routes dès le RCL 2 une fois extensions et conteneurs construits
 - [x] Éclaireur seulement s'il reste une voisine utile à explorer
@@ -74,14 +80,14 @@ Priorité actuelle, avant les phases avancées : tirer le maximum des premiers R
 - [x] Transporteurs qui remplissent les structures adjacentes en passant et ramassent l'énergie croisée en chemin
 - [x] Upgraders en pause quand le stockage est bas ou la salle attaquée, sauf risque de rétrogradation
 - [x] Remplacement anticipé étendu aux upgraders (trajet noté au contrôleur) et aux haulers (durée de spawn)
-- [ ] Chantiers non entamés depuis longtemps retirés
+- [x] Chantiers non entamés depuis 5 000 ticks retirés (`Memory.sites`)
 
 ## Phase 7 : logistique avancée (RCL 5-6)
 
 - [ ] Plan de base pré-calculé : upgrader fixe au contrôleur, stockage à côté, `filler` fixe au stockage ; structures posées le long des chemins pré-calculés
 - [ ] Créeps sur chemins pré-calculés et mis en cache dans la salle : moins de pathfinding
 
-- [ ] Liens (`STRUCTURE_LINK`) : source → stockage → contrôleur, moins de transporteurs
+- [ ] Liens (`STRUCTURE_LINK`) : source → stockage → contrôleur, moins de transporteurs ; un lien de source plein (80 %, sans cooldown) envoie vers le lien puits le plus vide
 - [ ] Remplacement des `harvester` par un `filler` dédié au spawn et aux extensions depuis le stockage
 - [ ] Nombre d'`upgrader` et taille des corps selon l'énergie stockée
 - [ ] Extracteur et mineur de minerai (RCL 6)

@@ -10,6 +10,11 @@ const ROAD_MIN_RCL = 3;
 // RCL à partir duquel les conteneurs sont posés.
 const CONTAINER_MIN_RCL = 2;
 
+// Chantier non entamé depuis ce nombre de ticks retiré (inaccessible, salle perdue, plan obsolète) :
+// il libère une place sur MAX_CONSTRUCTION_SITES. Rien n'est perdu ; le planner le repose s'il est toujours voulu.
+// ponytail: un chantier inaccessible mais encore voulu est reposé aussitôt, et ses builders restent ; à traiter si ça arrive.
+const SITE_TTL = 5000;
+
 // Chantiers que le planner peut encore poser sur ce passage.
 let budget = 0;
 // RCL de chaque salle lors de sa dernière planification, gardé jusqu'au reset du global.
@@ -151,10 +156,30 @@ function planWalls(room, costs) {
   }
 }
 
+// Retire les chantiers restés à 0 de progression plus de SITE_TTL ticks, sur tout le compte.
+// Memory.sites garde le tick où chaque chantier a été vu sans progression pour la première fois.
+function removeStaleSites() {
+  const seen = Memory.sites = Memory.sites || {};
+  for (const id in seen) {
+    const site = Game.constructionSites[id];
+    if (!site || site.progress) delete seen[id];
+  }
+  for (const id in Game.constructionSites) {
+    const site = Game.constructionSites[id];
+    if (site.progress) continue;
+    if (!seen[id]) {
+      seen[id] = Game.time;
+    } else if (Game.time - seen[id] > SITE_TTL && site.remove() === OK) {
+      delete seen[id];
+    }
+  }
+}
+
 module.exports.run = function () {
   // Tous les INTERVAL ticks, et dès qu'une salle change de RCL : ses nouvelles structures sont posées aussitôt.
   // Après un reset du global, chaque salle est replanifiée une fois.
   const due = Game.time % INTERVAL === 0;
+  if (due) removeStaleSites();
   const rooms = Object.values(Game.rooms).filter((room) => room.controller && room.controller.my
     && (due || plannedLevel[room.name] !== room.controller.level));
   if (!rooms.length) return;
