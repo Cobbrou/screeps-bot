@@ -62,8 +62,8 @@ Priorité actuelle, avant les phases avancées : tirer le maximum des premiers R
 
 - [x] Récolte statique dès le RCL 1 : mineurs au sol sans conteneur, haulers dès le départ
 - [x] Effectifs calculés : 5 `WORK` par source plafonnés aux cases libres, haulers selon le débit réel
-- [ ] Ordre des chantiers : RCL 2 d'abord, puis conteneurs des sources, conteneur du contrôleur après les extensions
-- [ ] Upgraders selon le surplus d'énergie plutôt qu'en nombre fixe
+- [x] Ordre des chantiers : RCL 2 d'abord, puis extensions, conteneurs des sources, conteneur du contrôleur après les extensions
+- [x] Upgraders selon le surplus d'énergie plutôt qu'en nombre fixe
 - [ ] Corps par rôle (upgrader riche en `WORK`) et sans énergie inutilisée
 - [ ] Planner relancé dès la montée de RCL
 

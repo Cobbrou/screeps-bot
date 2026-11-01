@@ -6,11 +6,11 @@ const sources = require('../sources');
 // assez serré pour séparer extensions (3000 points) et conteneurs (5000 points).
 const WORK_SPREAD = 1.5;
 
-// Travail restant d'un chantier : les plus courts d'abord (routes, puis extensions…).
-// Le spawn passe avant tout, puis les conteneurs : ils débloquent la récolte statique (miners et haulers).
+// Travail restant d'un chantier : les plus courts d'abord (routes, puis extensions, puis conteneurs…).
+// Le spawn passe avant tout. Les extensions précèdent les conteneurs : la capacité finance des mineurs
+// complets, alors que sans conteneur les mineurs posent simplement l'énergie au sol.
 function work(site) {
   if (site.structureType === STRUCTURE_SPAWN) return 0;
-  if (site.structureType === STRUCTURE_CONTAINER) return 1;
   return site.progressTotal - site.progress;
 }
 

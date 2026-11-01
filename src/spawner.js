@@ -11,9 +11,10 @@ const MAX_REMOTE_ROOMS = 2;
 const REPAIR_RATIO = 0.5;
 // ponytail: un upgrader de plus par tranche d'énergie stockée, plafonné ; à revoir au RCL 8 (15 énergie/tick max).
 const ENERGY_PER_UPGRADER = 100000;
-// Avant le stockage : un upgrader de plus par tranche d'énergie en attente dans le conteneur du contrôleur.
-const CONTAINER_ENERGY_PER_UPGRADER = 1000;
-const MAX_EXTRA_UPGRADERS = 3;
+// Avant le stockage : un upgrader de plus par tranche d'énergie en attente (conteneurs, sol).
+// ponytail: stock instantané et non débit, plafonné ; les créeps vivant 1500 ticks, un pic passager en laisse trop.
+const WAITING_ENERGY_PER_UPGRADER = 500;
+const MAX_EXTRA_UPGRADERS = 6;
 
 // Récolte statique dès le RCL 1 : même un mineur à 2 WORK posé sur la source (4 énergie/tick en continu)
 // rapporte bien plus qu'un harvester qui fait l'aller-retour. Sans conteneur, il pose l'énergie au sol.
@@ -40,12 +41,22 @@ function extensionSites(room) {
   return room.find(FIND_MY_CONSTRUCTION_SITES, { filter: (s) => s.structureType === STRUCTURE_EXTENSION }).length;
 }
 
-// Upgraders en plus des 2 de base, selon l'énergie stockée ou en attente au contrôleur.
+// Énergie récoltée mais pas encore dépensée : conteneur du contrôleur, et avant le stockage
+// conteneurs des sources et énergie au sol. Si elle s'accumule, la salle produit plus qu'elle ne dépense.
+// Avec un stockage, ces derniers trahissent plutôt un manque de haulers : ils ne comptent plus.
+function waitingEnergy(room) {
+  const atController = sources.container(room.controller, 2);
+  const waiting = atController ? atController.store[RESOURCE_ENERGY] : 0;
+  if (room.storage) return waiting;
+  return waiting + sources.list(room).map((s) => sources.container(s)).reduce((sum, b) => sum + (b ? b.store[RESOURCE_ENERGY] : 0), 0)
+    + room.find(FIND_DROPPED_RESOURCES, { filter: (r) => r.resourceType === RESOURCE_ENERGY })
+      .reduce((sum, r) => sum + r.amount, 0);
+}
+
+// Upgraders en plus des 2 de base, selon l'énergie stockée ou en attente.
 function extraUpgraders(room) {
   const stored = room.storage ? room.storage.store[RESOURCE_ENERGY] : 0;
-  const waiting = sources.container(room.controller, 2);
-  const extra = Math.floor(stored / ENERGY_PER_UPGRADER)
-    + Math.floor((waiting ? waiting.store[RESOURCE_ENERGY] : 0) / CONTAINER_ENERGY_PER_UPGRADER);
+  const extra = Math.floor(stored / ENERGY_PER_UPGRADER) + Math.floor(waitingEnergy(room) / WAITING_ENERGY_PER_UPGRADER);
   return Math.min(MAX_EXTRA_UPGRADERS, extra);
 }
 
