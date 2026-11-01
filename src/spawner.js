@@ -64,7 +64,7 @@ function waitingEnergy(room) {
       .reduce((sum, r) => sum + r.amount, 0);
 }
 
-// Upgraders en plus des 2 de base, selon l'énergie stockée ou en attente.
+// Créeps en plus des 2 upgraders de base, selon l'énergie stockée ou en attente (des builders s'il y a des chantiers).
 function extraUpgraders(room) {
   const stored = room.storage ? room.storage.store[RESOURCE_ENERGY] : 0;
   const extra = Math.floor(stored / ENERGY_PER_UPGRADER) + Math.floor(waitingEnergy(room) / WAITING_ENERGY_PER_UPGRADER);
@@ -121,7 +121,12 @@ function targets(room, roomCounts, miners, carry) {
   const expanding = Memory.expansion && Memory.expansion.from === room.name;
   // downgrading avant paused : il pose le drapeau qui lève la pause.
   const urgent = downgrading(room);
-  const upgrader = upgraders.paused(room) ? 0 : (extensionSites(room) ? 1 : 2) + extraUpgraders(room);
+  // Chantiers en cours (hors murs et remparts, trop longs) : le surplus d'énergie va aux builders,
+  // les upgraders gardent leur base.
+  const sites = room.find(FIND_MY_CONSTRUCTION_SITES);
+  const building = sites.some((s) => s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART);
+  const extra = extraUpgraders(room);
+  const upgrader = upgraders.paused(room) ? 0 : (extensionSites(room) ? 1 : 2) + (building ? 0 : extra);
   return {
     // En mode sans échec, les hostiles ne peuvent rien contre la salle : pas de défenseur.
     defender: !room.controller.safeMode && defense.threats(room).length ? 2 : 0,
@@ -132,9 +137,10 @@ function targets(room, roomCounts, miners, carry) {
     hauler: (roomCounts.hauler || 0)
       + (list.reduce((sum, s) => sum + haulCapacity(room, s, (miners[s.id] || {}).work), 0) > (carry || 0) ? 1 : 0),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
+    // Builders avant upgraders : chaque structure (extensions d'abord) améliore la salle plus tôt.
+    builder: sites.length ? 2 + (building ? extra : 0) : (needsRepair(room) ? 1 : 0),
     // Un seul upgrader de base tant que des extensions sont en chantier : l'énergie va d'abord à la capacité.
     upgrader,
-    builder: room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 ? 2 : (needsRepair(room) ? 1 : 0),
     // Un éclaireur suffit à tenir les renseignements à jour, et seulement s'il a encore une utilité.
     scout: needsScout(room) ? 1 : 0,
     claimer: expanding && !expansion.claimed() ? 1 : 0,
