@@ -2,6 +2,7 @@ const sources = require('./sources');
 const defense = require('./defense');
 const intel = require('./intel');
 const expansion = require('./expansion');
+const upgraders = require('./roles/upgrader');
 
 const MAX_MINER_WORK = 5;
 // ponytail: récolteurs distants par source sans réservation (5 énergie/tick), à revoir avec un rôle reserver.
@@ -114,13 +115,15 @@ function downgrading(room) {
 function targets(room, roomCounts, miners) {
   const list = sources.list(room);
   const expanding = Memory.expansion && Memory.expansion.from === room.name;
-  const upgrader = (extensionSites(room) ? 1 : 2) + extraUpgraders(room);
+  // downgrading avant paused : il pose le drapeau qui lève la pause.
+  const urgent = downgrading(room);
+  const upgrader = upgraders.paused(room) ? 0 : (extensionSites(room) ? 1 : 2) + extraUpgraders(room);
   return {
     // En mode sans échec, les hostiles ne peuvent rien contre la salle : pas de défenseur.
     defender: !room.controller.safeMode && defense.threats(room).length ? 2 : 0,
     // Rétrogradation proche : les upgraders passent avant l'économie (une clé déjà posée garde sa place).
     // ponytail: tous les upgraders voulus passent en tête, pas seulement le premier ; l'urgence harvester couvre la famine.
-    ...(downgrading(room) ? { upgrader } : {}),
+    ...(urgent ? { upgrader } : {}),
     hauler: list.reduce((sum, s) => sum + haulersFor(room, s, (miners[s.id] || {}).work), 0),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
     // Un seul upgrader de base tant que des extensions sont en chantier : l'énergie va d'abord à la capacité.

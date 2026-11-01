@@ -72,7 +72,7 @@ Priorité actuelle, avant les phases avancées : tirer le maximum des premiers R
 - [x] Éclaireur seulement s'il reste une voisine utile à explorer
 - [x] Garde-fou de rétrogradation : sous 10 % de `CONTROLLER_DOWNGRADE`, priorité à l'amélioration (avec hystérésis pour ne pas osciller)
 - [x] Transporteurs qui remplissent les structures adjacentes en passant et ramassent l'énergie croisée en chemin
-- [ ] Upgraders en pause quand le stockage est bas ou la salle attaquée, sauf risque de rétrogradation
+- [x] Upgraders en pause quand le stockage est bas ou la salle attaquée, sauf risque de rétrogradation
 - [ ] Remplacement anticipé étendu aux upgraders et aux haulers
 - [ ] Chantiers non entamés depuis longtemps retirés
 
