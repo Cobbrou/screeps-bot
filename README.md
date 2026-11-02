@@ -62,7 +62,7 @@ screeps-bot/
 │   ├── remoteMining.js      # récolte distante : salles et sources exploitées, besoins en mineurs et transporteurs
 │   ├── planner.js           # stockage, tours, extensions, routes, conteneurs, murs (tous les 100 ticks et à chaque montée de RCL)
 │   ├── sources.js           # sources et conteneurs en cache, récolte et collecte d'énergie
-│   ├── spawner.js           # création des créeps selon les effectifs voulus
+│   ├── spawner.js           # création des créeps selon les effectifs voulus (upgraders et builders sur le revenu net)
 │   ├── stats.js             # CPU par module, indicateurs dans Memory.stats, bucket bas, pixels
 │   └── roles/
 │       ├── builder.js       # répare le très abîmé (< 50 %), construit, répare le reste sinon ; nourri par les haulers sans stockage

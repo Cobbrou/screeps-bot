@@ -63,6 +63,17 @@ function missing(room, remote) {
   return result;
 }
 
+// Énergie/tick rapportée par les sources distantes de la salle : production des mineurs vivants,
+// au prorata du transport assuré (capacité CARRY / besoin sur l'aller-retour, comme dans missing).
+function income(room, remote) {
+  return list(room).reduce((sum, source) => {
+    const r = remote[source.id] || { work: 0, carry: 0 };
+    const rate = Math.min(r.work * HARVEST_POWER, NEUTRAL_RATE);
+    const need = trip(room, source) * rate;
+    return sum + (need ? rate * Math.min(1, r.carry / need) : 0);
+  }, 0);
+}
+
 // Vrai si la salle visée par le créep est sûre ; sur place, il signale lui-même les hostiles.
 function safe(creep) {
   if (creep.room.name === creep.memory.target && defense.threats(creep.room).length) intel.record(creep.room);
@@ -76,4 +87,4 @@ function retreat(creep) {
   }
 }
 
-module.exports = { MINER_WORK, missing, safe, retreat };
+module.exports = { MINER_WORK, missing, income, safe, retreat };

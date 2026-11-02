@@ -1,5 +1,6 @@
 const move = require('../move');
 const sources = require('../sources');
+const upgraders = require('./upgrader');
 
 // Écart toléré entre le chantier le plus court et ceux qu'on accepte comme cible (×1,5).
 // Assez large pour ne pas courir après une route à moitié finie à l'autre bout de la salle,
@@ -104,6 +105,17 @@ module.exports.run = function (creep) {
     if (repair(creep, URGENT_RATIO)) return;
     if (build(creep)) return;
     if (repair(creep, REPAIR_RATIO)) return;
+    // Plus rien à construire ni à réparer : le builder devient upgrader s'il reste une place au dépôt
+    // (le spawner ne crée pas d'upgrader pendant les chantiers, ceux-ci prennent le relais).
+    const room = creep.room;
+    if (room.controller && room.controller.my && !room.find(FIND_MY_CONSTRUCTION_SITES).length) {
+      const placed = Object.values(Game.creeps)
+        .filter((c) => c.memory.role === 'upgrader' && c.memory.room === room.name).length;
+      if (placed < upgraders.spots(room)) {
+        creep.memory.role = 'upgrader';
+        return;
+      }
+    }
   }
   if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
     move.to(creep, creep.room.controller);

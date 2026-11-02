@@ -8,12 +8,16 @@ const remoteMining = require('./remoteMining');
 const MAX_MINER_WORK = 5;
 // Sans tour, un builder est créé dès qu'une structure passe sous cette part de ses points de vie (comme l'urgence du builder).
 const REPAIR_RATIO = 0.5;
-// ponytail: un upgrader de plus par tranche d'énergie stockée, plafonné ; à revoir au RCL 8 (15 énergie/tick max).
-const ENERGY_PER_UPGRADER = 100000;
-// Avant le stockage : un upgrader de plus par tranche d'énergie en attente (conteneurs, sol).
-// ponytail: stock instantané et non débit, plafonné ; les créeps vivant 1500 ticks, un pic passager en laisse trop.
-const WAITING_ENERGY_PER_UPGRADER = 500;
-const MAX_EXTRA_UPGRADERS = 6;
+// Avec un stockage, 1 énergie/tick de revenu en plus par tranche stockée : le stock se dépense en upgraders.
+// ponytail: à revoir au RCL 8 (15 énergie/tick d'amélioration au plus).
+const STORED_PER_ENERGY = 10000;
+// Énergie/tick consommée par WORK, entretien du corps compris (coût / durée de vie) :
+// upgrader 1 (UPGRADE_CONTROLLER_POWER) et un demi-MOVE par WORK ; builder ~4 sur BUILD_POWER 5, une fois retirés
+// les temps morts (EFFECTIVE_BUILD_POWER de harabibot), corps polyvalent WORK/CARRY/MOVE.
+const UPGRADE_SPEND = UPGRADE_CONTROLLER_POWER + (BODYPART_COST[WORK] + BODYPART_COST[MOVE] / 2) / CREEP_LIFE_TIME;
+const BUILD_SPEND = 4 + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPART_COST[MOVE]) / CREEP_LIFE_TIME;
+// Rôles dont l'entretien est déduit du revenu : ceux qui récoltent et transportent.
+const ECONOMY_ROLES = ['miner', 'hauler', 'remoteMiner', 'remoteHauler'];
 // Renseignements sur une salle voisine jugés périmés après ce nombre de ticks : un éclaireur va les rafraîchir.
 const SCOUT_REFRESH = 5000;
 // Garde-fou de rétrogradation : priorité à l'amélioration sous DOWNGRADE_LOW de CONTROLLER_DOWNGRADE,
@@ -48,38 +52,19 @@ function haulCapacity(room, source, work) {
   return 2 * route.length * rate;
 }
 
-// Nombre de chantiers d'extension dans la salle.
-function extensionSites(room) {
-  return room.find(FIND_MY_CONSTRUCTION_SITES, { filter: (s) => s.structureType === STRUCTURE_EXTENSION }).length;
-}
-
-// Énergie récoltée mais pas encore dépensée : conteneur du contrôleur, et sans stockage ni conteneur au contrôleur
-// conteneurs des sources et énergie au sol. Si elle s'accumule, la salle produit plus qu'elle ne dépense.
-// Avec un stockage ou un conteneur au contrôleur, ces derniers trahissent plutôt un manque de haulers
-// (les upgraders ne puisent plus qu'au contrôleur) : ils ne comptent plus.
-function waitingEnergy(room) {
-  const atController = sources.container(room.controller, 2);
-  const waiting = atController ? atController.store[RESOURCE_ENERGY] : 0;
-  if (room.storage || atController) return waiting;
-  return waiting + sources.list(room).map((s) => sources.container(s)).reduce((sum, b) => sum + (b ? b.store[RESOURCE_ENERGY] : 0), 0)
-    + room.find(FIND_DROPPED_RESOURCES, { filter: (r) => r.resourceType === RESOURCE_ENERGY })
-      .reduce((sum, r) => sum + r.amount, 0);
-}
-
-// Créeps en plus des 2 upgraders de base, selon l'énergie stockée ou en attente (des builders s'il y a des chantiers).
-function extraUpgraders(room) {
-  const stored = room.storage ? room.storage.store[RESOURCE_ENERGY] : 0;
-  const extra = Math.floor(stored / ENERGY_PER_UPGRADER) + Math.floor(waitingEnergy(room) / WAITING_ENERGY_PER_UPGRADER);
-  return Math.min(MAX_EXTRA_UPGRADERS, extra);
-}
-
-// Upgraders postés au plus autour du dépôt : ses cases voisines praticables, moins une laissée aux haulers
-// (le tas se pose depuis la case du dépôt, le conteneur se remplit depuis une case voisine). Sans dépôt, pas de plafond.
-// ponytail: la case laissée libre peut être enclavée par le terrain ; à traiter si les haulers n'atteignent plus le dépôt.
-function upgraderSpots(room) {
-  const d = sources.depot(room);
-  if (!d) return Infinity;
-  return Math.max(1, sources.spots({ id: `depot:${room.name}`, room, pos: d.pos }) - 1);
+// Revenu net soutenable de la salle (énergie/tick) : production des mineurs locaux (2 par WORK, 10 au plus par source)
+// au prorata du transport assuré (capacité des haulers / besoin), plus les sources distantes, plus le bonus du stockage,
+// moins l'entretien des mineurs et transporteurs (`upkeep`). Contrairement à un stock instantané, il ne suit pas
+// les pics passagers : les créeps qu'il finance vivent 1 500 ticks.
+// ponytail: pertes au sol (decay) et entretien des conteneurs ignorés.
+function netIncome(room, miners, carry, remote, upkeep) {
+  const list = sources.list(room);
+  const work = (s) => (miners[s.id] || { work: 0 }).work;
+  const need = list.reduce((sum, s) => sum + haulCapacity(room, s, work(s)), 0);
+  const ratio = need ? Math.min(1, (carry || 0) / need) : 1;
+  const local = list.reduce((sum, s) => sum + Math.min(work(s), MAX_MINER_WORK) * HARVEST_POWER, 0) * ratio;
+  const stored = room.storage ? Math.floor(room.storage.store[RESOURCE_ENERGY] / STORED_PER_ENERGY) : 0;
+  return local + remoteMining.income(room, remote) + stored - (upkeep || 0);
 }
 
 // Vrai si une structure (hors murs et remparts) est sous REPAIR_RATIO de ses points de vie et qu'aucune tour
@@ -118,18 +103,27 @@ function downgrading(room) {
 // Haulers avant mineurs : ils suivent les WORK déjà posés, ce qui alterne mineur et hauler au démarrage
 // au lieu de payer tous les mineurs avant de pouvoir transporter.
 // `remoteNeed` : sources distantes à qui il manque un mineur ou du transport (remoteMining.missing).
-function targets(room, roomCounts, miners, carry, remoteNeed) {
+// `net` : revenu net (netIncome) ; `work` : WORK vivants des upgraders et des builders.
+// Upgraders et builders se partagent le revenu sans se le disputer : pendant les chantiers (hors murs et remparts,
+// trop longs), tout va aux builders et aucun upgrader n'est créé ; ensuite les builders deviennent upgraders.
+// Un créep de plus tant que les WORK vivants restent sous revenu / consommation par WORK.
+// ponytail: le dernier créep peut dépasser le revenu d'un corps entier ; dimensionner le corps au manque si ça gaspille.
+function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   const list = sources.list(room);
   const expanding = Memory.expansion && Memory.expansion.from === room.name;
   // downgrading avant paused : il pose le drapeau qui lève la pause.
   const urgent = downgrading(room);
-  // Chantiers en cours (hors murs et remparts, trop longs) : le surplus d'énergie va aux builders,
-  // les upgraders gardent leur base.
   const sites = room.find(FIND_MY_CONSTRUCTION_SITES);
   const building = sites.some((s) => s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART);
-  const extra = extraUpgraders(room);
-  const upgrader = upgraders.paused(room) ? 0
-    : Math.min((extensionSites(room) ? 1 : 2) + (building ? 0 : extra), upgraderSpots(room));
+  const up = roomCounts.upgrader || 0;
+  // Rétrogradation proche : au moins un upgrader, même pendant les chantiers.
+  const moreUp = !upgraders.paused(room) && up < upgraders.spots(room)
+    && ((urgent && !up) || (!building && (work.upgrader || 0) < net / UPGRADE_SPEND));
+  const upgrader = up + (moreUp ? 1 : 0);
+  const bd = roomCounts.builder || 0;
+  // Au moins un builder par chantier en cours, même à revenu nul ; murs et remparts seuls ou réparation : un seul.
+  const builder = building ? bd + (!bd || (work.builder || 0) < net / BUILD_SPEND ? 1 : 0)
+    : (sites.length || needsRepair(room) ? 1 : 0);
   return {
     // En mode sans échec, les hostiles ne peuvent rien contre la salle : pas de défenseur.
     defender: !room.controller.safeMode && defense.threats(room).length ? 2 : 0,
@@ -144,8 +138,7 @@ function targets(room, roomCounts, miners, carry, remoteNeed) {
         ? 1 : 0),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
     // Builders avant upgraders : chaque structure (extensions d'abord) améliore la salle plus tôt.
-    builder: sites.length ? 2 + (building ? extra : 0) : (needsRepair(room) ? 1 : 0),
-    // Un seul upgrader de base tant que des extensions sont en chantier : l'énergie va d'abord à la capacité.
+    builder,
     upgrader,
     // Un éclaireur suffit à tenir les renseignements à jour, et seulement s'il a encore une utilité.
     scout: needsScout(room) ? 1 : 0,
@@ -219,6 +212,16 @@ module.exports.run = function () {
     m.work += body.filter((p) => (p.type || p) === WORK).length;
     m.count++;
   };
+  // Par salle : entretien (énergie/tick) des mineurs et transporteurs, WORK vivants des upgraders et des builders.
+  const upkeep = {};
+  const addUpkeep = (room, body) => {
+    upkeep[room] = (upkeep[room] || 0) + cost(body.map((p) => p.type || p)) / CREEP_LIFE_TIME;
+  };
+  const work = {};
+  const addWork = (room, role, body) => {
+    const w = work[room] = work[room] || {};
+    w[role] = (w[role] || 0) + body.filter((p) => (p.type || p) === WORK).length;
+  };
   for (const name in Game.creeps) {
     const creep = Game.creeps[name];
     const room = creep.memory.room || creep.room.name;
@@ -236,6 +239,10 @@ module.exports.run = function () {
     if (creep.memory.role === 'miner') addMiner(creep.memory.sourceId, creep.body, dying);
     if (creep.memory.role === 'hauler' && !dying) addCarry(room, creep.body);
     if (remoteRole && !dying) addRemote(creep.memory.role, creep.memory.sourceId, creep.body);
+    if (ECONOMY_ROLES.includes(creep.memory.role)) addUpkeep(room, creep.body);
+    if (creep.memory.role === 'builder' || (creep.memory.role === 'upgrader' && !dying)) {
+      addWork(room, creep.memory.role, creep.body);
+    }
   }
 
   for (const name in Game.spawns) {
@@ -248,7 +255,8 @@ module.exports.run = function () {
     // récolteur avec l'énergie disponible.
     const emergency = !roomCounts.harvester && (!roomCounts.hauler || !roomCounts.miner);
     const remoteNeed = remoteMining.missing(room, remote);
-    const wanted = targets(room, roomCounts, miners, carry[room.name], remoteNeed);
+    const net = netIncome(room, miners, carry[room.name], remote, upkeep[room.name]);
+    const wanted = targets(room, roomCounts, miners, carry[room.name], remoteNeed, net, work[room.name] || {});
     const role = emergency ? 'harvester' : Object.keys(wanted).find((r) => (roomCounts[r] || 0) < wanted[r]);
     if (!role) continue;
 
@@ -274,6 +282,8 @@ module.exports.run = function () {
       if (role === 'miner') addMiner(memory.sourceId, body);
       if (role === 'hauler') addCarry(room.name, body);
       if (role === 'remoteMiner' || role === 'remoteHauler') addRemote(role, memory.sourceId, body);
+      if (ECONOMY_ROLES.includes(role)) addUpkeep(room.name, body);
+      if (role === 'builder' || role === 'upgrader') addWork(room.name, role, body);
     }
   }
 };

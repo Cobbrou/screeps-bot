@@ -60,4 +60,13 @@ function run(creep) {
   if (creep.store[RESOURCE_ENERGY]) creep.upgradeController(room.controller);
 }
 
-module.exports = { run, paused };
+// Upgraders postés au plus autour du dépôt : ses cases voisines praticables, moins une laissée aux haulers
+// (le tas se pose depuis la case du dépôt, le conteneur se remplit depuis une case voisine). Sans dépôt, pas de plafond.
+// ponytail: la case laissée libre peut être enclavée par le terrain ; à traiter si les haulers n'atteignent plus le dépôt.
+function spots(room) {
+  const d = sources.depot(room);
+  if (!d) return Infinity;
+  return Math.max(1, sources.spots({ id: `depot:${room.name}`, room, pos: d.pos }) - 1);
+}
+
+module.exports = { run, paused, spots };
