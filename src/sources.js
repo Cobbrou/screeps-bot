@@ -97,6 +97,32 @@ function container(target, range = 1) {
   return found;
 }
 
+// Case où un mineur attend que le conteneur de sa source se libère (le mineur qu'il remplace s'y tient encore) :
+// voisine du conteneur et de la source, il y récolte en attendant et prend la place en un pas.
+// Sa case actuelle si elle convient (il ne bouge plus), sinon une case sans créep, hors route de préférence
+// (laissée aux transporteurs). undefined s'il n'y en a aucune.
+function waitSpot(creep, sourcePos, box) {
+  const room = box.room;
+  const terrain = room.getTerrain();
+  const spots = [];
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const x = box.pos.x + dx;
+      const y = box.pos.y + dy;
+      if (x < 1 || x > 48 || y < 1 || y > 48 || terrain.get(x, y) === TERRAIN_MASK_WALL
+        || Math.max(Math.abs(x - sourcePos.x), Math.abs(y - sourcePos.y)) !== 1) continue;
+      const structures = room.lookForAt(LOOK_STRUCTURES, x, y);
+      if (structures.some((s) => OBSTACLE_OBJECT_TYPES.includes(s.structureType))) continue;
+      const pos = new RoomPosition(x, y, room.name);
+      if (creep.pos.isEqualTo(pos)) return pos;
+      if (pos.lookFor(LOOK_CREEPS).length) continue;
+      spots.push({ pos, road: structures.some((s) => s.structureType === STRUCTURE_ROAD) });
+    }
+  }
+  spots.sort((a, b) => a.road - b.road);
+  return spots.length ? spots[0].pos : undefined;
+}
+
 // Dépôt d'énergie des upgraders, au hub du contrôleur (room.memory.plan.hub, portée 2) : le stockage du hub
 // s'il est construit, sinon le conteneur du hub, sinon sa case, où les haulers posent l'énergie au sol.
 // `container` : la structure où puiser (conteneur ou stockage), absente pour le tas au sol.
@@ -296,4 +322,4 @@ function collect(creep) {
   if (creep.withdraw(store, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, store);
 }
 
-module.exports = { list, spots, container, depot, depotPile, harvest, harvestSource, collect, goBack, stepAway, forget };
+module.exports = { list, spots, container, waitSpot, depot, depotPile, harvest, harvestSource, collect, goBack, stepAway, forget };
