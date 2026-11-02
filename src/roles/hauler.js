@@ -178,23 +178,38 @@ function pickupNearby(creep) {
 // Livre au spawn, aux extensions et aux tours (s'il leur manque TOWER_REFILL, sauf hostiles), puis aux builders (sans stockage), puis au dépôt des upgraders
 // (sources.depot), puis au stockage.
 // Sans conteneur, le dépôt est une case (RoomPosition) où l'énergie est posée au sol, jusqu'à DEPOT_MAX.
-// Un builder n'est visé que s'il lui manque au moins la moitié de sa capacité : pas de détour pour quelques points.
+// Un builder n'est visé que s'il lui manque au moins la moitié de sa capacité, énergie des haulers déjà en route
+// vers lui déduite (`creep.memory.deliverId`) : pas de détour pour quelques points.
 // Avec un stockage, les builders y puisent eux-mêmes.
 // `skip` : structure ou builder qu'on vient de remplir ce tick, à ne plus viser.
 function deliveryTarget(creep, skip) {
   const room = creep.room;
   const threatened = defense.threats(room).length > 0;
+  // Réservation du builder visé : refaite à chaque choix, gardée seulement si un builder est retenu.
+  delete creep.memory.deliverId;
   const structure = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
     filter: (s) => s !== skip && needsEnergy(s) && (s.structureType !== STRUCTURE_TOWER || threatened
       || s.store.getFreeCapacity(RESOURCE_ENERGY) >= TOWER_REFILL),
   });
   if (structure) return structure;
   if (!room.storage) {
+    // Énergie déjà en route vers chaque builder (autres transporteurs chargés qui l'ont choisi) :
+    // sans ça, tous les haulers chargés suivent le même builder à travers la salle.
+    const incoming = {};
+    for (const name in Game.creeps) {
+      const other = Game.creeps[name];
+      if (other !== creep && other.memory.working && other.memory.deliverId) {
+        incoming[other.memory.deliverId] = (incoming[other.memory.deliverId] || 0) + other.store[RESOURCE_ENERGY];
+      }
+    }
     const builder = creep.pos.findClosestByRange(FIND_MY_CREEPS, {
       filter: (c) => c !== skip && c.memory.role === 'builder'
-        && c.store.getFreeCapacity(RESOURCE_ENERGY) >= c.store.getCapacity() / 2,
+        && c.store.getFreeCapacity(RESOURCE_ENERGY) - (incoming[c.id] || 0) >= c.store.getCapacity() / 2,
     });
-    if (builder) return builder;
+    if (builder) {
+      creep.memory.deliverId = builder.id;
+      return builder;
+    }
   }
   const depot = sources.depot(room);
   if (depot && depot.container) {
