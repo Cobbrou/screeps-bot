@@ -59,15 +59,43 @@ function build(creep) {
   return true;
 }
 
+// Vrai si les haulers livrent les builders de la salle : pas de stockage (sinon le builder y puise lui-même)
+// et au moins un hauler vivant (sinon personne ne viendrait).
+function fed(room) {
+  if (room.storage) return false;
+  return Object.values(Game.creeps).some((c) => c.memory.role === 'hauler' && c.memory.room === room.name);
+}
+
+// Builder vide qui attend un hauler : il ramasse l'énergie au sol adjacente (hors dépôt des upgraders)
+// et se poste à portée de sa cible, pour que l'énergie livrée serve sans nouveau trajet.
+function wait(creep) {
+  if (sources.goBack(creep)) return;
+  const controller = creep.room.controller;
+  const pile = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, {
+    filter: (r) => r.resourceType === RESOURCE_ENERGY && !(controller && r.pos.inRangeTo(controller, 3)),
+  })[0];
+  if (pile) creep.pickup(pile);
+  const target = Game.getObjectById(creep.memory.siteId) || Game.getObjectById(creep.memory.repairId);
+  if (target && !creep.pos.inRangeTo(target, 3)) move.to(creep, target, { range: 3 });
+}
+
 // Répare les structures très abîmées ; sinon construit les chantiers ; sinon répare ce qui est sous REPAIR_RATIO ;
 // sinon améliore le contrôleur.
+// Sans stockage, les haulers apportent l'énergie (hauler.deliveryTarget) : le builder travaille dès qu'il en porte
+// et attend sur place sinon, au lieu de marcher jusqu'aux sources. Avec stockage ou sans hauler, il se recharge seul.
 module.exports.run = function (creep) {
-  if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) creep.memory.working = false;
-  if (!creep.memory.working && creep.store.getFreeCapacity() === 0) creep.memory.working = true;
+  const delivered = fed(creep.room);
+  if (delivered) {
+    creep.memory.working = creep.store[RESOURCE_ENERGY] > 0;
+  } else {
+    if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) creep.memory.working = false;
+    if (!creep.memory.working && creep.store.getFreeCapacity() === 0) creep.memory.working = true;
+  }
   if (creep.memory.working && sources.goBack(creep)) return;
 
   if (!creep.memory.working) {
-    sources.collect(creep);
+    if (delivered) wait(creep);
+    else sources.collect(creep);
     return;
   }
 

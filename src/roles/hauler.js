@@ -86,14 +86,23 @@ function fullestContainer(creep) {
   return containers.find((c) => !taken.has(c.id)) || containers[0];
 }
 
-// Livre au spawn, aux extensions et aux tours, puis au dépôt des upgraders (sources.depot), puis au stockage.
+// Livre au spawn, aux extensions et aux tours, puis aux builders (sans stockage), puis au dépôt des upgraders
+// (sources.depot), puis au stockage.
 // Sans conteneur, le dépôt est une case (RoomPosition) où l'énergie est posée au sol, jusqu'à DEPOT_MAX.
-// Les builders se chargent eux-mêmes (sources.collect).
-// `skip` : structure qu'on vient de remplir ce tick, à ne plus viser.
+// Un builder n'est visé que s'il lui manque au moins la moitié de sa capacité : pas de détour pour quelques points.
+// Avec un stockage, les builders y puisent eux-mêmes.
+// `skip` : structure ou builder qu'on vient de remplir ce tick, à ne plus viser.
 function deliveryTarget(creep, skip) {
   const room = creep.room;
   const structure = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, { filter: (s) => s !== skip && needsEnergy(s) });
   if (structure) return structure;
+  if (!room.storage) {
+    const builder = creep.pos.findClosestByRange(FIND_MY_CREEPS, {
+      filter: (c) => c !== skip && c.memory.role === 'builder'
+        && c.store.getFreeCapacity(RESOURCE_ENERGY) >= c.store.getCapacity() / 2,
+    });
+    if (builder) return builder;
+  }
   const depot = sources.depot(room);
   if (depot && depot.container) {
     if (depot.container.store.getFreeCapacity(RESOURCE_ENERGY) > 0) return depot.container;
