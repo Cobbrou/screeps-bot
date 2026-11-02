@@ -55,13 +55,14 @@ function extensionSites(room) {
   return room.find(FIND_MY_CONSTRUCTION_SITES, { filter: (s) => s.structureType === STRUCTURE_EXTENSION }).length;
 }
 
-// Énergie récoltée mais pas encore dépensée : conteneur du contrôleur, et avant le stockage
+// Énergie récoltée mais pas encore dépensée : conteneur du contrôleur, et sans stockage ni conteneur au contrôleur
 // conteneurs des sources et énergie au sol. Si elle s'accumule, la salle produit plus qu'elle ne dépense.
-// Avec un stockage, ces derniers trahissent plutôt un manque de haulers : ils ne comptent plus.
+// Avec un stockage ou un conteneur au contrôleur, ces derniers trahissent plutôt un manque de haulers
+// (les upgraders ne puisent plus qu'au contrôleur) : ils ne comptent plus.
 function waitingEnergy(room) {
   const atController = sources.container(room.controller, 2);
   const waiting = atController ? atController.store[RESOURCE_ENERGY] : 0;
-  if (room.storage) return waiting;
+  if (room.storage || atController) return waiting;
   return waiting + sources.list(room).map((s) => sources.container(s)).reduce((sum, b) => sum + (b ? b.store[RESOURCE_ENERGY] : 0), 0)
     + room.find(FIND_DROPPED_RESOURCES, { filter: (r) => r.resourceType === RESOURCE_ENERGY })
       .reduce((sum, r) => sum + r.amount, 0);

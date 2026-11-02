@@ -2,8 +2,6 @@ const move = require('../move');
 const sources = require('../sources');
 const defense = require('../defense');
 
-// Retrait minimal dans le conteneur du contrôleur, comme MIN_WITHDRAW dans sources.js.
-const MIN_WITHDRAW = 100;
 // Sous ce stock d'énergie dans le stockage, l'amélioration s'arrête : l'énergie va au spawn et aux tours.
 const STORAGE_LOW = 10000;
 
@@ -34,15 +32,12 @@ function run(creep) {
       if (creep.store[RESOURCE_ENERGY]) creep.memory.working = true;
       return;
     }
-    // Le conteneur du contrôleur passe avant tout : sinon le withdrawId de collect reste collé
-    // au conteneur d'une source, toujours plein, loin du contrôleur.
+    // Avec un conteneur au contrôleur, l'upgrader (un seul CARRY, peu de MOVE) attend à côté que les haulers
+    // le remplissent : aller chercher 50 d'énergie aux sources coûte bien plus de ticks que d'attendre.
     const box = sources.container(creep.room.controller, 2);
-    const need = Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), MIN_WITHDRAW);
-    if (box && box.store[RESOURCE_ENERGY] >= need) {
-      if (creep.withdraw(box, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, box);
-    } else {
-      sources.collect(creep);
-    }
+    if (!box) sources.collect(creep);
+    else if (!creep.pos.isNearTo(box)) move.to(creep, box);
+    else if (box.store[RESOURCE_ENERGY]) creep.withdraw(box, RESOURCE_ENERGY);
   } else if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
     move.to(creep, creep.room.controller);
   }
