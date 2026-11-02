@@ -1,18 +1,18 @@
 const move = require('../move');
+const planner = require('../planner');
 const sources = require('../sources');
 const upgraders = require('./upgrader');
 
-// Écart toléré entre le chantier le plus court et ceux qu'on accepte comme cible (×1,5).
-// Assez large pour ne pas courir après une route à moitié finie à l'autre bout de la salle,
-// assez serré pour séparer extensions (3000 points) et conteneurs (5000 points).
-const WORK_SPREAD = 1.5;
-
-// Travail restant d'un chantier : les plus courts d'abord (routes, puis extensions, puis conteneurs…).
-// Le spawn passe avant tout. Les extensions précèdent les conteneurs : la capacité finance des mineurs
-// complets, alors que sans conteneur les mineurs posent simplement l'énergie au sol.
-function work(site) {
-  if (site.structureType === STRUCTURE_SPAWN) return 0;
-  return site.progressTotal - site.progress;
+// Chantier prioritaire de la salle : ordre de construction du planner (planner.priority), puis le moins
+// de travail restant. Tous les builders y vont ensemble : chaque structure est finie au plus vite.
+function target(room, sites) {
+  const key = (s) => [planner.priority(room, s.structureType), s.progressTotal - s.progress];
+  return sites.reduce((best, s) => {
+    if (!best) return s;
+    const [p, w] = key(s);
+    const [bp, bw] = key(best);
+    return p < bp || (p === bp && w < bw) ? s : best;
+  }, undefined);
 }
 
 // Sous cette part de ses points de vie, une structure est réparée avant toute construction (usure, decay).
@@ -40,18 +40,13 @@ function repair(creep, ratio) {
   return true;
 }
 
-// Construit le chantier prioritaire de la salle (spawn, conteneurs, puis le moins de travail restant).
-// Vrai si le créep a un chantier. Utilisé aussi par les harvesters pour leur surplus.
+// Construit le chantier prioritaire de la salle. Vrai si le créep a un chantier.
+// Utilisé aussi par les harvesters pour leur surplus.
 function build(creep) {
-  // Cibles gardées en mémoire tant qu'elles restent valides : évite un calcul de chemin à chaque tick.
-  // Un chantier bien plus court apparu entre-temps remplace la cible en cours.
-  let site = Game.getObjectById(creep.memory.siteId);
-  const sites = creep.room.find(FIND_MY_CONSTRUCTION_SITES);
-  const limit = Math.min(...sites.map(work)) * WORK_SPREAD;
-  if (!site || work(site) > limit) {
-    site = creep.pos.findClosestByPath(sites.filter((s) => work(s) <= limit));
-    creep.memory.siteId = site ? site.id : undefined;
-  }
+  // Recalculé à chaque tick (3 chantiers actifs au plus, sans calcul de chemin) : un chantier
+  // plus prioritaire apparu entre-temps remplace la cible en cours. siteId sert à wait.
+  const site = target(creep.room, creep.room.find(FIND_MY_CONSTRUCTION_SITES));
+  creep.memory.siteId = site ? site.id : undefined;
   if (!site) return false;
   // Portée 3 : le créep peut construire en s'écartant de la source qu'il bloquerait.
   const result = creep.build(site);

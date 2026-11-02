@@ -15,22 +15,68 @@ const CONTAINER_MIN_RCL = 2;
 // ponytail: un chantier inaccessible mais encore voulu est reposé aussitôt, et ses builders restent ; à traiter si ça arrive.
 const SITE_TTL = 5000;
 
-// Chantiers que le planner peut encore poser sur ce passage.
+// Chantiers actifs au plus par salle, hors murs et remparts (1 point chacun, finis en un tick) :
+// les builders finissent chaque structure au plus vite au lieu de se disperser.
+const MAX_ACTIVE_SITES = 3;
+
+// Chantiers que le planner peut encore poser sur ce passage : sur le compte, et dans la salle en cours.
 let budget = 0;
+let slots = 0;
+// Vrai si un chantier voulu a été refusé faute de place dans la salle en cours.
+let blocked = false;
 // RCL de chaque salle lors de sa dernière planification, gardé jusqu'au reset du global.
 const plannedLevel = {};
+// Salles dont un chantier attend une place : replanifiées dès qu'un chantier se termine.
+const waiting = {};
 
-// Pose un chantier dans la limite du budget.
+function isBarrier(type) {
+  return type === STRUCTURE_WALL || type === STRUCTURE_RAMPART;
+}
+
+// Ordre de construction (plus petit d'abord), partagé par le planner et les builders.
+// Les premières extensions passent avant la tour : la capacité finance des corps complets.
+function priority(room, type) {
+  const capacity = room.energyCapacityAvailable;
+  if (type === STRUCTURE_SPAWN) return 0;
+  if (type === STRUCTURE_EXTENSION && capacity < 650) return 1;
+  if (type === STRUCTURE_TOWER) return 2;
+  if (type === STRUCTURE_EXTENSION && capacity < 800) return 3;
+  if (type === STRUCTURE_STORAGE) return 4;
+  if (type === STRUCTURE_EXTENSION) return 5;
+  if (type === STRUCTURE_CONTAINER) return 6;
+  if (type === STRUCTURE_ROAD) return 7;
+  return isBarrier(type) ? 9 : 8;
+}
+
+// Chantiers actifs de la salle (hors murs et remparts).
+function activeSites(room) {
+  return room.find(FIND_MY_CONSTRUCTION_SITES, { filter: (s) => !isBarrier(s.structureType) }).length;
+}
+
+// Pose un chantier dans la limite du budget du compte et des places de la salle (le type est le dernier argument).
 function place(room, ...args) {
+  const barrier = isBarrier(args[args.length - 1]);
   if (budget <= 0) return ERR_FULL;
+  if (!barrier && slots <= 0) {
+    blocked = true;
+    return ERR_FULL;
+  }
   const result = room.createConstructionSite(...args);
-  if (result === OK) budget--;
+  if (result === OK) {
+    budget--;
+    if (!barrier) slots--;
+  }
   return result;
 }
 
-// Coûts pour tracer les routes : réutilise routes et chantiers de route, contourne les autres structures.
+// Coûts pour tracer les routes : réutilise routes, chantiers de route et routes gardées (même sans route
+// construite), contourne les autres structures. Les cases à coût non nul sont interdites aux structures
+// (planAround) : une extension sur une route gardée la ferait recalculer et déplacerait son bout (dépôt du contrôleur).
 function costMatrix(room) {
   const costs = new PathFinder.CostMatrix();
+  for (const id in room.memory.routes) {
+    for (const k of room.memory.routes[id]) costs.set(Math.floor(k / 50), k % 50, 1);
+  }
   const objects = [...room.find(FIND_STRUCTURES), ...room.find(FIND_MY_CONSTRUCTION_SITES)];
   for (const o of objects) {
     if (o.structureType === STRUCTURE_ROAD) {
@@ -58,6 +104,7 @@ function planAround(room, spawn, type, costs) {
         const x = spawn.pos.x + dx;
         const y = spawn.pos.y + dy;
         if (x < 2 || x > 47 || y < 2 || y > 47 || terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
+        if (costs.get(x, y) !== 0) continue;
         if (avoid.some((o) => o.pos.getRangeTo(x, y) <= 2)) continue;
         if (place(room, x, y, type) === OK) {
           costs.set(x, y, 255);
@@ -91,11 +138,12 @@ function planContainer(room, target, range, end, wanted) {
   if (wanted && !built && !sites.length) place(room, end, STRUCTURE_CONTAINER);
 }
 
-// Route du spawn jusqu'à la cible, terminée par un conteneur si `withContainer`.
+// Chemin du spawn jusqu'à la cible, terminé par un conteneur si `withContainer`. Renvoie le chemin sans son bout
+// (les cases de la route, posée ensuite par planRoad), ou undefined.
 // Le chemin est gardé en mémoire (cases codées x * 50 + y) : le recalculer à chaque passage le ferait dévier
 // au gré des nouvelles structures et laisserait des tronçons orphelins. Il n'est recalculé que s'il est bloqué.
 // Il est calculé même sans conteneur ni route : le spawner s'en sert pour dimensionner les haulers.
-function planRoute(room, spawn, target, range, costs, withContainer, withRoad) {
+function planRoute(room, spawn, target, range, costs, withContainer) {
   if (!room.memory.routes) room.memory.routes = {};
   const saved = room.memory.routes[target.id];
   let path = saved && saved.map((k) => new RoomPosition(Math.floor(k / 50), k % 50, room.name));
@@ -110,18 +158,18 @@ function planRoute(room, spawn, target, range, costs, withContainer, withRoad) {
     path = result.path;
     room.memory.routes[target.id] = path.map((pos) => pos.x * 50 + pos.y);
   }
+  // Les routes suivantes réutilisent celle-ci.
+  for (const pos of path) costs.set(pos.x, pos.y, 1);
   path = path.slice();
   const end = path.pop();
   planContainer(room, target, range, end, withContainer);
-  // Sans route voulue, les chantiers de route pas encore entamés sont retirés.
-  if (!withRoad) {
-    removeSites(path, STRUCTURE_ROAD);
-    return;
-  }
-  for (const pos of path) {
-    place(room, pos, STRUCTURE_ROAD);
-    costs.set(pos.x, pos.y, 1);
-  }
+  return path;
+}
+
+// Route sur les cases du chemin ; sans route voulue, les chantiers de route pas encore entamés sont retirés.
+function planRoad(room, path, withRoad) {
+  if (!withRoad) removeSites(path, STRUCTURE_ROAD);
+  else for (const pos of path) place(room, pos, STRUCTURE_ROAD);
 }
 
 // Ceinture de murs à 2 cases des sorties : tout chemin depuis une sortie la traverse.
@@ -177,24 +225,30 @@ function removeStaleSites() {
 
 module.exports.run = function () {
   // Tous les INTERVAL ticks, et dès qu'une salle change de RCL : ses nouvelles structures sont posées aussitôt.
+  // Aussi dès qu'une place se libère dans une salle dont un chantier attend.
   // Après un reset du global, chaque salle est replanifiée une fois.
   const due = Game.time % INTERVAL === 0;
   if (due) removeStaleSites();
   const rooms = Object.values(Game.rooms).filter((room) => room.controller && room.controller.my
-    && (due || plannedLevel[room.name] !== room.controller.level));
+    && (due || plannedLevel[room.name] !== room.controller.level
+      || (waiting[room.name] && activeSites(room) < MAX_ACTIVE_SITES)));
   if (!rooms.length) return;
   // Game.constructionSites ne compte pas les chantiers posés pendant le tick : décompte local.
   budget = MAX_CONSTRUCTION_SITES - SITE_MARGIN - Object.keys(Game.constructionSites).length;
   for (const room of rooms) {
     plannedLevel[room.name] = room.controller.level;
+    slots = MAX_ACTIVE_SITES - activeSites(room);
+    blocked = false;
+    waiting[room.name] = false;
     const spawn = room.find(FIND_MY_SPAWNS)[0];
     if (!spawn) continue;
 
     const costs = costMatrix(room);
-    // Le stockage (RCL 4) passe avant les extensions pour rester au plus près du spawn.
-    planAround(room, spawn, STRUCTURE_STORAGE, costs);
-    planAround(room, spawn, STRUCTURE_TOWER, costs);
-    planAround(room, spawn, STRUCTURE_EXTENSION, costs);
+    // Dans l'ordre de priority : les places libres vont d'abord aux structures prioritaires.
+    // Le stockage (RCL 4) passe avant les extensions restantes et reste au plus près du spawn.
+    const types = [STRUCTURE_STORAGE, STRUCTURE_TOWER, STRUCTURE_EXTENSION];
+    types.sort((a, b) => priority(room, a) - priority(room, b));
+    for (const type of types) planAround(room, spawn, type, costs);
     // Pas de conteneur au RCL 1 : le passage au RCL 2 ne coûte que 200 énergie, un conteneur 5000.
     // Les mineurs posent l'énergie au sol en attendant.
     const containers = room.controller.level >= CONTAINER_MIN_RCL;
@@ -206,15 +260,20 @@ module.exports.run = function () {
     const otherSites = room.find(FIND_MY_CONSTRUCTION_SITES, { filter: (s) => s.structureType !== STRUCTURE_ROAD });
     const roads = room.controller.level >= ROAD_MIN_RCL || (containers && extensionsDone && !otherSites.length
       && builtContainers.length >= sources.list(room).length + 1);
-    for (const source of sources.list(room)) planRoute(room, spawn, source, 1, costs, containers, roads);
+    const paths = sources.list(room).map((source) => planRoute(room, spawn, source, 1, costs, containers));
     // Conteneur du contrôleur une fois toutes les extensions du RCL construites : la capacité passe avant.
     // Portée 2 : le conteneur reste à portée d'amélioration (3) sans bloquer les abords du contrôleur.
-    planRoute(room, spawn, room.controller, 2, costs, containers && extensionsDone, roads);
+    paths.push(planRoute(room, spawn, room.controller, 2, costs, containers && extensionsDone));
+    // Routes après tous les conteneurs : elles passent en dernier dans les places libres.
+    for (const path of paths) if (path) planRoad(room, path, roads);
     // Murs seulement une fois une tour construite (elle seule les entretient) et le stockage aussi (RCL 4) :
     // avant, les remonter à leur plafond prendrait l'essentiel de l'énergie de la salle.
     if (room.storage
       && room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length) {
       planWalls(room, costs);
     }
+    waiting[room.name] = blocked;
   }
 };
+
+module.exports.priority = priority;

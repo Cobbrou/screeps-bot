@@ -79,6 +79,7 @@ screeps-bot/
 ├── docs/
 │   ├── architecture.md      # architecture prévue
 │   ├── harabibot-analysis.md # comparaison avec harabibot v2 : pistes pour l'early game
+│   ├── harabibot-planner-analysis.md # comparaison des planners : pistes pour le plan de base
 │   └── screeps-reference.md # aide-mémoire de l'API Screeps
 ├── .editorconfig
 ├── .gitignore
@@ -96,4 +97,5 @@ screeps-bot/
 - [ROADMAP.md](ROADMAP.md) : étapes de développement prévues
 - [docs/architecture.md](docs/architecture.md) : architecture prévue
 - [docs/harabibot-analysis.md](docs/harabibot-analysis.md) : pourquoi l'early game de harabibot v2 est meilleur, pistes à reprendre
+- [docs/harabibot-planner-analysis.md](docs/harabibot-planner-analysis.md) : planner de harabibot v2 comparé au nôtre, améliorations du plan de base
 - [docs/screeps-reference.md](docs/screeps-reference.md) : concepts de base de Screeps

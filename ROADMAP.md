@@ -92,16 +92,23 @@ Pistes tirées de l'[analyse de harabibot v2](docs/harabibot-analysis.md), par i
 - [ ] Haulers 1:1 avant les routes, trajet chargé compté à part dans `haulCapacity` (marais à 5) ; passage en 2:1 seulement avec routes
 - [ ] `MOVE` des mineurs choisis selon le trajet (minimiser temps de spawn / vie productive)
 - [ ] Premier mineur et haulers créés avec `energyAvailable` au démarrage, sans attendre la capacité pleine
-- [ ] Hub près du contrôleur (stockage à portée 4) et extensions classées par distance au hub et proximité des chemins de source
-- [ ] Chantiers concentrés : 3 actifs au plus, tous les builders sur le prioritaire (spawn, extensions, tour, conteneur du hub)
 - [ ] Gestionnaire de trafic global (intentions, échanges, zones de travail des créeps fixes) au lieu de `moveTo` et contournement
 - [ ] Haulers envoyés selon l'énergie prévue à l'arrivée (stock − réservé + régénération en route), nouveau trajet dans le même tick après livraison
 
+Pistes tirées de l'[analyse du planner de harabibot v2](docs/harabibot-planner-analysis.md), par priorité :
+
+- [x] Correction : extensions jamais posées sur les routes gardées (`room.memory.routes`), sinon la route est recalculée et le dépôt du contrôleur change de case
+- [x] Chantiers concentrés : 3 actifs au plus par salle, triés par priorité (spawn, extensions sous 650 de capacité, tour, extensions sous 800, conteneurs, routes), tous les builders sur le prioritaire
+- [ ] Plan de base calculé une fois et gardé en mémoire (cases codées `x * 50 + y`, RCL par structure) ; le planner ne pose que la différence avec la salle
+- [ ] Hub près du contrôleur : stockage à portée 4, cases réservées aux upgraders fixes, conteneur provisoire sur la case du stockage aux RCL 2-3 comme dépôt unique ; premier spawn d'une expansion placé d'après le plan
+- [ ] Extensions de part et d'autre de routes de service (courtes diagonales, routes du noyau et des sources) au lieu du damier sans route ; avant le RCL 4, d'abord celles qui touchent un chemin de source ; routes posées au RCL des structures qu'elles desservent (au moins 3)
+
 ## Phase 7 : logistique avancée (RCL 5-6)
 
-- [ ] Plan de base pré-calculé : upgrader fixe au contrôleur, stockage à côté, `filler` fixe au stockage ; structures posées le long des chemins pré-calculés
+- [ ] Plan de base : `filler` fixe au stockage, spawns suivants et liens à côté du stockage
 - [ ] Créeps sur chemins pré-calculés et mis en cache dans la salle : moins de pathfinding
 
+- [ ] Planner : liens (RCL 5), terminal, extracteur et son conteneur, labs (RCL 6) ajoutés au plan
 - [ ] Liens (`STRUCTURE_LINK`) : source → stockage → contrôleur, moins de transporteurs ; un lien de source plein (80 %, sans cooldown) envoie vers le lien puits le plus vide
 - [ ] Remplacement des `harvester` par un `filler` dédié au spawn et aux extensions depuis le stockage
 - [ ] Nombre d'`upgrader` et taille des corps selon l'énergie stockée
@@ -116,7 +123,8 @@ Pistes tirées de l'[analyse de harabibot v2](docs/harabibot-analysis.md), par i
 
 ## Phase 9 : défense et attaque avancées (RCL 7+)
 
-- [ ] Remparts autour des structures clés au lieu d'une simple ceinture
+- [ ] Planner : 2e spawn (RCL 7), factory, observer, puis 3e spawn, power spawn et nuker (RCL 8) ajoutés au plan
+- [ ] Remparts par coupe minimale (min-cut) autour de la base au lieu de la ceinture aux sorties, une fois le plan gardé
 - [ ] Défense des salles de remote mining (créeps distants, tours de garde)
 - [ ] Boosts des défenseurs depuis les laboratoires
 - [ ] Escouades d'attaque (soin + attaque) contre les salles hostiles voisines
