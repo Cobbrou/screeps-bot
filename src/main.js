@@ -6,6 +6,7 @@ const planner = require('./planner');
 const defense = require('./defense');
 const expansion = require('./expansion');
 const stats = require('./stats');
+const move = require('./move');
 const roles = {
   harvester: require('./roles/harvester'),
   upgrader: require('./roles/upgrader'),
@@ -19,6 +20,7 @@ const roles = {
   remoteMiner: require('./roles/remoteMiner'),
   remoteHauler: require('./roles/remoteHauler'),
   reserver: require('./roles/reserver'),
+  remoteBuilder: require('./roles/remoteBuilder'),
 };
 
 module.exports.loop = function () {
@@ -37,6 +39,8 @@ module.exports.loop = function () {
         console.log(`[${name}] ${e.stack || e}`);
       }
     }
+    // Pas notés par les rôles, exécutés ensemble pour pousser les créeps qui barrent la route.
+    move.run();
   });
   // Planification et expansion sautées quand le bucket est bas : non essentielles.
   if (!stats.lowBucket()) {

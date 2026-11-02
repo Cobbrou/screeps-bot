@@ -61,7 +61,7 @@ function trip(room, source) {
 }
 
 // Sources distantes joignables ({ id, x, y, room }), les plus proches d'abord : elles rapportent le plus par transporteur.
-function list(room) {
+function sourceList(room) {
   const all = [];
   for (const name of rooms(room)) {
     for (const s of intel.get(name).sourcePos) all.push(Object.assign({ room: name }, s));
@@ -101,7 +101,7 @@ function needsReserve(name) {
 // `remote` : WORK et capacité CARRY vivants par source ; `reservers` : reservers vivants par salle visée.
 function missing(room, remote, reservers) {
   const result = {};
-  const sources = list(room);
+  const sources = sourceList(room);
   for (const source of sources) {
     const r = remote[source.id] || { work: 0, carry: 0 };
     if (!result.miner && !r.work) result.miner = source;
@@ -126,7 +126,7 @@ function missing(room, remote, reservers) {
 // Énergie/tick rapportée par les sources distantes de la salle : production des mineurs vivants,
 // au prorata du transport assuré (capacité CARRY / besoin sur l'aller-retour, comme dans missing).
 function income(room, remote) {
-  return list(room).reduce((sum, source) => {
+  return sourceList(room).reduce((sum, source) => {
     const r = remote[source.id] || { work: 0, carry: 0 };
     const flow = Math.min(r.work * HARVEST_POWER, rate(source.room));
     const need = trip(room, source) * flow;
@@ -147,6 +147,106 @@ function retreat(creep) {
   }
 }
 
+// Sous cette part de ses points de vie, une route distante est réparée par le remoteBuilder (pas de tour hors de nos salles).
+const ROAD_REPAIR_RATIO = 0.5;
+
+// Coûts d'une salle distante visible : routes et chantiers de route réutilisés, structures bloquantes contournées.
+function remoteCosts(room) {
+  const costs = new PathFinder.CostMatrix();
+  for (const o of [...room.find(FIND_STRUCTURES), ...room.find(FIND_MY_CONSTRUCTION_SITES)]) {
+    if (o.structureType === STRUCTURE_ROAD) costs.set(o.pos.x, o.pos.y, 1);
+    else if (OBSTACLE_OBJECT_TYPES.includes(o.structureType)) costs.set(o.pos.x, o.pos.y, 255);
+  }
+  return costs;
+}
+
+// Route du spawn jusqu'à une source distante dont le conteneur existe : { salle: [cases x * 50 + y] } dans l'ordre
+// du trajet, conteneur exclu, gardée dans room.memory.remoteRoads[id].path. Elle ne passe que par la salle
+// et la salle distante ; dans la salle, `homeCosts` (matrice du planner) lui fait éviter les cases du plan.
+// Recalculée si une case est devenue bloquante. Renvoie le chemin, ou undefined.
+function roadPath(room, source, homeCosts) {
+  const memory = room.memory.remoteRoads = room.memory.remoteRoads || {};
+  const saved = memory[source.id];
+  const callback = (name) => {
+    if (name === room.name) return homeCosts;
+    if (name !== source.room) return false;
+    return Game.rooms[name] ? remoteCosts(Game.rooms[name]) : new PathFinder.CostMatrix();
+  };
+  const blocked = saved && Object.keys(saved.path).some((name) => {
+    const costs = Game.rooms[name] && callback(name);
+    return costs && saved.path[name].some((k) => costs.get(Math.floor(k / 50), k % 50) === 255);
+  });
+  if (saved && !blocked) return saved.path;
+  const spawn = room.find(FIND_MY_SPAWNS)[0];
+  if (!spawn) return undefined;
+  const result = PathFinder.search(spawn.pos, { pos: new RoomPosition(source.x, source.y, source.room), range: 1 }, {
+    plainCost: 2, swampCost: 10, maxRooms: 2, maxOps: 6000, roomCallback: callback,
+  });
+  if (result.incomplete || result.path.length < 2) return undefined;
+  const path = {};
+  // Le dernier pas est la case du conteneur, où se tient le mineur. Les cases du bord (sorties) sont laissées nues.
+  // ponytail: une route sur la sortie serait permise mais on n'y passe qu'un tick ; à ajouter si la fatigue s'y voit.
+  for (const pos of result.path.slice(0, -1)) {
+    if (pos.x < 1 || pos.x > 48 || pos.y < 1 || pos.y > 48) continue;
+    (path[pos.roomName] = path[pos.roomName] || []).push(pos.x * 50 + pos.y);
+  }
+  memory[source.id] = { path, done: false };
+  return path;
+}
+
+// Routes à poser pour la récolte distante : par source distante dont le conteneur est construit, son chemin.
+// Note `done` quand toutes ses cases ont une route (salles visibles) : les transporteurs passent alors à 2 CARRY par MOVE.
+// Les chemins des sources qui ne sont plus exploitées sont oubliés.
+function roads(room, homeCosts) {
+  const all = sourceList(room);
+  const memory = room.memory.remoteRoads = room.memory.remoteRoads || {};
+  for (const id in memory) if (!all.some((s) => s.id === id)) delete memory[id];
+  const paths = [];
+  for (const source of all.filter((s) => container(s))) {
+    const path = roadPath(room, source, homeCosts);
+    if (!path) continue;
+    paths.push(path);
+    const names = Object.keys(path);
+    if (names.every((name) => Game.rooms[name])) {
+      memory[source.id].done = names.every((name) => path[name].every((k) => Game.rooms[name]
+        .lookForAt(LOOK_STRUCTURES, Math.floor(k / 50), k % 50).some((st) => st.structureType === STRUCTURE_ROAD)));
+    }
+  }
+  return paths;
+}
+
+// Vrai si la route jusqu'à la source distante est entièrement construite.
+function paved(room, sourceId) {
+  const memory = room.memory.remoteRoads;
+  return !!(memory && memory[sourceId] && memory[sourceId].done);
+}
+
+// Cases (x * 50 + y) de nos chemins de récolte distante dans la salle `name`.
+function roadCells(room, name) {
+  const cells = new Set();
+  const memory = room.memory.remoteRoads || {};
+  for (const id in memory) for (const k of memory[id].path[name] || []) cells.add(k);
+  return cells;
+}
+
+// Salle distante où le remoteBuilder a du travail : chantier de route, ou route de nos chemins sous ROAD_REPAIR_RATIO.
+// Seulement les salles visibles (un mineur distant y travaille), undefined sinon.
+function roadWork(room) {
+  for (const name of rooms(room)) {
+    const remote = Game.rooms[name];
+    if (!remote) continue;
+    if (remote.find(FIND_MY_CONSTRUCTION_SITES, { filter: (s) => s.structureType === STRUCTURE_ROAD }).length) return name;
+    const cells = roadCells(room, name);
+    if (remote.find(FIND_STRUCTURES, {
+      filter: (s) => s.structureType === STRUCTURE_ROAD && s.hits < s.hitsMax * ROAD_REPAIR_RATIO
+        && cells.has(s.pos.x * 50 + s.pos.y),
+    }).length) return name;
+  }
+  return undefined;
+}
+
 module.exports = {
-  RESERVER_UNIT, RESERVER_UNITS, minerWork, container, missing, income, safe, retreat,
+  RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, minerWork, container, missing, income, safe, retreat,
+  roads, paved, roadWork, roadCells,
 };
+

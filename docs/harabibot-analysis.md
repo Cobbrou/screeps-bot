@@ -50,10 +50,10 @@ Les points sont classés par impact estimé. Les suites à donner sont dans [ROA
 - **Chez nous** : tous les chantiers sont posés d'un coup et les builders se dispersent (marge ×1,5).
 - Les routes arrivent au RCL 3 dans les deux bots.
 
-## 7. Trafic et répartition des haulers
+## 7. Trafic et répartition des haulers (fait)
 
-- **Trafic** : harabibot a un gestionnaire global (`traffic.ts`). Les créeps déclarent leurs intentions de mouvement, puis le gestionnaire résout échanges de place et poussées. Les créeps fixes déclarent une zone de travail, et les cases des mineurs et upgraders sont pénalisées. Chez nous : `moveTo`, puis un nouveau chemin après 2 ticks bloqué.
-- **Répartition** : un hauler n'est envoyé vers une source que si l'énergie prévue à son arrivée suffit. Le calcul part du stock, retire ce que les autres haulers en route ont réservé et ajoute la régénération pendant le trajet (`assignHauler`, `getExpectedEnergyDelta`). Après une livraison, il repart dans le même tick.
+- **Trafic** : harabibot a un gestionnaire global (`traffic.ts`). Les créeps déclarent leurs intentions de mouvement, puis le gestionnaire résout échanges de place et poussées. Les créeps fixes déclarent une zone de travail, et les cases des mineurs et upgraders sont pénalisées. Fait chez nous : `move.run` exécute les pas notés et pousse les créeps immobiles sans les sortir de leur zone.
+- **Répartition** : un hauler n'est envoyé vers une source que si l'énergie prévue à son arrivée suffit. Le calcul part du stock, retire ce que les autres haulers en route ont réservé et ajoute la régénération pendant le trajet (`assignHauler`, `getExpectedEnergyDelta`). Après une livraison, il repart dans le même tick. Fait chez nous : `dispatch` dans `roles/hauler.js`, trajet estimé en ligne droite.
 
 ## Hors sujet pour l'early normal
 

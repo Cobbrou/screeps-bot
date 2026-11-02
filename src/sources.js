@@ -261,7 +261,7 @@ function stepAway(creep) {
   const near = list(creep.room).filter((s) => creep.pos.isNearTo(s));
   if (!near.length) return;
   const result = PathFinder.search(creep.pos, near.map((s) => ({ pos: s.pos, range: 2 })), { flee: true, maxRooms: 1 });
-  if (result.path.length) creep.move(creep.pos.getDirectionTo(result.path[0]));
+  if (result.path.length) move.step(creep, creep.pos.getDirectionTo(result.path[0]));
 }
 
 // Ramasse l'énergie au sol (tas d'au moins 50) ; sinon prend dans un conteneur ou le stockage s'il en reste assez

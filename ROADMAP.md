@@ -82,7 +82,8 @@ Priorité actuelle, avant les phases avancées : tirer le maximum des premiers R
 - [x] Remplacement anticipé étendu aux upgraders (trajet noté au contrôleur) et aux haulers (durée de spawn)
 - [x] Chantiers non entamés depuis 5 000 ticks retirés (`Memory.sites`)
 - [x] Récolte distante dès le RCL 2 (mineur et transporteurs, dernière priorité du spawn) au lieu d'attendre le stockage
-- [ ] Routes dans les salles distantes (builder distant) ; les conteneurs sont posés par les mineurs distants
+- [x] Routes dans les salles distantes (`remoteBuilder`) ; les conteneurs sont posés par les mineurs distants ; transporteurs distants à 2 `CARRY` par `MOVE` sur route finie
+- [x] Upgraders sur des postes fixes autour du dépôt, cases de la route du hub laissées libres pour les haulers
 
 Pistes tirées de l'[analyse de harabibot v2](docs/harabibot-analysis.md), par impact estimé :
 
@@ -92,8 +93,8 @@ Pistes tirées de l'[analyse de harabibot v2](docs/harabibot-analysis.md), par i
 - [x] Haulers 1:1 avant les routes, trajet chargé compté à part dans `haulCapacity` (marais à 5) ; passage en 2:1 seulement avec routes
 - [x] `MOVE` des mineurs choisis selon le trajet (minimiser temps de spawn / vie productive)
 - [x] Premier mineur et haulers créés avec `energyAvailable` au démarrage, sans attendre la capacité pleine
-- [ ] Gestionnaire de trafic global (intentions, échanges, zones de travail des créeps fixes) au lieu de `moveTo` et contournement
-- [ ] Haulers envoyés selon l'énergie prévue à l'arrivée (stock − réservé + régénération en route), nouveau trajet dans le même tick après livraison
+- [x] Gestionnaire de trafic global (intentions, échanges, zones de travail des créeps fixes) au lieu de `moveTo` et contournement
+- [x] Haulers envoyés selon l'énergie prévue à l'arrivée (stock − réservé + régénération en route), nouveau trajet dans le même tick après livraison
 
 Pistes tirées de l'[analyse du planner de harabibot v2](docs/harabibot-planner-analysis.md), par priorité :
 

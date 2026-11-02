@@ -190,6 +190,8 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     // Transporteur avant mineur, comme dans la salle : les deux alternent source par source.
     remoteHauler: (roomCounts.remoteHauler || 0) + (remoteNeed.hauler ? 1 : 0),
     remoteMiner: (roomCounts.remoteMiner || 0) + (remoteNeed.miner ? 1 : 0),
+    // Un constructeur distant tant qu'une salle distante a des chantiers de route ou des routes abîmées.
+    remoteBuilder: remoteMining.roadWork(room) ? 1 : 0,
     // Réservation en tout dernier : elle double le débit des sources distantes déjà tenues.
     reserver: (roomCounts.reserver || 0) + (remoteNeed.reserver ? 1 : 0),
   };
@@ -247,7 +249,13 @@ function buildBody(role, energy, room, sourceId, target) {
     const unit = remoteMining.RESERVER_UNIT;
     return energy >= remoteMining.RESERVER_UNITS * cost(unit) ? [].concat(...Array(remoteMining.RESERVER_UNITS).fill(unit)) : [];
   }
-  if (role === 'remoteHauler') return repeat([CARRY, MOVE], energy);
+  // Transporteur distant : 2 CARRY par MOVE une fois la route jusqu'à sa source entièrement construite.
+  if (role === 'remoteHauler') {
+    return room && remoteMining.paved(room, sourceId)
+      ? repeat([CARRY, CARRY, MOVE], energy, [[CARRY, MOVE]]) : repeat([CARRY, MOVE], energy);
+  }
+  // Constructeur distant : corps polyvalent, 4 motifs au plus (les chantiers de route sont posés 5 par 5).
+  if (role === 'remoteBuilder') return repeat([WORK, CARRY, MOVE], Math.min(energy, 4 * cost([WORK, CARRY, MOVE])));
   if (role === 'defender') return repeat([RANGED_ATTACK, MOVE], energy);
   if (role === 'scout') return [MOVE];
   if (role === 'claimer') return energy >= BODYPART_COST[CLAIM] + BODYPART_COST[MOVE] ? [CLAIM, MOVE] : [];
@@ -347,6 +355,7 @@ module.exports.run = function () {
     }
     if (role === 'claimer' || role === 'pioneer') memory.target = Memory.expansion.target;
     if (role === 'reserver') memory.target = remoteNeed.reserver;
+    if (role === 'remoteBuilder') memory.target = remoteMining.roadWork(room);
     if (role === 'remoteMiner' || role === 'remoteHauler') {
       const source = role === 'remoteMiner' ? remoteNeed.miner : remoteNeed.hauler;
       Object.assign(memory, { target: source.room, sourceId: source.id, x: source.x, y: source.y });

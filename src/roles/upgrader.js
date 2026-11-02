@@ -29,10 +29,61 @@ function roam(creep) {
   }
 }
 
-// Poste fixe à côté du dépôt (portée 2 du contrôleur, donc chaque case voisine est à portée 3) :
-// les haulers y apportent l'énergie, l'upgrader ne marche plus. À chaque tick il améliore avec ce qu'il porte
-// et reprend au dépôt ce qui lui manque (permis au même tick ; l'énergie prise ne sert qu'au tick suivant).
-// En pause, il finit ce qu'il porte sans en reprendre.
+// Postes des upgraders autour du dépôt : cases voisines praticables (portée 2 du contrôleur, donc portée 3),
+// la case du dépôt comprise s'il est un conteneur (pas pour le tas, où les haulers se posent). Les cases de la route
+// du hub voisines du dépôt sont laissées aux haulers : sans elles, les upgraders entassés n'importe où autour
+// pouvaient fermer l'accès au conteneur. Sans route connue, la case la plus proche du spawn leur est laissée.
+// Recalculés une fois par tick et par salle.
+const postCache = {};
+function posts(room, depot) {
+  const cached = postCache[room.name];
+  if (cached && cached.time === Game.time) return cached.list;
+  const terrain = room.getTerrain();
+  const route = new Set((room.memory.routes && room.memory.routes[room.controller.id]) || []);
+  const depotKey = depot.pos.x * 50 + depot.pos.y;
+  const cells = [];
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const x = depot.pos.x + dx;
+      const y = depot.pos.y + dy;
+      if (x < 1 || x > 48 || y < 1 || y > 48 || terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
+      if (!dx && !dy && !depot.container) continue;
+      if (room.controller.pos.getRangeTo(x, y) > 3) continue;
+      if (room.lookForAt(LOOK_STRUCTURES, x, y).some((st) => OBSTACLE_OBJECT_TYPES.includes(st.structureType))) continue;
+      cells.push(x * 50 + y);
+    }
+  }
+  let list = cells.filter((k) => k === depotKey || !route.has(k));
+  if (list.length === cells.length) {
+    const spawn = room.find(FIND_MY_SPAWNS)[0];
+    const lane = spawn && cells.filter((k) => k !== depotKey)
+      .sort((a, b) => spawn.pos.getRangeTo(Math.floor(a / 50), a % 50) - spawn.pos.getRangeTo(Math.floor(b / 50), b % 50))[0];
+    list = cells.filter((k) => k !== lane);
+  }
+  postCache[room.name] = { time: Game.time, list };
+  return list;
+}
+
+// Poste attribué à l'upgrader (creep.memory.post, case x * 50 + y) : gardé tant qu'il reste un poste
+// et qu'aucun autre upgrader de la salle ne l'a ; sinon le poste libre le plus proche. undefined si tout est pris.
+function post(creep, depot) {
+  const list = posts(creep.room, depot);
+  const taken = new Set(Object.values(Game.creeps)
+    .filter((c) => c !== creep && c.memory.role === 'upgrader' && c.memory.room === creep.memory.room)
+    .map((c) => c.memory.post));
+  let k = creep.memory.post;
+  if (!list.includes(k) || taken.has(k)) {
+    const range = (cell) => creep.pos.getRangeTo(Math.floor(cell / 50), cell % 50);
+    k = list.filter((cell) => !taken.has(cell)).sort((a, b) => range(a) - range(b))[0];
+    creep.memory.post = k;
+  }
+  return k === undefined ? undefined : new RoomPosition(Math.floor(k / 50), k % 50, creep.room.name);
+}
+
+// Poste fixe à côté du dépôt : les haulers y apportent l'énergie, l'upgrader ne marche plus. À chaque tick
+// il améliore avec ce qu'il porte et reprend au dépôt ce qui lui manque (permis au même tick ; l'énergie prise
+// ne sert qu'au tick suivant). En pause, il finit ce qu'il porte sans en reprendre.
+// Sans poste libre (plus d'upgraders que de postes), il se contente de rester à portée du contrôleur.
 function run(creep) {
   const room = creep.room;
   // Temps de trajet depuis le spawn, noté à la première arrivée au contrôleur : le spawner lance le successeur
@@ -47,12 +98,10 @@ function run(creep) {
     return;
   }
 
-  if (creep.pos.isEqualTo(depot.pos) && !depot.container) {
-    // Case du tas : les haulers doivent pouvoir s'y poser, on se décale vers le contrôleur (toujours voisin du dépôt).
-    move.to(creep, room.controller, { range: 1 });
-  } else if (!creep.pos.isNearTo(depot.pos)) {
-    move.to(creep, depot.pos, { range: 1 });
-  } else if (!paused(room) && creep.store.getFreeCapacity(RESOURCE_ENERGY)) {
+  const spot = post(creep, depot);
+  if (spot && !creep.pos.isEqualTo(spot)) move.to(creep, spot, { range: 0 });
+  else if (!spot && !creep.pos.inRangeTo(room.controller, 3)) move.to(creep, room.controller, { range: 3 });
+  if (creep.pos.isNearTo(depot.pos) && !paused(room) && creep.store.getFreeCapacity(RESOURCE_ENERGY)) {
     const pile = !depot.container && sources.depotPile(depot);
     if (pile) creep.pickup(pile);
     else if (depot.container && depot.container.store[RESOURCE_ENERGY]) creep.withdraw(depot.container, RESOURCE_ENERGY);
@@ -60,13 +109,11 @@ function run(creep) {
   if (creep.store[RESOURCE_ENERGY]) creep.upgradeController(room.controller);
 }
 
-// Upgraders postés au plus autour du dépôt : ses cases voisines praticables, moins une laissée aux haulers
-// (le tas se pose depuis la case du dépôt, le conteneur se remplit depuis une case voisine). Sans dépôt, pas de plafond.
-// ponytail: la case laissée libre peut être enclavée par le terrain ; à traiter si les haulers n'atteignent plus le dépôt.
+// Upgraders postés au plus : un par poste (posts). Sans dépôt, pas de plafond.
 function spots(room) {
   const d = sources.depot(room);
   if (!d) return Infinity;
-  return Math.max(1, sources.spots({ id: `depot:${room.name}`, room, pos: d.pos }) - 1);
+  return Math.max(1, posts(room, d).length);
 }
 
 module.exports = { run, paused, spots };

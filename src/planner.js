@@ -1,4 +1,5 @@
 const sources = require('./sources');
+const remoteMining = require('./remoteMining');
 
 // Le plan est recalculé tous les INTERVAL ticks : les chantiers manquants sont recréés.
 const INTERVAL = 100;
@@ -16,6 +17,9 @@ const CONTAINER_MIN_RCL = 2;
 // il libère une place sur MAX_CONSTRUCTION_SITES. Rien n'est perdu ; le planner le repose s'il est toujours voulu.
 // ponytail: un chantier inaccessible mais encore voulu est reposé aussitôt, et ses builders restent ; à traiter si ça arrive.
 const SITE_TTL = 5000;
+
+// Chantiers de route actifs au plus par salle distante : le remoteBuilder les finit avant que d'autres soient posés.
+const MAX_REMOTE_SITES = 5;
 
 // Chantiers actifs au plus par salle, hors murs et remparts (1 point chacun, finis en un tick) :
 // les builders finissent chaque structure au plus vite au lieu de se disperser.
@@ -79,6 +83,9 @@ function costMatrix(room) {
   const costs = new PathFinder.CostMatrix();
   for (const id in room.memory.routes) {
     for (const k of room.memory.routes[id]) costs.set(Math.floor(k / 50), k % 50, 1);
+  }
+  for (const id in room.memory.remoteRoads) {
+    for (const k of room.memory.remoteRoads[id].path[room.name] || []) costs.set(Math.floor(k / 50), k % 50, 1);
   }
   for (const type of PLANNED) {
     for (const k of (room.memory.plan && room.memory.plan[type]) || []) costs.set(Math.floor(k / 50), k % 50, 255);
@@ -282,6 +289,26 @@ function planRoad(room, path, withRoad) {
   else for (const pos of path) place(room, pos, STRUCTURE_ROAD);
 }
 
+// Chantiers de route d'une salle distante visible, sur les cases du chemin (x * 50 + y), depuis le bout côté source :
+// le remoteBuilder y prend son énergie. MAX_REMOTE_SITES actifs au plus par salle ; `posted` compte aussi ceux posés
+// pendant ce passage (find ne les voit qu'au tick suivant).
+function planRemoteRoad(name, cells, posted) {
+  const remote = Game.rooms[name];
+  if (!remote) return;
+  const isRoad = (o) => o.structureType === STRUCTURE_ROAD;
+  if (posted[name] === undefined) posted[name] = remote.find(FIND_MY_CONSTRUCTION_SITES, { filter: isRoad }).length;
+  for (const k of cells.slice().reverse()) {
+    if (posted[name] >= MAX_REMOTE_SITES || budget <= 0) return;
+    const x = Math.floor(k / 50);
+    const y = k % 50;
+    if (remote.lookForAt(LOOK_STRUCTURES, x, y).some(isRoad) || remote.lookForAt(LOOK_CONSTRUCTION_SITES, x, y).length) continue;
+    if (remote.createConstructionSite(x, y, STRUCTURE_ROAD) === OK) {
+      posted[name]++;
+      budget--;
+    }
+  }
+}
+
 // Ceinture de murs à 2 cases des sorties : tout chemin depuis une sortie la traverse.
 // Remparts sur les routes et au milieu de chaque côté pour laisser passer nos créeps.
 function planWalls(room, costs) {
@@ -385,6 +412,18 @@ module.exports.run = function () {
     }
     // Routes après tous les conteneurs : elles passent en dernier dans les places libres.
     for (const path of paths) if (path) planRoad(room, path, roads);
+    // Routes des sources distantes dont le conteneur est construit, en même temps que celles de la salle :
+    // la partie dans la salle passe par planRoad (places et priorité des chantiers), le reste par planRemoteRoad.
+    if (roads) {
+      const posted = {};
+      for (const path of remoteMining.roads(room, costs)) {
+        for (const name in path) {
+          const cells = path[name];
+          if (name === room.name) planRoad(room, cells.map((k) => new RoomPosition(Math.floor(k / 50), k % 50, name)), true);
+          else planRemoteRoad(name, cells, posted);
+        }
+      }
+    }
     // Murs seulement une fois une tour construite (elle seule les entretient) et le stockage aussi (RCL 4) :
     // avant, les remonter à leur plafond prendrait l'essentiel de l'énergie de la salle.
     if (room.storage
