@@ -39,11 +39,11 @@
 - [x] Murs et remparts aux sorties de la salle, une fois une tour construite
 - [x] Activation du mode sans échec (`safeMode`) en dernier recours
 - [x] Défenseurs créés quand des hostiles sont présents
-- [ ] Priorité de tir des tours : soigneur, puis claimer hostile (`attackController` bloque l'amélioration), puis cible presque morte, puis la plus proche
-- [ ] Protection contre le vidage des tours : ne tirer que si les dégâts estimés (selon la portée) dépassent le soin hostile
-- [ ] Défenseurs selon la menace : aucun si les tours suffisent, sinon selon les parties `ATTACK`/`RANGED_ATTACK`/`HEAL` hostiles (aujourd'hui 2 fixes)
-- [ ] Défenseur posté sur le rempart le plus proche de l'ennemi, à distance (`RANGED_ATTACK`), au lieu de l'attendre près du spawn
-- [ ] Mode sans échec aussi quand un claimer hostile attaque le contrôleur
+- [x] Priorité de tir des tours : soigneur, puis claimer hostile (`attackController` bloque l'amélioration), puis cible presque morte, puis la plus proche
+- [x] Protection contre le vidage des tours : ne tirer que si les dégâts estimés (selon la portée) dépassent le soin hostile
+- [x] Défenseurs selon la menace : aucun si les tours suffisent, sinon selon les parties `ATTACK`/`RANGED_ATTACK`/`HEAL` hostiles (aujourd'hui 2 fixes)
+- [x] Défenseur posté sur le rempart le plus proche de l'ennemi, à distance (`RANGED_ATTACK`), au lieu de l'attendre près du spawn
+- [x] Mode sans échec aussi quand un claimer hostile approche du contrôleur (avant qu'il frappe : `upgradeBlocked` peut empêcher l'activation)
 
 ## Phase 5 : suivi et optimisation (fait)
 

@@ -163,8 +163,8 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   const builder = building ? bd + (!bd || (work.builder || 0) < net / BUILD_SPEND ? 1 : 0)
     : (sites.length || needsRepair(room) ? 1 : 0);
   return {
-    // En mode sans échec, les hostiles ne peuvent rien contre la salle : pas de défenseur.
-    defender: !room.controller.safeMode && defense.threats(room).length ? 2 : 0,
+    // Selon la menace que les tours ne couvrent pas (voir defense.defenders).
+    defender: defense.defenders(room),
     // Rétrogradation proche : les upgraders passent avant l'économie (une clé déjà posée garde sa place).
     // ponytail: tous les upgraders voulus passent en tête, pas seulement le premier ; l'urgence harvester couvre la famine.
     ...(urgent ? { upgrader } : {}),
@@ -232,7 +232,7 @@ function buildBody(role, energy, room, sourceId) {
   // Mineur plafonné à MINER_WORK, assez pour une source non réservée (300 → 2 WORK, 450 → 3 WORK).
   if (role === 'remoteMiner') return repeat([WORK, MOVE], Math.min(energy, remoteMining.MINER_WORK * cost([WORK, MOVE])));
   if (role === 'remoteHauler') return repeat([CARRY, MOVE], energy);
-  if (role === 'defender') return repeat([ATTACK, MOVE], energy);
+  if (role === 'defender') return repeat([RANGED_ATTACK, MOVE], energy);
   if (role === 'scout') return [MOVE];
   if (role === 'claimer') return energy >= BODYPART_COST[CLAIM] + BODYPART_COST[MOVE] ? [CLAIM, MOVE] : [];
   // Upgrader nourri au dépôt du contrôleur (tas puis conteneur) : il ne bouge plus une fois posté,

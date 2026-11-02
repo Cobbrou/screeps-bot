@@ -67,7 +67,7 @@ screeps-bot/
 │   └── roles/
 │       ├── builder.js       # répare le très abîmé (< 50 %), construit, répare le reste sinon ; nourri par les haulers sans stockage
 │       ├── claimer.js       # revendique le contrôleur de la salle visée
-│       ├── defender.js      # attaque les hostiles de la salle
+│       ├── defender.js      # tire à distance depuis le rempart le plus proche de l'ennemi
 │       ├── harvester.js     # récolte et remplit spawn, extensions et tours, construit le surplus
 │       ├── hauler.js        # transporte l'énergie des conteneurs vers spawn, extensions, tours, dépôt du contrôleur
 │       ├── miner.js         # récolte statique sur une source (conteneur, ou au sol)
