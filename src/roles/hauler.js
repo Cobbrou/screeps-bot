@@ -18,8 +18,9 @@ function collect(creep) {
   // filerait vers l'autre devenu le plus plein, et ainsi de suite sans jamais livrer.
   let target = Game.getObjectById(creep.memory.pickupId);
   if (!target || !target.store[RESOURCE_ENERGY]) {
-    // Cible vidée alors qu'on porte déjà de l'énergie : on livre plutôt que de courir vers une autre.
-    if (target && creep.store[RESOURCE_ENERGY]) {
+    // Cible vidée alors qu'on porte déjà au moins la moitié de sa capacité : on livre plutôt que de courir
+    // vers une autre. En dessous (pierre tombale presque vide…), traverser la salle ne vaut pas le coup.
+    if (target && creep.store[RESOURCE_ENERGY] >= creep.store.getCapacity() / 2) {
       delete creep.memory.pickupId;
       creep.memory.working = true;
       deliver(creep);
