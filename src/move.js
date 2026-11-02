@@ -2,12 +2,17 @@
 const STUCK_TICKS = 2;
 // Ticks pendant lesquels un chemin calculé est réutilisé (5 par défaut dans `moveTo`) : moins de pathfinding.
 const REUSE_PATH = 20;
+// Ticks pendant lesquels le chemin de contournement est suivi : au-delà, on revient au chemin normal (routes).
+// Sans cette limite, le détour resterait en cache REUSE_PATH ticks, même une fois le passage libéré.
+const DETOUR_TICKS = 3;
 
 // Dernière position connue de chaque créep, par nom, gardée hors de `Memory` : écrite à chaque déplacement,
 // elle alourdirait la sérialisation. Perdue au reset du global, ce qui remet juste le compteur à zéro.
 const lastSeen = {};
 // Dernière destination demandée par chaque créep : sa zone de travail. Un créep poussé ne s'en éloigne jamais.
 const goals = {};
+// Fin du détour en cours de chaque créep (Game.time), par nom.
+const detours = {};
 // Intentions de déplacement du tick (nom → { creep, dir }), exécutées ensemble par `run`.
 let intents = {};
 let intentTick = -1;
@@ -38,6 +43,11 @@ function to(creep, target, opts = {}) {
     // Oublie le chemin en cache, qui traverse le créep gênant.
     delete creep.memory._move;
     opts = Object.assign({}, opts, { ignoreCreeps: false });
+    detours[creep.name] = Game.time + DETOUR_TICKS;
+  } else if (detours[creep.name] <= Game.time) {
+    // Détour fini : on oublie le chemin de contournement pour recalculer le chemin normal.
+    delete creep.memory._move;
+    delete detours[creep.name];
   }
   const pos = target.pos || target;
   goals[creep.name] = { x: pos.x, y: pos.y, roomName: pos.roomName };
@@ -132,6 +142,7 @@ function run() {
 function forget(name) {
   delete lastSeen[name];
   delete goals[name];
+  delete detours[name];
 }
 
 module.exports = { to, step, run, forget };
