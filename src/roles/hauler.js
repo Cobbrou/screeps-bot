@@ -1,9 +1,13 @@
 const move = require('../move');
 const sources = require('../sources');
+const defense = require('../defense');
 
 // Énergie au sol au-delà de laquelle le dépôt sans conteneur n'est plus alimenté : le tas perd 1 par tranche
 // de 1 000 à chaque tick, inutile de l'entasser plus que ne le ferait un conteneur.
 const DEPOT_MAX = CONTAINER_CAPACITY;
+// Tour visée seulement s'il lui manque au moins cette énergie, sauf hostiles présents : pas de détour pour quelques points.
+// Le remplissage en passant (fillNearby) la complète sans condition.
+const TOWER_REFILL = 200;
 
 // Ramasse l'énergie au sol, dans les pierres tombales, les ruines puis les conteneurs des sources.
 // L'énergie posée près du contrôleur (par les remoteHauler) est laissée aux upgraders et aux builders.
@@ -86,7 +90,7 @@ function fullestContainer(creep) {
   return containers.find((c) => !taken.has(c.id)) || containers[0];
 }
 
-// Livre au spawn, aux extensions et aux tours, puis aux builders (sans stockage), puis au dépôt des upgraders
+// Livre au spawn, aux extensions et aux tours (s'il leur manque TOWER_REFILL, sauf hostiles), puis aux builders (sans stockage), puis au dépôt des upgraders
 // (sources.depot), puis au stockage.
 // Sans conteneur, le dépôt est une case (RoomPosition) où l'énergie est posée au sol, jusqu'à DEPOT_MAX.
 // Un builder n'est visé que s'il lui manque au moins la moitié de sa capacité : pas de détour pour quelques points.
@@ -94,7 +98,11 @@ function fullestContainer(creep) {
 // `skip` : structure ou builder qu'on vient de remplir ce tick, à ne plus viser.
 function deliveryTarget(creep, skip) {
   const room = creep.room;
-  const structure = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, { filter: (s) => s !== skip && needsEnergy(s) });
+  const threatened = defense.threats(room).length > 0;
+  const structure = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
+    filter: (s) => s !== skip && needsEnergy(s) && (s.structureType !== STRUCTURE_TOWER || threatened
+      || s.store.getFreeCapacity(RESOURCE_ENERGY) >= TOWER_REFILL),
+  });
   if (structure) return structure;
   if (!room.storage) {
     const builder = creep.pos.findClosestByRange(FIND_MY_CREEPS, {

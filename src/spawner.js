@@ -27,6 +27,43 @@ const DOWNGRADE_HIGH = 0.2;
 // Énergie dans un conteneur de source au-delà de laquelle on ajoute un hauler : l'estimation de haulCapacity ne suit pas.
 // ponytail: stock instantané, un hauler de plus par spawn tant que ça dure ; peut en créer un ou deux de trop.
 const HAUL_BACKLOG = CONTAINER_CAPACITY / 2;
+// Ticks entre deux relevés du terrain et des routes sur le chemin d'une source.
+const ROUTE_SCAN_INTERVAL = 100;
+
+// Relevé du chemin spawn → source gardé par le planner, par source, gardé jusqu'au reset du global.
+const routeScans = {};
+
+// Facteur de fatigue de chaque case du chemin de la source (sans la case du bout, celle du conteneur) :
+// 1 sur route, 2 en plaine, 10 en marais ; `roads` vrai si toutes ont leur route. Undefined sans chemin connu.
+// Relevé tous les ROUTE_SCAN_INTERVAL ticks, et dès que le planner recalcule le chemin.
+function routeTerrain(room, sourceId) {
+  const route = room.memory.routes && room.memory.routes[sourceId];
+  if (!route) return undefined;
+  const cached = routeScans[sourceId];
+  if (cached && Game.time - cached.time < ROUTE_SCAN_INTERVAL && cached.route === route.join()) return cached;
+  const terrain = room.getTerrain();
+  const factors = route.slice(0, -1).map((k) => {
+    const x = Math.floor(k / 50);
+    const y = k % 50;
+    if (room.lookForAt(LOOK_STRUCTURES, x, y).some((s) => s.structureType === STRUCTURE_ROAD)) return 1;
+    return terrain.get(x, y) === TERRAIN_MASK_SWAMP ? 10 : 2;
+  });
+  routeScans[sourceId] = { time: Game.time, route: route.join(), factors, roads: factors.every((f) => f === 1) };
+  return routeScans[sourceId];
+}
+
+// Ticks pour parcourir ces cases avec `heavy` parties qui fatiguent (WORK, CARRY plein…) et `moves` MOVE :
+// chaque MOVE retire 2 de fatigue par tick, une case coûte facteur × parties lourdes.
+function travelTime(factors, heavy, moves) {
+  return factors.reduce((sum, f) => sum + Math.max(1, Math.ceil(heavy * f / (2 * moves))), 0);
+}
+
+// CARRY par MOVE des haulers : 2 seulement quand toutes les routes des sources sont construites ;
+// avant, 1:1 pour garder une case par tick chargé en plaine (2:1 hors route : une case tous les 2 ticks).
+function haulerRatio(room) {
+  const scans = sources.list(room).map((s) => routeTerrain(room, s.id));
+  return scans.length && scans.every((s) => s && s.roads) ? 2 : 1;
+}
 
 // Récolte statique dès le RCL 1 : même un mineur à 2 WORK posé sur la source (4 énergie/tick en continu)
 // rapporte bien plus qu'un harvester qui fait l'aller-retour. Sans conteneur, il pose l'énergie au sol.
@@ -40,16 +77,17 @@ function needsMiner(source, miners) {
 }
 
 // Capacité de transport (CARRY × 50) nécessaire pour suivre la production réelle des mineurs de la source
-// (2 énergie/tick par WORK, 10 au plus) sur l'aller-retour spawn ↔ source. Comparée à la capacité des haulers
+// (2 énergie/tick par WORK, 10 au plus) sur l'aller-retour spawn ↔ source : aller à vide à une case par tick,
+// retour chargé selon le terrain et le profil des haulers (haulerRatio). Comparée à la capacité des haulers
 // vivants, et non à leur nombre : ceux nés avant les extensions portent moins qu'un corps neuf.
-// ponytail: distance de la route du planner, alors que les haulers livrent aussi aux tours et au contrôleur.
+// ponytail: chemin de la route du planner, alors que les haulers livrent aussi aux tours et au contrôleur.
 function haulCapacity(room, source, work) {
   if (!work) return 0;
   const rate = Math.min(work, MAX_MINER_WORK) * HARVEST_POWER;
-  const route = room.memory.routes && room.memory.routes[source.id];
+  const scan = routeTerrain(room, source.id);
   // Sans route connue : la capacité d'un hauler neuf.
-  if (!route) return buildBody('hauler', room.energyCapacityAvailable).filter((p) => p === CARRY).length * CARRY_CAPACITY;
-  return 2 * route.length * rate;
+  if (!scan) return buildBody('hauler', room.energyCapacityAvailable, room).filter((p) => p === CARRY).length * CARRY_CAPACITY;
+  return (scan.factors.length + travelTime(scan.factors, haulerRatio(room), 1)) * rate;
 }
 
 // Revenu net soutenable de la salle (énergie/tick) : production des mineurs locaux (2 par WORK, 10 au plus par source)
@@ -165,14 +203,31 @@ function repeat(unit, energy, rest = []) {
   return body;
 }
 
-// Corps du rôle pour `energy` ; `room` sert à adapter l'upgrader à sa salle.
-function buildBody(role, energy, room) {
+// Corps du rôle pour `energy` ; `room` adapte l'upgrader et le hauler à leur salle, `sourceId` le mineur à son chemin.
+function buildBody(role, energy, room, sourceId) {
   if (role === 'miner') {
-    // Un seul MOVE : le mineur ne se déplace qu'une fois jusqu'à son conteneur.
     const work = Math.min(Math.floor((energy - BODYPART_COST[MOVE]) / BODYPART_COST[WORK]), MAX_MINER_WORK);
-    return work > 0 ? [...Array(work).fill(WORK), MOVE] : [];
+    if (work <= 0) return [];
+    // Le mineur ne se déplace qu'une fois jusqu'à son conteneur : MOVE choisis, dans l'énergie restante,
+    // pour minimiser temps de spawn / vie productive (durée de vie moins le trajet) sur le chemin réel.
+    // Sans chemin connu, un seul MOVE.
+    const scan = room && sourceId && routeTerrain(room, sourceId);
+    const maxMoves = Math.min(work, Math.floor((energy - work * BODYPART_COST[WORK]) / BODYPART_COST[MOVE]));
+    let moves = 1;
+    let best = Infinity;
+    for (let m = 1; m <= maxMoves; m++) {
+      const travel = scan ? travelTime(scan.factors, work, m) : 0;
+      const score = (work + m) / (CREEP_LIFE_TIME - travel);
+      if (score < best) {
+        best = score;
+        moves = m;
+      }
+    }
+    return [...Array(work).fill(WORK), ...Array(moves).fill(MOVE)];
   }
-  if (role === 'hauler') return repeat([CARRY, CARRY, MOVE], energy, [[CARRY, MOVE]]);
+  if (role === 'hauler') {
+    return room && haulerRatio(room) === 2 ? repeat([CARRY, CARRY, MOVE], energy, [[CARRY, MOVE]]) : repeat([CARRY, MOVE], energy);
+  }
   // Rôles distants, hors route : un MOVE par partie, une case par tick (chargé pour le transporteur).
   // Mineur plafonné à MINER_WORK, assez pour une source non réservée (300 → 2 WORK, 450 → 3 WORK).
   if (role === 'remoteMiner') return repeat([WORK, MOVE], Math.min(energy, remoteMining.MINER_WORK * cost([WORK, MOVE])));
@@ -260,9 +315,6 @@ module.exports.run = function () {
     const role = emergency ? 'harvester' : Object.keys(wanted).find((r) => (roomCounts[r] || 0) < wanted[r]);
     if (!role) continue;
 
-    const body = buildBody(role, emergency ? room.energyAvailable : room.energyCapacityAvailable, room);
-    if (!body.length) continue;
-
     const memory = { role, room: room.name };
     if (role === 'miner') {
       // Source la moins équipée d'abord : sinon la première source de la liste prend tous les mineurs
@@ -277,6 +329,14 @@ module.exports.run = function () {
       const source = role === 'remoteMiner' ? remoteNeed.miner : remoteNeed.hauler;
       Object.assign(memory, { target: source.room, sourceId: source.id, x: source.x, y: source.y });
     }
+    // Premier mineur ou premier hauler de la salle : créé avec l'énergie disponible au lieu d'attendre la capacité
+    // pleine, la récolte démarre plus tôt. Au moins l'énergie que le spawn régénère seul (300) : pas de corps minuscule.
+    const startup = (role === 'miner' || role === 'hauler') && !roomCounts[role];
+    const energy = emergency ? room.energyAvailable
+      : startup ? Math.min(room.energyCapacityAvailable, Math.max(SPAWN_ENERGY_CAPACITY, room.energyAvailable))
+        : room.energyCapacityAvailable;
+    const body = buildBody(role, energy, room, memory.sourceId);
+    if (!body.length) continue;
     if (spawn.spawnCreep(body, `${role}-${spawn.name}-${Game.time}`, { memory }) === OK) {
       roomCounts[role] = (roomCounts[role] || 0) + 1;
       if (role === 'miner') addMiner(memory.sourceId, body);

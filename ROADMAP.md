@@ -72,7 +72,7 @@ Priorité actuelle, avant les phases avancées : tirer le maximum des premiers R
 - [x] Ordre des chantiers : RCL 2 d'abord, puis extensions, conteneurs des sources, conteneur du contrôleur après les extensions
 - [x] Upgraders selon le surplus d'énergie plutôt qu'en nombre fixe
 - [x] Corps par rôle (upgrader riche en `WORK`) et sans énergie inutilisée
-- [ ] Haulers qui ne visent une tour que s'il lui manque assez d'énergie (~200), sauf hostiles présents : pas de détour pour quelques points
+- [x] Haulers qui ne visent une tour que s'il lui manque assez d'énergie (~200), sauf hostiles présents : pas de détour pour quelques points
 - [x] Planner relancé dès la montée de RCL
 - [x] Routes dès le RCL 2 une fois extensions et conteneurs construits
 - [x] Éclaireur seulement s'il reste une voisine utile à explorer
@@ -89,9 +89,9 @@ Pistes tirées de l'[analyse de harabibot v2](docs/harabibot-analysis.md), par i
 - [x] Énergie livrée aux upgraders : dépôt fixe près du contrôleur dès le RCL 1 (tas, puis conteneur), alimenté par les haulers ; upgraders fixes riches en `WORK`, plus de `sources.collect`
 - [x] Énergie livrée aux builders par les haulers (sans stockage), au lieu de `sources.collect`
 - [x] Effectifs sur le revenu net soutenable (énergie/tick, entretien des créeps déduit) : `WORK` des upgraders = revenu, puissance des builders = revenu, aucun upgrader pendant les chantiers, builders convertis en upgraders ensuite
-- [ ] Haulers 1:1 avant les routes, trajet chargé compté à part dans `haulCapacity` (marais à 5) ; passage en 2:1 seulement avec routes
-- [ ] `MOVE` des mineurs choisis selon le trajet (minimiser temps de spawn / vie productive)
-- [ ] Premier mineur et haulers créés avec `energyAvailable` au démarrage, sans attendre la capacité pleine
+- [x] Haulers 1:1 avant les routes, trajet chargé compté à part dans `haulCapacity` (marais à 5) ; passage en 2:1 seulement avec routes
+- [x] `MOVE` des mineurs choisis selon le trajet (minimiser temps de spawn / vie productive)
+- [x] Premier mineur et haulers créés avec `energyAvailable` au démarrage, sans attendre la capacité pleine
 - [ ] Gestionnaire de trafic global (intentions, échanges, zones de travail des créeps fixes) au lieu de `moveTo` et contournement
 - [ ] Haulers envoyés selon l'énergie prévue à l'arrivée (stock − réservé + régénération en route), nouveau trajet dans le même tick après livraison
 
