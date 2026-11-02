@@ -16,6 +16,9 @@ function work(site) {
 
 // Sous cette part de ses points de vie, une structure est réparée avant toute construction (usure, decay).
 const URGENT_RATIO = 0.5;
+// Hors chantier, une structure est réparée sous cette part de ses points de vie : l'usure normale d'une route
+// (100 PV tous les 1000 ticks) ne mobilise pas les builders à chaque tick, ils améliorent le contrôleur.
+const REPAIR_RATIO = 0.8;
 
 // Répare la structure en cours, ou la plus proche sous `ratio` de ses points de vie (hors murs et remparts).
 // La cible est gardée jusqu'à réparation complète. Vrai si le créep a une structure à réparer.
@@ -56,7 +59,7 @@ function build(creep) {
   return true;
 }
 
-// Répare les structures très abîmées ; sinon construit les chantiers ; sinon répare le reste ;
+// Répare les structures très abîmées ; sinon construit les chantiers ; sinon répare ce qui est sous REPAIR_RATIO ;
 // sinon améliore le contrôleur.
 module.exports.run = function (creep) {
   if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) creep.memory.working = false;
@@ -72,7 +75,7 @@ module.exports.run = function (creep) {
   if (!creep.room.memory.downgrade) {
     if (repair(creep, URGENT_RATIO)) return;
     if (build(creep)) return;
-    if (repair(creep, 1)) return;
+    if (repair(creep, REPAIR_RATIO)) return;
   }
   if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
     move.to(creep, creep.room.controller);
