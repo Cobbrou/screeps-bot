@@ -1,6 +1,10 @@
 const move = require('../move');
 const sources = require('../sources');
 
+// Énergie au sol au-delà de laquelle le dépôt sans conteneur n'est plus alimenté : le tas perd 1 par tranche
+// de 1 000 à chaque tick, inutile de l'entasser plus que ne le ferait un conteneur.
+const DEPOT_MAX = CONTAINER_CAPACITY;
+
 // Ramasse l'énergie au sol, dans les pierres tombales, les ruines puis les conteneurs des sources.
 // L'énergie posée près du contrôleur (par les remoteHauler) est laissée aux upgraders et aux builders.
 function collect(creep) {
@@ -60,11 +64,12 @@ function fillNearby(creep) {
 }
 
 // En chemin vers sa livraison, ramasse l'énergie au sol adjacente s'il reste de la place (pickup, transfer
-// et déplacement passent au même tick).
+// et déplacement passent au même tick). Le dépôt des upgraders, près du contrôleur, n'est pas repris.
 function pickupNearby(creep) {
   if (!creep.store.getFreeCapacity(RESOURCE_ENERGY)) return;
+  const controller = creep.room.controller;
   const pile = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, {
-    filter: (r) => r.resourceType === RESOURCE_ENERGY,
+    filter: (r) => r.resourceType === RESOURCE_ENERGY && !(controller && r.pos.inRangeTo(controller, 3)),
   })[0];
   if (pile) creep.pickup(pile);
 }
@@ -81,15 +86,22 @@ function fullestContainer(creep) {
   return containers.find((c) => !taken.has(c.id)) || containers[0];
 }
 
-// Livre au spawn, aux extensions et aux tours, puis au conteneur du contrôleur, puis au stockage.
+// Livre au spawn, aux extensions et aux tours, puis au dépôt des upgraders (sources.depot), puis au stockage.
+// Sans conteneur, le dépôt est une case (RoomPosition) où l'énergie est posée au sol, jusqu'à DEPOT_MAX.
 // Les builders se chargent eux-mêmes (sources.collect).
 // `skip` : structure qu'on vient de remplir ce tick, à ne plus viser.
 function deliveryTarget(creep, skip) {
   const room = creep.room;
-  return creep.pos.findClosestByRange(FIND_MY_STRUCTURES, { filter: (s) => s !== skip && needsEnergy(s) })
-    || room.controller.pos.findInRange(FIND_STRUCTURES, 2, {
-      filter: (s) => s.structureType === STRUCTURE_CONTAINER && s.store.getFreeCapacity(RESOURCE_ENERGY) > 0,
-    })[0] || room.storage;
+  const structure = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, { filter: (s) => s !== skip && needsEnergy(s) });
+  if (structure) return structure;
+  const depot = sources.depot(room);
+  if (depot && depot.container) {
+    if (depot.container.store.getFreeCapacity(RESOURCE_ENERGY) > 0) return depot.container;
+  } else if (depot) {
+    const pile = sources.depotPile(depot);
+    if (!pile || pile.amount < DEPOT_MAX) return depot.pos;
+  }
+  return room.storage;
 }
 
 // Livre la cible. Si le transfer la remplit et qu'il reste de l'énergie, le hauler part déjà vers la suivante
@@ -97,6 +109,15 @@ function deliveryTarget(creep, skip) {
 function deliver(creep) {
   const target = deliveryTarget(creep);
   if (!target) return;
+  if (target instanceof RoomPosition) {
+    if (creep.pos.isEqualTo(target)) {
+      creep.drop(RESOURCE_ENERGY);
+    } else {
+      pickupNearby(creep);
+      move.to(creep, target);
+    }
+    return;
+  }
   const result = creep.transfer(target, RESOURCE_ENERGY);
   if (result === ERR_NOT_IN_RANGE) {
     pickupNearby(creep);

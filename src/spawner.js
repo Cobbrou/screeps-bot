@@ -73,6 +73,15 @@ function extraUpgraders(room) {
   return Math.min(MAX_EXTRA_UPGRADERS, extra);
 }
 
+// Upgraders postés au plus autour du dépôt : ses cases voisines praticables, moins une laissée aux haulers
+// (le tas se pose depuis la case du dépôt, le conteneur se remplit depuis une case voisine). Sans dépôt, pas de plafond.
+// ponytail: la case laissée libre peut être enclavée par le terrain ; à traiter si les haulers n'atteignent plus le dépôt.
+function upgraderSpots(room) {
+  const d = sources.depot(room);
+  if (!d) return Infinity;
+  return Math.max(1, sources.spots({ id: `depot:${room.name}`, room, pos: d.pos }) - 1);
+}
+
 // Vrai si une structure (hors murs et remparts) est sous REPAIR_RATIO de ses points de vie et qu'aucune tour
 // ne l'entretiendra : un builder vient alors la réparer.
 function needsRepair(room) {
@@ -119,7 +128,8 @@ function targets(room, roomCounts, miners, carry, remoteNeed) {
   const sites = room.find(FIND_MY_CONSTRUCTION_SITES);
   const building = sites.some((s) => s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART);
   const extra = extraUpgraders(room);
-  const upgrader = upgraders.paused(room) ? 0 : (extensionSites(room) ? 1 : 2) + (building ? 0 : extra);
+  const upgrader = upgraders.paused(room) ? 0
+    : Math.min((extensionSites(room) ? 1 : 2) + (building ? 0 : extra), upgraderSpots(room));
   return {
     // En mode sans échec, les hostiles ne peuvent rien contre la salle : pas de défenseur.
     defender: !room.controller.safeMode && defense.threats(room).length ? 2 : 0,
@@ -177,9 +187,9 @@ function buildBody(role, energy, room) {
   if (role === 'defender') return repeat([ATTACK, MOVE], energy);
   if (role === 'scout') return [MOVE];
   if (role === 'claimer') return energy >= BODYPART_COST[CLAIM] + BODYPART_COST[MOVE] ? [CLAIM, MOVE] : [];
-  // Upgrader nourri par le conteneur du contrôleur : il ne fait que des pas entre conteneur et contrôleur,
-  // donc surtout des WORK, un seul CARRY et un MOVE pour deux WORK (550 → 4 WORK, 800 → 6 WORK).
-  if (role === 'upgrader' && room && sources.container(room.controller, 2) && energy >= BODYPART_COST[CARRY] + 250) {
+  // Upgrader nourri au dépôt du contrôleur (tas puis conteneur) : il ne bouge plus une fois posté,
+  // donc surtout des WORK, un seul CARRY et un MOVE pour deux WORK (300 → 2 WORK, 550 → 4 WORK, 800 → 6 WORK).
+  if (role === 'upgrader' && room && sources.depot(room) && energy >= BODYPART_COST[CARRY] + 250) {
     return [CARRY, ...repeat([WORK, WORK, MOVE], energy - BODYPART_COST[CARRY], [[WORK, MOVE]])].slice(0, MAX_CREEP_SIZE);
   }
   // Polyvalent : le reste devient un WORK de plus (300 → 2 WORK, 550 → 3 WORK).

@@ -21,21 +21,13 @@ function collect(creep) {
   }
 }
 
-// Rentre et livre comme un hauler (spawn, extensions, tours, conteneur du contrôleur, stockage).
-// Tout est plein : pose l'énergie près du contrôleur, où upgraders et builders la ramassent.
-// ponytail: un upgrader posté au conteneur du contrôleur ne ramasse pas ce tas ; il ne sert alors qu'aux builders.
+// Rentre et livre comme un hauler (spawn, extensions, tours, dépôt des upgraders, stockage).
 function deliver(creep) {
   if (creep.room.name !== creep.memory.room) {
     move.to(creep, new RoomPosition(25, 25, creep.memory.room), { range: 20 });
     return;
   }
-  if (hauler.deliveryTarget(creep)) {
-    hauler.deliver(creep);
-    return;
-  }
-  const controller = creep.room.controller;
-  if (!creep.pos.inRangeTo(controller, 2)) move.to(creep, controller, { range: 2 });
-  else creep.drop(RESOURCE_ENERGY);
+  hauler.deliver(creep);
 }
 
 module.exports.run = function (creep) {

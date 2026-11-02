@@ -69,13 +69,13 @@ screeps-bot/
 │       ├── claimer.js       # revendique le contrôleur de la salle visée
 │       ├── defender.js      # attaque les hostiles de la salle
 │       ├── harvester.js     # récolte et remplit spawn, extensions et tours, construit le surplus
-│       ├── hauler.js        # transporte l'énergie des conteneurs vers spawn, extensions, tours
+│       ├── hauler.js        # transporte l'énergie des conteneurs vers spawn, extensions, tours, dépôt du contrôleur
 │       ├── miner.js         # récolte statique sur une source (conteneur, ou au sol)
 │       ├── pioneer.js       # amorce la nouvelle salle (construit son spawn)
 │       ├── remoteHauler.js  # ramasse l'énergie d'une source distante et la rapporte
 │       ├── remoteMiner.js   # récolte statique sur une source distante, l'énergie tombe au sol
 │       ├── scout.js         # explore les salles voisines
-│       └── upgrader.js      # puise l'énergie et améliore le contrôleur
+│       └── upgrader.js      # posté au dépôt du contrôleur, améliore sans aller chercher l'énergie
 ├── docs/
 │   ├── architecture.md      # architecture prévue
 │   ├── harabibot-analysis.md # comparaison avec harabibot v2 : pistes pour l'early game

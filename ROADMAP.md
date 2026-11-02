@@ -86,7 +86,8 @@ Priorité actuelle, avant les phases avancées : tirer le maximum des premiers R
 
 Pistes tirées de l'[analyse de harabibot v2](docs/harabibot-analysis.md), par impact estimé :
 
-- [ ] Énergie livrée aux upgraders et builders : dépôt fixe près du contrôleur dès le RCL 1 (tas, puis conteneur), alimenté par les haulers ; upgraders fixes riches en `WORK` ; plus de `sources.collect` pour ces rôles
+- [x] Énergie livrée aux upgraders : dépôt fixe près du contrôleur dès le RCL 1 (tas, puis conteneur), alimenté par les haulers ; upgraders fixes riches en `WORK`, plus de `sources.collect`
+- [ ] Énergie livrée aux builders par les haulers, au lieu de `sources.collect`
 - [ ] Effectifs sur le revenu net soutenable (énergie/tick, entretien des créeps déduit) : `WORK` des upgraders = revenu, puissance des builders = revenu, aucun upgrader pendant les chantiers, builders convertis en upgraders ensuite
 - [ ] Haulers 1:1 avant les routes, trajet chargé compté à part dans `haulCapacity` (marais à 5) ; passage en 2:1 seulement avec routes
 - [ ] `MOVE` des mineurs choisis selon le trajet (minimiser temps de spawn / vie productive)

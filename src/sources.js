@@ -97,6 +97,23 @@ function container(target, range = 1) {
   return found;
 }
 
+// Dépôt d'énergie des upgraders, à portée 2 du contrôleur : son conteneur s'il est construit, sinon la case
+// où le planner le prévoit (bout de la route spawn → contrôleur), où les haulers posent l'énergie au sol.
+// Existe dès le RCL 1 ; undefined tant que le planner n'a pas tracé la route.
+function depot(room) {
+  const box = container(room.controller, 2);
+  if (box) return { pos: box.pos, container: box };
+  const route = room.memory.routes && room.memory.routes[room.controller.id];
+  if (!route || !route.length) return undefined;
+  const k = route[route.length - 1];
+  return { pos: new RoomPosition(Math.floor(k / 50), k % 50, room.name) };
+}
+
+// Énergie posée au sol sur la case du dépôt, ou undefined.
+function depotPile(d) {
+  return d.pos.lookFor(LOOK_RESOURCES).find((r) => r.resourceType === RESOURCE_ENERGY);
+}
+
 // Sources occupées par un mineur vivant, recalculées une fois par tick.
 let minedTick = -1;
 let minedIds = new Set();
@@ -249,9 +266,12 @@ function stepAway(creep) {
 // (retrait partiel accepté) ; récolte sinon. L'énergie au sol passe en premier : elle se perd si personne ne la ramasse.
 // La réserve est gardée en mémoire tant qu'elle suffit ; sans réserve, la salle n'est fouillée
 // qu'une fois tous les WITHDRAW_SCAN_INTERVAL ticks.
+// Comme le conteneur du contrôleur, l'énergie au sol près du contrôleur (dépôt) est réservée aux upgraders.
 function collect(creep) {
+  const controller = creep.room.controller;
   const pile = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
-    filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50,
+    filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50
+      && !(controller && r.pos.inRangeTo(controller, 3)),
   });
   if (pile) {
     if (creep.pickup(pile) === ERR_NOT_IN_RANGE) move.to(creep, pile);
@@ -274,4 +294,4 @@ function collect(creep) {
   if (creep.withdraw(store, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, store);
 }
 
-module.exports = { list, spots, container, harvest, harvestSource, collect, goBack, stepAway, forget };
+module.exports = { list, spots, container, depot, depotPile, harvest, harvestSource, collect, goBack, stepAway, forget };
