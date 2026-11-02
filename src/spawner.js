@@ -123,15 +123,12 @@ function needsRepair(room) {
 }
 
 
-// Vrai si un éclaireur sert encore : une voisine est sûre (récolte distante), inconnue ou pas revue depuis
-// SCOUT_REFRESH ticks, ou une expansion est possible (il cherche alors des cibles plus loin).
-// Sinon toutes les voisines sont dangereuses ou prises : l'éclaireur y mourrait pour rien.
+// Vrai si une voisine est inconnue ou pas revue depuis SCOUT_REFRESH ticks : un éclaireur part la rafraîchir
+// (et erre plus loin pendant sa vie, ce qui alimente aussi l'expansion). Sinon aucun : il ne ferait que coûter.
 function needsScout(room) {
-  const owned = Object.values(Game.rooms).filter((r) => r.controller && r.controller.my).length;
-  if (owned < Game.gcl.level) return true;
   return Object.values(Game.map.describeExits(room.name)).some((name) => {
     const i = intel.get(name);
-    return !i || Game.time - i.time > SCOUT_REFRESH || intel.safe(name);
+    return !i || Game.time - i.time > SCOUT_REFRESH;
   });
 }
 
