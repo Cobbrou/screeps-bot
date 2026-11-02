@@ -80,8 +80,8 @@ function costMatrix(room) {
   for (const id in room.memory.routes) {
     for (const k of room.memory.routes[id]) costs.set(Math.floor(k / 50), k % 50, 1);
   }
-  for (const type in room.memory.plan) {
-    for (const k of room.memory.plan[type]) costs.set(Math.floor(k / 50), k % 50, 255);
+  for (const type of PLANNED) {
+    for (const k of (room.memory.plan && room.memory.plan[type]) || []) costs.set(Math.floor(k / 50), k % 50, 255);
   }
   const objects = [...room.find(FIND_STRUCTURES), ...room.find(FIND_MY_CONSTRUCTION_SITES)];
   for (const o of objects) {
@@ -94,12 +94,67 @@ function costMatrix(room) {
   return costs;
 }
 
+// Distance (en cases, diagonales comprises) entre deux cases codées x * 50 + y.
+function range(a, b) {
+  return Math.max(Math.abs(Math.floor(a / 50) - Math.floor(b / 50)), Math.abs(a % 50 - b % 50));
+}
+
+// Hub du contrôleur : case du conteneur provisoire (dépôt des upgraders aux RCL 1 à 3, tas au sol avant le RCL 2)
+// et case voisine du stockage (RCL 4), toutes deux à portée 2 du contrôleur : les upgraders postés autour
+// restent à portée d'amélioration (3) et puisent directement dans le stockage une fois construit.
+// Le conteneur reste le dépôt pendant la construction du stockage, puis il est détruit (sa case devient un poste).
+// Choix : le plus de postes d'upgraders (cases praticables voisines à portée 3), puis le plus près du spawn.
+// Conteneur de contrôleur déjà construit : sa case est reprise. Stockage déjà construit ailleurs : pas de case
+// de stockage, le conteneur reste le dépôt. Renvoie { container, storage } (storage absent), ou null.
+// Portée 2 plutôt que la portée 4 de harabibot : sans chaîne d'upgraders, elle ne laisserait que 3 postes.
+function planHub(room, spawn, costs) {
+  const ctrl = room.controller.pos;
+  const terrain = room.getTerrain();
+  const open = (x, y) => x >= 1 && x <= 48 && y >= 1 && y <= 48
+    && terrain.get(x, y) !== TERRAIN_MASK_WALL && costs.get(x, y) !== 255;
+  const ring = [];
+  for (let dx = -2; dx <= 2; dx++) {
+    for (let dy = -2; dy <= 2; dy++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) === 2 && open(ctrl.x + dx, ctrl.y + dy)) ring.push((ctrl.x + dx) * 50 + ctrl.y + dy);
+    }
+  }
+  // Postes d'upgraders autour de la case k, hors la case `except` (le stockage, qui bloque le passage).
+  const posts = (k, except) => {
+    let n = 0;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const x = Math.floor(k / 50) + dx;
+        const y = k % 50 + dy;
+        if ((dx || dy) && x * 50 + y !== except && open(x, y) && ctrl.getRangeTo(x, y) <= 3) n++;
+      }
+    }
+    return n;
+  };
+  const existing = ctrl.findInRange(FIND_STRUCTURES, 2, { filter: (s) => s.structureType === STRUCTURE_CONTAINER })[0];
+  let hub = null;
+  let best = -Infinity;
+  for (const container of existing ? [existing.pos.x * 50 + existing.pos.y] : ring) {
+    const pairs = room.storage ? [] : ring.filter((s) => range(s, container) === 1);
+    if (!pairs.length) pairs.push(undefined);
+    for (const storage of pairs) {
+      const score = (posts(container, storage) + (storage === undefined ? 0 : posts(storage))) * 100
+        - spawn.pos.getRangeTo(Math.floor(container / 50), container % 50);
+      if (score > best) {
+        best = score;
+        hub = storage === undefined ? { container } : { container, storage };
+      }
+    }
+  }
+  return hub;
+}
+
 // Cases libres (x * 50 + y) en damier autour du spawn, de la plus proche à la plus lointaine : les cases libres
 // en diagonale laissent passer les créeps. Ni mur naturel, ni case à coût non nul (structure, route gardée),
-// ni case à portée 2 d'une source ou du contrôleur.
-function planCells(room, spawn, costs) {
+// ni case à portée 2 d'une source ou du contrôleur, ni case voisine du hub (postes des upgraders).
+function planCells(room, spawn, costs, hub) {
   const terrain = room.getTerrain();
   const avoid = [...sources.list(room), room.controller];
+  const hubCells = hub ? [hub.container, hub.storage].filter((k) => k !== undefined) : [];
   const cells = [];
   for (let r = 2; r <= MAX_RADIUS; r++) {
     for (let dx = -r; dx <= r; dx++) {
@@ -110,6 +165,7 @@ function planCells(room, spawn, costs) {
         if (x < 2 || x > 47 || y < 2 || y > 47 || terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
         if (costs.get(x, y) !== 0) continue;
         if (avoid.some((o) => o.pos.getRangeTo(x, y) <= 2)) continue;
+        if (hubCells.some((k) => range(k, x * 50 + y) <= 1)) continue;
         cells.push(x * 50 + y);
       }
     }
@@ -123,25 +179,31 @@ function rclFor(type, n) {
   return Infinity;
 }
 
-// Plan de base : pour chaque type de PLANNED, cases (x * 50 + y) de toutes ses structures jusqu'au RCL 8,
-// calculées une fois et gardées dans room.memory.plan. Les positions ne dérivent plus au gré des constructions.
-// Les structures et chantiers déjà présents en font partie d'emblée ; le reste prend les cases de planCells,
-// les plus proches du spawn allant aux structures des plus bas RCL (à RCL égal, dans l'ordre de PLANNED).
+// Plan de base : hub du contrôleur (planHub) et, pour chaque type de PLANNED, cases (x * 50 + y) de toutes
+// ses structures jusqu'au RCL 8, calculés une fois et gardés dans room.memory.plan. Les positions ne dérivent plus
+// au gré des constructions. Le stockage va sur la case du hub ; les structures et chantiers déjà présents font
+// partie du plan d'emblée ; le reste prend les cases de planCells, les plus proches du spawn allant aux structures
+// des plus bas RCL (à RCL égal, dans l'ordre de PLANNED).
 // La n-ième case d'un type est posée dès que le RCL autorise n + 1 structures de ce type (rclFor).
 // ponytail: jamais recalculé (spawn détruit, damier trop petit pour tout placer) ; delete room.memory.plan pour le refaire.
 function basePlan(room, spawn, costs) {
   if (room.memory.plan) return room.memory.plan;
-  const plan = {};
+  const hub = planHub(room, spawn, costs);
+  const plan = { hub };
   const wanted = [];
   for (const type of PLANNED) {
     const isType = { filter: (s) => s.structureType === type };
     plan[type] = [...room.find(FIND_MY_STRUCTURES, isType), ...room.find(FIND_MY_CONSTRUCTION_SITES, isType)]
       .map((s) => s.pos.x * 50 + s.pos.y);
+    if (type === STRUCTURE_STORAGE && !plan[type].length && hub && hub.storage !== undefined) {
+      plan[type].push(hub.storage);
+      costs.set(Math.floor(hub.storage / 50), hub.storage % 50, 255);
+    }
     for (let n = plan[type].length; n < CONTROLLER_STRUCTURES[type][8]; n++) wanted.push({ type, rcl: rclFor(type, n) });
   }
   // Tri stable : à RCL égal, l'ordre de PLANNED est conservé.
   wanted.sort((a, b) => a.rcl - b.rcl);
-  const cells = planCells(room, spawn, costs);
+  const cells = planCells(room, spawn, costs, hub);
   wanted.forEach((w, i) => {
     if (i >= cells.length) return;
     plan[w.type].push(cells[i]);
@@ -194,7 +256,8 @@ function planRoute(room, spawn, target, range, costs, withContainer) {
   if (!room.memory.routes) room.memory.routes = {};
   const saved = room.memory.routes[target.id];
   let path = saved && saved.map((k) => new RoomPosition(Math.floor(k / 50), k % 50, room.name));
-  if (!path || path.some((pos) => costs.get(pos.x, pos.y) === 255)) {
+  // Recalculé aussi si son bout n'est plus à portée de la cible (cible déplacée : hub du contrôleur).
+  if (!path || path.some((pos) => costs.get(pos.x, pos.y) === 255) || !path[path.length - 1].inRangeTo(target.pos, range)) {
     const result = PathFinder.search(spawn.pos, { pos: target.pos, range }, {
       plainCost: 2,
       swampCost: 10,
@@ -290,6 +353,8 @@ module.exports.run = function () {
     const spawn = room.find(FIND_MY_SPAWNS)[0];
     if (!spawn) continue;
 
+    // Plan d'avant le hub : refait (les structures construites sont reprises), avant costMatrix qui en bloquerait les cases.
+    if (room.memory.plan && !('hub' in room.memory.plan)) delete room.memory.plan;
     const costs = costMatrix(room);
     const plan = basePlan(room, spawn, costs);
     // Dans l'ordre de priority : les places libres vont d'abord aux structures prioritaires.
@@ -307,9 +372,17 @@ module.exports.run = function () {
     const roads = room.controller.level >= ROAD_MIN_RCL || (containers && extensionsDone && !otherSites.length
       && builtContainers.length >= sources.list(room).length + 1);
     const paths = sources.list(room).map((source) => planRoute(room, spawn, source, 1, costs, containers));
-    // Conteneur du contrôleur une fois toutes les extensions du RCL construites : la capacité passe avant.
-    // Portée 2 : le conteneur reste à portée d'amélioration (3) sans bloquer les abords du contrôleur.
-    paths.push(planRoute(room, spawn, room.controller, 2, costs, containers && extensionsDone));
+    // Route jusqu'à la case du conteneur du hub (dépôt des upgraders), conteneur posé une fois toutes les extensions
+    // du RCL construites : la capacité passe avant. Stockage du hub construit : il devient le dépôt et le conteneur
+    // est détruit (l'énergie restante tombe dans sa ruine, que les haulers ramassent).
+    const hub = plan.hub;
+    if (hub) {
+      const pos = new RoomPosition(Math.floor(hub.container / 50), hub.container % 50, room.name);
+      const stored = !!room.storage && room.storage.pos.x * 50 + room.storage.pos.y === hub.storage;
+      paths.push(planRoute(room, spawn, { id: room.controller.id, pos }, 0, costs, containers && extensionsDone && !stored));
+      const box = stored && pos.lookFor(LOOK_STRUCTURES).find((s) => s.structureType === STRUCTURE_CONTAINER);
+      if (box) box.destroy();
+    }
     // Routes après tous les conteneurs : elles passent en dernier dans les places libres.
     for (const path of paths) if (path) planRoad(room, path, roads);
     // Murs seulement une fois une tour construite (elle seule les entretient) et le stockage aussi (RCL 4) :

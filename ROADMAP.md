@@ -100,7 +100,8 @@ Pistes tirées de l'[analyse du planner de harabibot v2](docs/harabibot-planner-
 - [x] Correction : extensions jamais posées sur les routes gardées (`room.memory.routes`), sinon la route est recalculée et le dépôt du contrôleur change de case
 - [x] Chantiers concentrés : 3 actifs au plus par salle, triés par priorité (spawn, extensions sous 650 de capacité, tour, extensions sous 800, conteneurs, routes), tous les builders sur le prioritaire
 - [x] Plan de base calculé une fois et gardé en mémoire (cases codées `x * 50 + y`, RCL par structure) ; le planner ne pose que la différence avec la salle (damier glouton autour du spawn, structures existantes reprises)
-- [ ] Hub près du contrôleur : stockage à portée 4, cases réservées aux upgraders fixes, conteneur provisoire sur la case du stockage aux RCL 2-3 comme dépôt unique ; premier spawn d'une expansion placé d'après le plan
+- [x] Hub près du contrôleur : stockage et conteneur provisoire voisins à portée 2 (la portée 4 de harabibot ne laisse que 3 postes sans chaîne d'upgraders), postes des upgraders réservés, conteneur dépôt unique jusqu'au stockage puis détruit ; premier spawn d'une expansion à portée 5 au moins du contrôleur
+- [ ] Chaînes d'upgraders (harabibot) pour éloigner le stockage à portée 4, si les 7-8 postes autour du hub ne suffisent plus
 - [ ] Extensions de part et d'autre de routes de service (courtes diagonales, routes du noyau et des sources) au lieu du damier sans route ; avant le RCL 4, d'abord celles qui touchent un chemin de source ; routes posées au RCL des structures qu'elles desservent (au moins 3)
 
 ## Phase 7 : logistique avancée (RCL 5-6)

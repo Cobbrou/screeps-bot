@@ -35,7 +35,12 @@ function choose() {
   if (best) Memory.expansion = best;
 }
 
-// Chantier du premier spawn : case dont les abords (3x3) sont libres, au plus près du contrôleur et des sources.
+// Distance minimale entre le premier spawn et le contrôleur : le hub du planner (portée 2) et les postes
+// des upgraders autour (portée 3) restent libres, le spawn et ses extensions juste à côté.
+const SPAWN_CONTROLLER_RANGE = 5;
+
+// Chantier du premier spawn : case dont les abords (3x3) sont libres, au plus près du contrôleur et des sources,
+// à SPAWN_CONTROLLER_RANGE au moins du contrôleur et 3 des sources.
 function placeSpawn(room) {
   if (room.find(FIND_MY_CONSTRUCTION_SITES, { filter: (s) => s.structureType === STRUCTURE_SPAWN }).length) return;
   const terrain = room.getTerrain();
@@ -48,7 +53,8 @@ function placeSpawn(room) {
       for (let dx = -1; dx <= 1 && !blocked; dx++) {
         for (let dy = -1; dy <= 1 && !blocked; dy++) blocked = terrain.get(x + dx, y + dy) === TERRAIN_MASK_WALL;
       }
-      if (blocked || anchors.some((o) => o.pos.getRangeTo(x, y) < 3)) continue;
+      if (blocked || room.controller.pos.getRangeTo(x, y) < SPAWN_CONTROLLER_RANGE
+        || anchors.some((o) => o.pos.getRangeTo(x, y) < 3)) continue;
       const cost = anchors.reduce((sum, o) => sum + o.pos.getRangeTo(x, y), 0);
       if (cost < bestCost) {
         bestCost = cost;

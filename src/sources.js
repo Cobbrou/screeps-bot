@@ -97,16 +97,18 @@ function container(target, range = 1) {
   return found;
 }
 
-// Dépôt d'énergie des upgraders, à portée 2 du contrôleur : son conteneur s'il est construit, sinon la case
-// où le planner le prévoit (bout de la route spawn → contrôleur), où les haulers posent l'énergie au sol.
-// Existe dès le RCL 1 ; undefined tant que le planner n'a pas tracé la route.
+// Dépôt d'énergie des upgraders, au hub du contrôleur (room.memory.plan.hub, portée 2) : le stockage du hub
+// s'il est construit, sinon le conteneur du hub, sinon sa case, où les haulers posent l'énergie au sol.
+// `container` : la structure où puiser (conteneur ou stockage), absente pour le tas au sol.
+// Existe dès le RCL 1 ; undefined tant que le planner n'a pas calculé le plan (ou sans hub possible).
 function depot(room) {
-  const box = container(room.controller, 2);
-  if (box) return { pos: box.pos, container: box };
-  const route = room.memory.routes && room.memory.routes[room.controller.id];
-  if (!route || !route.length) return undefined;
-  const k = route[route.length - 1];
-  return { pos: new RoomPosition(Math.floor(k / 50), k % 50, room.name) };
+  const hub = room.memory.plan && room.memory.plan.hub;
+  if (!hub) return undefined;
+  const storage = room.storage;
+  if (storage && storage.pos.x * 50 + storage.pos.y === hub.storage) return { pos: storage.pos, container: storage };
+  const pos = new RoomPosition(Math.floor(hub.container / 50), hub.container % 50, room.name);
+  const box = pos.lookFor(LOOK_STRUCTURES).find((s) => s.structureType === STRUCTURE_CONTAINER);
+  return box ? { pos, container: box } : { pos };
 }
 
 // Énergie posée au sol sur la case du dépôt, ou undefined.
