@@ -30,6 +30,9 @@ const DOWNGRADE_HIGH = 0.2;
 // Énergie dans un conteneur de source au-delà de laquelle on ajoute un hauler : l'estimation de haulCapacity ne suit pas.
 // ponytail: stock instantané, un hauler de plus par spawn tant que ça dure ; peut en créer un ou deux de trop.
 const HAUL_BACKLOG = CONTAINER_CAPACITY / 2;
+// Plafond de ce renfort : capacité des haulers au plus HAUL_BACKLOG_RATIO fois le besoin estimé. Sans lui, quand
+// spawn et extensions sont pleins, les haulers restent pleins, les conteneurs s'engorgent et les renforts s'enchaînent.
+const HAUL_BACKLOG_RATIO = 3;
 // Ticks entre deux relevés du terrain et des routes sur le chemin d'une source.
 const ROUTE_SCAN_INTERVAL = 100;
 
@@ -159,9 +162,13 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   const building = sites.some((s) => s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART);
   const up = roomCounts.upgrader || 0;
   // Rétrogradation proche : au moins un upgrader, même pendant les chantiers.
+  // Pendant les chantiers, l'effectif voulu avant eux (room.memory.upgraders) est maintenu : les upgraders
+  // en fin de vie sont remplacés, seule l'augmentation attend la fin des chantiers.
   const moreUp = !upgraders.paused(room) && up < upgraders.spots(room)
-    && ((urgent && !up) || (!building && (work.upgrader || 0) < net / UPGRADE_SPEND));
+    && ((urgent && !up) || (building ? up < (room.memory.upgraders || 0) : (work.upgrader || 0) < net / UPGRADE_SPEND));
   const upgrader = up + (moreUp ? 1 : 0);
+  if (!building) room.memory.upgraders = upgrader;
+  const need = list.reduce((sum, s) => sum + haulCapacity(room, s, (miners[s.id] || {}).work), 0);
   const bd = roomCounts.builder || 0;
   // Au moins un builder par chantier en cours, même à revenu nul ; murs et remparts seuls ou réparation : un seul.
   const builder = building ? bd + (!bd || (work.builder || 0) < net / BUILD_SPEND ? 1 : 0)
@@ -173,10 +180,12 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     // ponytail: tous les upgraders voulus passent en tête, pas seulement le premier ; l'urgence harvester couvre la famine.
     ...(urgent ? { upgrader } : {}),
     // Un hauler de plus tant que la capacité des haulers vivants reste sous le besoin, ou qu'un conteneur
-    // de source s'engorge (trajets plus lents ou plus longs que prévu : fatigue hors route, livraisons au contrôleur).
+    // de source s'engorge (trajets plus lents ou plus longs que prévu : fatigue hors route, livraisons au contrôleur),
+    // dans la limite de HAUL_BACKLOG_RATIO fois le besoin.
     hauler: (roomCounts.hauler || 0)
-      + (list.reduce((sum, s) => sum + haulCapacity(room, s, (miners[s.id] || {}).work), 0) > (carry || 0)
-        || list.some((s) => { const box = sources.container(s); return box && box.store[RESOURCE_ENERGY] > HAUL_BACKLOG; })
+      + (need > (carry || 0)
+        || ((carry || 0) < need * HAUL_BACKLOG_RATIO
+          && list.some((s) => { const box = sources.container(s); return box && box.store[RESOURCE_ENERGY] > HAUL_BACKLOG; }))
         ? 1 : 0),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
     // Builders avant upgraders : chaque structure (extensions d'abord) améliore la salle plus tôt.
