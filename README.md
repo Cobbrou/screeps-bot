@@ -60,7 +60,7 @@ screeps-bot/
 │   ├── memory.js            # nettoyage de Memory (créeps morts)
 │   ├── move.js              # déplacements : moveTo avec contournement des créeps en cas de blocage
 │   ├── remoteMining.js      # récolte distante : salles et sources exploitées, besoins en mineurs et transporteurs
-│   ├── planner.js           # stockage, tours, extensions, routes, conteneurs, murs (tous les 100 ticks et à chaque montée de RCL)
+│   ├── planner.js           # plan de base gardé (stockage, tours, extensions), routes, conteneurs, murs (tous les 100 ticks et à chaque montée de RCL)
 │   ├── sources.js           # sources et conteneurs en cache, récolte et collecte d'énergie
 │   ├── spawner.js           # création des créeps selon les effectifs voulus (upgraders et builders sur le revenu net)
 │   ├── stats.js             # CPU par module, indicateurs dans Memory.stats, bucket bas, pixels

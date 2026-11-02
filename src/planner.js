@@ -3,6 +3,8 @@ const sources = require('./sources');
 // Le plan est recalculé tous les INTERVAL ticks : les chantiers manquants sont recréés.
 const INTERVAL = 100;
 const MAX_RADIUS = 8;
+// Types placés par le plan de base, dans l'ordre d'attribution des cases à RCL égal.
+const PLANNED = [STRUCTURE_STORAGE, STRUCTURE_TOWER, STRUCTURE_EXTENSION];
 // Chantiers laissés libres sur le compte (MAX_CONSTRUCTION_SITES) pour le spawn d'expansion.
 const SITE_MARGIN = 20;
 // RCL à partir duquel les routes sont posées sans condition ; avant, seulement une fois la salle équipée.
@@ -70,12 +72,16 @@ function place(room, ...args) {
 }
 
 // Coûts pour tracer les routes : réutilise routes, chantiers de route et routes gardées (même sans route
-// construite), contourne les autres structures. Les cases à coût non nul sont interdites aux structures
-// (planAround) : une extension sur une route gardée la ferait recalculer et déplacerait son bout (dépôt du contrôleur).
+// construite), contourne les autres structures et les cases du plan de base (même pas encore construites).
+// Les cases à coût non nul sont interdites au plan (planCells) : une extension sur une route gardée la ferait
+// recalculer et déplacerait son bout (dépôt du contrôleur).
 function costMatrix(room) {
   const costs = new PathFinder.CostMatrix();
   for (const id in room.memory.routes) {
     for (const k of room.memory.routes[id]) costs.set(Math.floor(k / 50), k % 50, 1);
+  }
+  for (const type in room.memory.plan) {
+    for (const k of room.memory.plan[type]) costs.set(Math.floor(k / 50), k % 50, 255);
   }
   const objects = [...room.find(FIND_STRUCTURES), ...room.find(FIND_MY_CONSTRUCTION_SITES)];
   for (const o of objects) {
@@ -88,30 +94,71 @@ function costMatrix(room) {
   return costs;
 }
 
-// Structures (extensions, stockage) en damier autour du spawn : les cases libres en diagonale laissent passer les créeps.
-function planAround(room, spawn, type, costs) {
-  const max = CONTROLLER_STRUCTURES[type][room.controller.level];
-  const isType = { filter: (s) => s.structureType === type };
-  let missing = max - room.find(FIND_MY_STRUCTURES, isType).length
-    - room.find(FIND_MY_CONSTRUCTION_SITES, isType).length;
+// Cases libres (x * 50 + y) en damier autour du spawn, de la plus proche à la plus lointaine : les cases libres
+// en diagonale laissent passer les créeps. Ni mur naturel, ni case à coût non nul (structure, route gardée),
+// ni case à portée 2 d'une source ou du contrôleur.
+function planCells(room, spawn, costs) {
   const terrain = room.getTerrain();
   const avoid = [...sources.list(room), room.controller];
-
-  for (let r = 2; r <= MAX_RADIUS && missing > 0; r++) {
-    for (let dx = -r; dx <= r && missing > 0; dx++) {
-      for (let dy = -r; dy <= r && missing > 0; dy++) {
+  const cells = [];
+  for (let r = 2; r <= MAX_RADIUS; r++) {
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dy = -r; dy <= r; dy++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r || (dx + dy) % 2) continue;
         const x = spawn.pos.x + dx;
         const y = spawn.pos.y + dy;
         if (x < 2 || x > 47 || y < 2 || y > 47 || terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
         if (costs.get(x, y) !== 0) continue;
         if (avoid.some((o) => o.pos.getRangeTo(x, y) <= 2)) continue;
-        if (place(room, x, y, type) === OK) {
-          costs.set(x, y, 255);
-          missing--;
-        }
+        cells.push(x * 50 + y);
       }
     }
+  }
+  return cells;
+}
+
+// Premier RCL qui autorise n + 1 structures de ce type.
+function rclFor(type, n) {
+  for (let rcl = 1; rcl <= 8; rcl++) if (CONTROLLER_STRUCTURES[type][rcl] > n) return rcl;
+  return Infinity;
+}
+
+// Plan de base : pour chaque type de PLANNED, cases (x * 50 + y) de toutes ses structures jusqu'au RCL 8,
+// calculées une fois et gardées dans room.memory.plan. Les positions ne dérivent plus au gré des constructions.
+// Les structures et chantiers déjà présents en font partie d'emblée ; le reste prend les cases de planCells,
+// les plus proches du spawn allant aux structures des plus bas RCL (à RCL égal, dans l'ordre de PLANNED).
+// La n-ième case d'un type est posée dès que le RCL autorise n + 1 structures de ce type (rclFor).
+// ponytail: jamais recalculé (spawn détruit, damier trop petit pour tout placer) ; delete room.memory.plan pour le refaire.
+function basePlan(room, spawn, costs) {
+  if (room.memory.plan) return room.memory.plan;
+  const plan = {};
+  const wanted = [];
+  for (const type of PLANNED) {
+    const isType = { filter: (s) => s.structureType === type };
+    plan[type] = [...room.find(FIND_MY_STRUCTURES, isType), ...room.find(FIND_MY_CONSTRUCTION_SITES, isType)]
+      .map((s) => s.pos.x * 50 + s.pos.y);
+    for (let n = plan[type].length; n < CONTROLLER_STRUCTURES[type][8]; n++) wanted.push({ type, rcl: rclFor(type, n) });
+  }
+  // Tri stable : à RCL égal, l'ordre de PLANNED est conservé.
+  wanted.sort((a, b) => a.rcl - b.rcl);
+  const cells = planCells(room, spawn, costs);
+  wanted.forEach((w, i) => {
+    if (i >= cells.length) return;
+    plan[w.type].push(cells[i]);
+    costs.set(Math.floor(cells[i] / 50), cells[i] % 50, 255);
+  });
+  room.memory.plan = plan;
+  return plan;
+}
+
+// Pose les structures du plan de ce type que le RCL autorise et qui manquent (ni la structure ni un chantier
+// sur la case). S'arrête dès que les places de chantier sont prises.
+function buildPlan(room, plan, type) {
+  for (const k of plan[type].slice(0, CONTROLLER_STRUCTURES[type][room.controller.level])) {
+    const pos = new RoomPosition(Math.floor(k / 50), k % 50, room.name);
+    if (pos.lookFor(LOOK_STRUCTURES).some((s) => s.structureType === type)) continue;
+    if (pos.lookFor(LOOK_CONSTRUCTION_SITES).length) continue;
+    if (place(room, pos, type) === ERR_FULL) return;
   }
 }
 
@@ -244,11 +291,10 @@ module.exports.run = function () {
     if (!spawn) continue;
 
     const costs = costMatrix(room);
+    const plan = basePlan(room, spawn, costs);
     // Dans l'ordre de priority : les places libres vont d'abord aux structures prioritaires.
-    // Le stockage (RCL 4) passe avant les extensions restantes et reste au plus près du spawn.
-    const types = [STRUCTURE_STORAGE, STRUCTURE_TOWER, STRUCTURE_EXTENSION];
-    types.sort((a, b) => priority(room, a) - priority(room, b));
-    for (const type of types) planAround(room, spawn, type, costs);
+    const types = PLANNED.slice().sort((a, b) => priority(room, a) - priority(room, b));
+    for (const type of types) buildPlan(room, plan, type);
     // Pas de conteneur au RCL 1 : le passage au RCL 2 ne coûte que 200 énergie, un conteneur 5000.
     // Les mineurs posent l'énergie au sol en attendant.
     const containers = room.controller.level >= CONTAINER_MIN_RCL;
