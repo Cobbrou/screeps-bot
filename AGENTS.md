@@ -26,6 +26,7 @@ Consignes pour les agents IA qui travaillent sur ce dépôt.
 - Ne jamais afficher, écrire, copier ni commiter `secrets.json` ou un token, même partiellement.
 - Ne jamais lancer `npm run deploy` ni `npm run watch` (qui déploie aussi) sans demande explicite de l'utilisateur.
 - Ne pas faire de commit git sans demande explicite.
+- Commiter directement sur `main` : ne jamais créer de branche.
 
 ## Vérification
 
