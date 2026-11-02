@@ -3,6 +3,7 @@ const defense = require('./defense');
 const intel = require('./intel');
 const expansion = require('./expansion');
 const upgraders = require('./roles/upgrader');
+const scout = require('./roles/scout');
 const remoteMining = require('./remoteMining');
 
 const MAX_MINER_WORK = 5;
@@ -123,10 +124,11 @@ function needsRepair(room) {
 }
 
 
-// Vrai si une voisine est inconnue ou pas revue depuis SCOUT_REFRESH ticks : un éclaireur part la rafraîchir
-// (et erre plus loin pendant sa vie, ce qui alimente aussi l'expansion). Sinon aucun : il ne ferait que coûter.
+// Vrai si une voisine où l'éclaireur peut aller (scout.exits) est inconnue ou pas revue depuis SCOUT_REFRESH ticks :
+// un éclaireur part la rafraîchir (et erre plus loin pendant sa vie, ce qui alimente aussi l'expansion).
+// Sinon aucun : il ne ferait que coûter. Les voisines où il ne va jamais resteraient inconnues pour toujours.
 function needsScout(room) {
-  return Object.values(Game.map.describeExits(room.name)).some((name) => {
+  return scout.exits(room.name).some((name) => {
     const i = intel.get(name);
     return !i || Game.time - i.time > SCOUT_REFRESH;
   });

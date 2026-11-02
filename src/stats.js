@@ -25,7 +25,7 @@ function lowBucket() {
 
 // Fiche de stats de la salle, créée au besoin.
 function roomStats(roomName) {
-  if (!Memory.stats) Memory.stats = { rooms: {} };
+  if (!Memory.stats || !Memory.stats.rooms) Memory.stats = { rooms: {} };
   if (!Memory.stats.rooms[roomName]) Memory.stats.rooms[roomName] = { harvested: 0 };
   return Memory.stats.rooms[roomName];
 }
@@ -38,7 +38,8 @@ function recordHarvest(creep, source) {
 
 // Écrit les indicateurs du tick dans Memory.stats, puis génère un pixel si le bucket est plein.
 function run() {
-  if (!Memory.stats) Memory.stats = { rooms: {} };
+  // Memory.stats sans `rooms` (Memory d'un ancien code, simulateur) : fiche recréée.
+  if (!Memory.stats || !Memory.stats.rooms) Memory.stats = { rooms: {} };
   for (const name in Game.rooms) {
     const room = Game.rooms[name];
     if (!room.controller || !room.controller.my) continue;

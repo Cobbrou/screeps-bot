@@ -11,8 +11,22 @@ function keeperRoom(name) {
   return x >= 4 && x <= 6 && y >= 4 && y <= 6 && !(x === 5 && y === 5);
 }
 
+// Voisines où l'éclaireur peut aller : même statut (zones novices ou fermées infranchissables),
+// salles à keepers évitées sauf s'il n'y a rien d'autre (éclaireur déjà dans un secteur de keepers).
+// getRoomStatus renvoie undefined dans le simulateur (salle « sim ») : pas de statut, pas de voisine.
+function exits(here) {
+  const statusOf = (name) => (Game.map.getRoomStatus(name) || {}).status;
+  const status = statusOf(here);
+  if (!status) return [];
+  const open = Object.values(Game.map.describeExits(here) || {})
+    .filter((name) => statusOf(name) === status);
+  const calm = open.filter((name) => !keeperRoom(name));
+  return calm.length ? calm : open;
+}
+
+module.exports.exits = exits;
+
 // Explore les salles voisines, en allant toujours vers celle visitée il y a le plus longtemps.
-// Salles à keepers évitées, sauf s'il n'y a rien d'autre (éclaireur déjà dans un secteur de keepers).
 module.exports.run = function (creep) {
   const here = creep.room.name;
   if (creep.memory.scanned !== here) {
@@ -20,14 +34,9 @@ module.exports.run = function (creep) {
     creep.memory.scanned = here;
   }
   if (!creep.memory.target || creep.memory.target === here) {
-    // Seulement les salles de même statut : les zones novices ou fermées sont infranchissables.
-    const status = Game.map.getRoomStatus(here).status;
-    const open = Object.values(Game.map.describeExits(here))
-      .filter((name) => Game.map.getRoomStatus(name).status === status);
-    const calm = open.filter((name) => !keeperRoom(name));
-    const exits = calm.length ? calm : open;
+    const list = exits(here);
     const age = (name) => (intel.get(name) ? intel.get(name).time : 0);
-    creep.memory.target = exits.reduce((a, b) => (age(b) < age(a) ? b : a), exits[0]);
+    creep.memory.target = list.reduce((a, b) => (age(b) < age(a) ? b : a), list[0]);
   }
   if (!creep.memory.target) return;
   // Portée 22 depuis le centre : il suffit d'entrer dans la salle, la case centrale peut être un mur.
