@@ -82,7 +82,9 @@ screeps-bot/
 │   ├── architecture.md      # architecture prévue
 │   ├── harabibot-analysis.md # comparaison avec harabibot v2 : pistes pour l'early game
 │   ├── harabibot-planner-analysis.md # comparaison des planners : pistes pour le plan de base
-│   └── screeps-reference.md # aide-mémoire de l'API Screeps
+│   ├── screeps-reference.md # aide-mémoire de l'API Screeps
+│   ├── tooangel-analysis.md # comparaison avec TooAngel : robustesse, entraide entre salles
+│   └── tooangel-early-analysis.md # comparaison avec TooAngel : début de partie (RCL 1 à 4)
 ├── .editorconfig
 ├── .gitignore
 ├── AGENTS.md                # consignes pour les agents IA
@@ -101,3 +103,5 @@ screeps-bot/
 - [docs/harabibot-analysis.md](docs/harabibot-analysis.md) : pourquoi l'early game de harabibot v2 est meilleur, pistes à reprendre
 - [docs/harabibot-planner-analysis.md](docs/harabibot-planner-analysis.md) : planner de harabibot v2 comparé au nôtre, améliorations du plan de base
 - [docs/screeps-reference.md](docs/screeps-reference.md) : concepts de base de Screeps
+- [docs/tooangel-analysis.md](docs/tooangel-analysis.md) : ce qui marche chez TooAngel comparé à notre bot, pistes classées par impact
+- [docs/tooangel-early-analysis.md](docs/tooangel-early-analysis.md) : début de partie de TooAngel comparé au nôtre, jalons de référence par RCL
