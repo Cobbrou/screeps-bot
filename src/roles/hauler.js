@@ -77,15 +77,12 @@ function fullestContainer(creep) {
   return containers.find((c) => !taken.has(c.id)) || containers[0];
 }
 
-// Livre au spawn, aux extensions et aux tours, puis aux builders qui ont de la place, puis au conteneur
-// du contrôleur, puis au stockage.
+// Livre au spawn, aux extensions et aux tours, puis au conteneur du contrôleur, puis au stockage.
+// Les builders se chargent eux-mêmes (sources.collect).
 // `skip` : structure qu'on vient de remplir ce tick, à ne plus viser.
 function deliveryTarget(creep, skip) {
   const room = creep.room;
   return creep.pos.findClosestByRange(FIND_MY_STRUCTURES, { filter: (s) => s !== skip && needsEnergy(s) })
-    || creep.pos.findClosestByRange(FIND_MY_CREEPS, {
-      filter: (c) => c !== skip && c.memory.role === 'builder' && c.store.getFreeCapacity(RESOURCE_ENERGY) > 0,
-    })
     || room.controller.pos.findInRange(FIND_STRUCTURES, 2, {
       filter: (s) => s.structureType === STRUCTURE_CONTAINER && s.store.getFreeCapacity(RESOURCE_ENERGY) > 0,
     })[0] || room.storage;

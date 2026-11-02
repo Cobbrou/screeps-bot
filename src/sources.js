@@ -258,12 +258,14 @@ function collect(creep) {
     return;
   }
   const need = Math.min(creep.store.getFreeCapacity(RESOURCE_ENERGY), MIN_WITHDRAW);
+  // Le conteneur du contrôleur est réservé aux upgraders.
+  const reserved = creep.room.controller && container(creep.room.controller, 2);
   let store = Game.getObjectById(creep.memory.withdrawId);
-  if (!store || store.store[RESOURCE_ENERGY] < need) {
+  if (!store || store === reserved || store.store[RESOURCE_ENERGY] < need) {
     if (!store && Game.time - (creep.memory.withdrawScan || 0) < WITHDRAW_SCAN_INTERVAL) return harvest(creep);
     store = creep.pos.findClosestByRange(FIND_STRUCTURES, {
       filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_STORAGE)
-        && s.store[RESOURCE_ENERGY] >= need,
+        && s !== reserved && s.store[RESOURCE_ENERGY] >= need,
     });
     creep.memory.withdrawId = store ? store.id : undefined;
     creep.memory.withdrawScan = Game.time;
