@@ -59,7 +59,7 @@ screeps-bot/
 │   ├── intel.js             # renseignements sur les salles explorées (Memory.rooms[*].intel)
 │   ├── memory.js            # nettoyage de Memory (créeps morts)
 │   ├── move.js              # déplacements : moveTo avec contournement des créeps en cas de blocage
-│   ├── remoteMining.js      # récolte distante : salles et sources exploitées, besoins en mineurs et transporteurs
+│   ├── remoteMining.js      # récolte distante : salles et sources exploitées, besoins en mineurs, transporteurs et reservers
 │   ├── planner.js           # plan de base gardé (hub du contrôleur, stockage, tours, extensions), routes, conteneurs, murs (tous les 100 ticks et à chaque montée de RCL)
 │   ├── sources.js           # sources et conteneurs en cache, récolte et collecte d'énergie
 │   ├── spawner.js           # création des créeps selon les effectifs voulus (upgraders et builders sur le revenu net)
@@ -72,8 +72,9 @@ screeps-bot/
 │       ├── hauler.js        # transporte l'énergie des conteneurs vers spawn, extensions, tours, dépôt du contrôleur
 │       ├── miner.js         # récolte statique sur une source (conteneur, ou au sol)
 │       ├── pioneer.js       # amorce la nouvelle salle (construit son spawn)
-│       ├── remoteHauler.js  # ramasse l'énergie d'une source distante et la rapporte
-│       ├── remoteMiner.js   # récolte statique sur une source distante, l'énergie tombe au sol
+│       ├── remoteHauler.js  # ramasse l'énergie d'une source distante (sol, conteneur) et la rapporte
+│       ├── remoteMiner.js   # récolte statique sur une source distante, construit et entretient son conteneur
+│       ├── reserver.js      # réserve le contrôleur d'une salle de récolte distante
 │       ├── scout.js         # explore les salles voisines
 │       └── upgrader.js      # posté au dépôt du contrôleur, améliore sans aller chercher l'énergie
 ├── docs/

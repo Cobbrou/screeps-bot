@@ -2,7 +2,8 @@ const move = require('../move');
 const hauler = require('./hauler');
 const remoteMining = require('../remoteMining');
 
-// Ramasse l'énergie posée au sol autour de sa source distante (le tas le plus gros d'abord).
+// Ramasse l'énergie posée au sol autour de sa source distante (le tas le plus gros d'abord : il se perd),
+// puis celle du conteneur de la source.
 // Rien à prendre : livre s'il porte déjà la moitié de sa capacité, sinon attend à 2 cases de la source.
 function collect(creep) {
   const pos = new RoomPosition(creep.memory.x, creep.memory.y, creep.memory.target);
@@ -12,8 +13,11 @@ function collect(creep) {
   }
   const pile = pos.findInRange(FIND_DROPPED_RESOURCES, 2, { filter: (r) => r.resourceType === RESOURCE_ENERGY })
     .sort((a, b) => b.amount - a.amount)[0];
+  const box = remoteMining.container({ x: creep.memory.x, y: creep.memory.y, room: creep.memory.target });
   if (pile) {
     if (creep.pickup(pile) === ERR_NOT_IN_RANGE) move.to(creep, pile);
+  } else if (box && box.store[RESOURCE_ENERGY]) {
+    if (creep.withdraw(box, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, box);
   } else if (creep.store[RESOURCE_ENERGY] >= creep.store.getCapacity() / 2) {
     creep.memory.working = true;
   } else if (!creep.pos.inRangeTo(pos, 2)) {

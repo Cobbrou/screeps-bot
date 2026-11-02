@@ -59,8 +59,8 @@
 - [x] Récolte dans les salles adjacentes non revendiquées (remote mining : `remoteMiner` posé au sol et `remoteHauler`, dès le RCL 2)
 - [x] Gestion multi-salles : chaque salle possédée gérée indépendamment
 - [x] Créeps inoccupés (source vide ou encombrée) envoyés récolter dans une salle voisine sûre
-- [ ] Réservation des salles de remote mining (`reserver`), si le rendement le justifie
-- [ ] Mineur distant avec 1 `CARRY` qui construit et entretient son conteneur, transporteurs appelés selon le stock
+- [x] Réservation des salles de remote mining (`reserver`), si le rendement le justifie
+- [x] Mineur distant avec 1 `CARRY` qui construit et entretient son conteneur, transporteurs appelés selon le stock
 - [ ] Détection d'enfermement : une seule salle depuis longtemps, voisines hostiles ; adapter la stratégie
 
 ## Retravail des bases (RCL 1-3)
@@ -82,7 +82,7 @@ Priorité actuelle, avant les phases avancées : tirer le maximum des premiers R
 - [x] Remplacement anticipé étendu aux upgraders (trajet noté au contrôleur) et aux haulers (durée de spawn)
 - [x] Chantiers non entamés depuis 5 000 ticks retirés (`Memory.sites`)
 - [x] Récolte distante dès le RCL 2 (mineur et transporteurs, dernière priorité du spawn) au lieu d'attendre le stockage
-- [ ] Conteneurs et routes dans les salles distantes (builder distant)
+- [ ] Routes dans les salles distantes (builder distant) ; les conteneurs sont posés par les mineurs distants
 
 Pistes tirées de l'[analyse de harabibot v2](docs/harabibot-analysis.md), par impact estimé :
 

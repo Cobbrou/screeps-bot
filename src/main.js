@@ -18,6 +18,7 @@ const roles = {
   pioneer: require('./roles/pioneer'),
   remoteMiner: require('./roles/remoteMiner'),
   remoteHauler: require('./roles/remoteHauler'),
+  reserver: require('./roles/reserver'),
 };
 
 module.exports.loop = function () {

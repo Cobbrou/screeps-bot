@@ -95,7 +95,8 @@ module.exports.run = function () {
     return;
   }
   // Prise ou réservée par un autre joueur, ou trop longue à atteindre : on change de cible.
-  const taken = room && room.controller && (room.controller.owner || room.controller.reservation);
+  const c = room && room.controller;
+  const taken = c && (c.owner || (c.reservation && c.reservation.username !== intel.me()));
   if (taken || Game.time - exp.since > GIVE_UP) {
     if (room) intel.record(room);
     delete Memory.expansion;
