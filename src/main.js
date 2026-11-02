@@ -16,7 +16,8 @@ const roles = {
   scout: require('./roles/scout'),
   claimer: require('./roles/claimer'),
   pioneer: require('./roles/pioneer'),
-  remote: require('./roles/remote'),
+  remoteMiner: require('./roles/remoteMiner'),
+  remoteHauler: require('./roles/remoteHauler'),
 };
 
 module.exports.loop = function () {

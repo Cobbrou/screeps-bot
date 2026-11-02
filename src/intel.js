@@ -8,13 +8,16 @@ function get(name) {
   return Memory.rooms && Memory.rooms[name] && Memory.rooms[name].intel;
 }
 
-// Note ce que la salle contient : sources, contrôleur, propriétaire, réservation et dernier passage d'hostiles.
+// Note ce que la salle contient : sources (nombre et positions), contrôleur, propriétaire, réservation
+// et dernier passage d'hostiles. Les positions servent aux mineurs distants, envoyés sans visibilité sur la salle.
 function record(room) {
   const c = room.controller;
   const previous = room.memory.intel;
+  const sources = room.find(FIND_SOURCES);
   room.memory.intel = {
     time: Game.time,
-    sources: room.find(FIND_SOURCES).length,
+    sources: sources.length,
+    sourcePos: sources.map((s) => ({ id: s.id, x: s.pos.x, y: s.pos.y })),
     controller: !!c,
     owner: c && c.owner ? c.owner.username : null,
     reserved: c && c.reservation ? c.reservation.username : null,

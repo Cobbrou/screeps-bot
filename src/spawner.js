@@ -3,11 +3,9 @@ const defense = require('./defense');
 const intel = require('./intel');
 const expansion = require('./expansion');
 const upgraders = require('./roles/upgrader');
+const remoteMining = require('./remoteMining');
 
 const MAX_MINER_WORK = 5;
-// ponytail: récolteurs distants par source sans réservation (5 énergie/tick), à revoir avec un rôle reserver.
-const REMOTE_PER_SOURCE = 2;
-const MAX_REMOTE_ROOMS = 2;
 // Sans tour, un builder est créé dès qu'une structure passe sous cette part de ses points de vie (comme l'urgence du builder).
 const REPAIR_RATIO = 0.5;
 // ponytail: un upgrader de plus par tranche d'énergie stockée, plafonné ; à revoir au RCL 8 (15 énergie/tick max).
@@ -85,16 +83,6 @@ function needsRepair(room) {
   }).length > 0;
 }
 
-// Salles voisines où récolter : seulement depuis une salle qui a un stockage pour recevoir l'énergie.
-// Au plus MAX_REMOTE_ROOMS, celles qui ont le plus de sources, pour ne pas saturer le spawn.
-function remoteRooms(room) {
-  if (!room.storage) return [];
-  const exp = Memory.expansion;
-  return Object.values(Game.map.describeExits(room.name))
-    .filter((name) => intel.safe(name) && intel.get(name).sources && (!exp || exp.target !== name))
-    .sort((a, b) => intel.get(b).sources - intel.get(a).sources)
-    .slice(0, MAX_REMOTE_ROOMS);
-}
 
 // Vrai si un éclaireur sert encore : une voisine est sûre (récolte distante), inconnue ou pas revue depuis
 // SCOUT_REFRESH ticks, ou une expansion est possible (il cherche alors des cibles plus loin).
@@ -120,7 +108,8 @@ function downgrading(room) {
 // Effectifs voulus par rôle, dans l'ordre de priorité. Les harvesters ne servent plus qu'en urgence (voir run).
 // Haulers avant mineurs : ils suivent les WORK déjà posés, ce qui alterne mineur et hauler au démarrage
 // au lieu de payer tous les mineurs avant de pouvoir transporter.
-function targets(room, roomCounts, miners, carry) {
+// `remoteNeed` : sources distantes à qui il manque un mineur ou du transport (remoteMining.missing).
+function targets(room, roomCounts, miners, carry, remoteNeed) {
   const list = sources.list(room);
   const expanding = Memory.expansion && Memory.expansion.from === room.name;
   // downgrading avant paused : il pose le drapeau qui lève la pause.
@@ -152,7 +141,10 @@ function targets(room, roomCounts, miners, carry) {
     scout: needsScout(room) ? 1 : 0,
     claimer: expanding && !expansion.claimed() ? 1 : 0,
     pioneer: expanding && expansion.claimed() ? 2 : 0,
-    remote: remoteRooms(room).reduce((sum, name) => sum + intel.get(name).sources * REMOTE_PER_SOURCE, 0),
+    // Récolte distante dès le RCL 2, en dernier : elle ne prend que le temps de spawn laissé libre par le reste.
+    // Transporteur avant mineur, comme dans la salle : les deux alternent source par source.
+    remoteHauler: (roomCounts.remoteHauler || 0) + (remoteNeed.hauler ? 1 : 0),
+    remoteMiner: (roomCounts.remoteMiner || 0) + (remoteNeed.miner ? 1 : 0),
   };
 }
 
@@ -178,6 +170,10 @@ function buildBody(role, energy, room) {
     return work > 0 ? [...Array(work).fill(WORK), MOVE] : [];
   }
   if (role === 'hauler') return repeat([CARRY, CARRY, MOVE], energy, [[CARRY, MOVE]]);
+  // Rôles distants, hors route : un MOVE par partie, une case par tick (chargé pour le transporteur).
+  // Mineur plafonné à MINER_WORK, assez pour une source non réservée (300 → 2 WORK, 450 → 3 WORK).
+  if (role === 'remoteMiner') return repeat([WORK, MOVE], Math.min(energy, remoteMining.MINER_WORK * cost([WORK, MOVE])));
+  if (role === 'remoteHauler') return repeat([CARRY, MOVE], energy);
   if (role === 'defender') return repeat([ATTACK, MOVE], energy);
   if (role === 'scout') return [MOVE];
   if (role === 'claimer') return energy >= BODYPART_COST[CLAIM] + BODYPART_COST[MOVE] ? [CLAIM, MOVE] : [];
@@ -198,7 +194,14 @@ module.exports.run = function () {
     carry[room] = (carry[room] || 0) + body.filter((p) => (p.type || p) === CARRY).length * CARRY_CAPACITY;
   };
   const miners = {};
-  const remoteCounts = {};
+  // Par source distante : WORK des remoteMiner et capacité CARRY des remoteHauler vivants (hors fin de vie).
+  const remote = {};
+  const addRemote = (role, sourceId, body) => {
+    const r = remote[sourceId] = remote[sourceId] || { work: 0, carry: 0 };
+    const count = (part) => body.filter((p) => (p.type || p) === part).length;
+    if (role === 'remoteMiner') r.work += count(WORK);
+    else r.carry += count(CARRY) * CARRY_CAPACITY;
+  };
   const addMiner = (sourceId, body, dying) => {
     const m = miners[sourceId] = miners[sourceId] || { work: 0, count: 0, total: 0 };
     m.total++;
@@ -212,15 +215,17 @@ module.exports.run = function () {
     counts[room] = counts[room] || {};
     // Créep en fin de vie (il lui reste moins que le trajet plus la durée de spawn) : déjà compté comme absent,
     // pour que son successeur arrive quand il meurt au lieu de laisser son poste vide.
-    // Trajet noté à l'arrivée par le mineur et l'upgrader ; le hauler n'a pas de poste fixe, seule la durée de spawn compte.
-    const lead = creep.memory.role === 'hauler' ? 0 : creep.memory.travel;
+    // Trajet noté à l'arrivée par les mineurs et l'upgrader ; les transporteurs n'ont pas de poste fixe,
+    // seule la durée de spawn compte.
+    const remoteRole = creep.memory.role === 'remoteMiner' || creep.memory.role === 'remoteHauler';
+    const lead = creep.memory.role === 'hauler' || creep.memory.role === 'remoteHauler' ? 0 : creep.memory.travel;
     const dying = lead !== undefined && creep.ticksToLive <= lead + creep.body.length * CREEP_SPAWN_TIME;
     if (!(dying && creep.memory.role === 'upgrader')) {
       counts[room][creep.memory.role] = (counts[room][creep.memory.role] || 0) + 1;
     }
     if (creep.memory.role === 'miner') addMiner(creep.memory.sourceId, creep.body, dying);
     if (creep.memory.role === 'hauler' && !dying) addCarry(room, creep.body);
-    if (creep.memory.role === 'remote') remoteCounts[creep.memory.target] = (remoteCounts[creep.memory.target] || 0) + 1;
+    if (remoteRole && !dying) addRemote(creep.memory.role, creep.memory.sourceId, creep.body);
   }
 
   for (const name in Game.spawns) {
@@ -232,7 +237,8 @@ module.exports.run = function () {
     // Personne pour remplir spawn et extensions (ou haulers sans mineur pour les alimenter) :
     // récolteur avec l'énergie disponible.
     const emergency = !roomCounts.harvester && (!roomCounts.hauler || !roomCounts.miner);
-    const wanted = targets(room, roomCounts, miners, carry[room.name]);
+    const remoteNeed = remoteMining.missing(room, remote);
+    const wanted = targets(room, roomCounts, miners, carry[room.name], remoteNeed);
     const role = emergency ? 'harvester' : Object.keys(wanted).find((r) => (roomCounts[r] || 0) < wanted[r]);
     if (!role) continue;
 
@@ -249,16 +255,15 @@ module.exports.run = function () {
       memory.sourceId = free.id;
     }
     if (role === 'claimer' || role === 'pioneer') memory.target = Memory.expansion.target;
-    if (role === 'remote') {
-      // Salle voisine la moins pourvue par rapport à son nombre de sources.
-      const load = (name) => (remoteCounts[name] || 0) / intel.get(name).sources;
-      memory.target = remoteRooms(room).reduce((a, b) => (load(b) < load(a) ? b : a));
+    if (role === 'remoteMiner' || role === 'remoteHauler') {
+      const source = role === 'remoteMiner' ? remoteNeed.miner : remoteNeed.hauler;
+      Object.assign(memory, { target: source.room, sourceId: source.id, x: source.x, y: source.y });
     }
     if (spawn.spawnCreep(body, `${role}-${spawn.name}-${Game.time}`, { memory }) === OK) {
       roomCounts[role] = (roomCounts[role] || 0) + 1;
-      if (memory.sourceId) addMiner(memory.sourceId, body);
+      if (role === 'miner') addMiner(memory.sourceId, body);
       if (role === 'hauler') addCarry(room.name, body);
-      if (memory.target && role === 'remote') remoteCounts[memory.target] = (remoteCounts[memory.target] || 0) + 1;
+      if (role === 'remoteMiner' || role === 'remoteHauler') addRemote(role, memory.sourceId, body);
     }
   }
 };

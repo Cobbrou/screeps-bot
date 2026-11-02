@@ -2,7 +2,7 @@
 
 Bot pour [Screeps World](https://screeps.com), le MMO de stratégie où l'on programme ses unités (les « créeps ») en JavaScript.
 
-L'objectif à terme est un bot autonome capable de gérer ses salles : récolte d'énergie, création de créeps, construction et défense. Pour l'instant, le bot se limite au strict minimum : il maintient récolteurs, améliorateurs et constructeurs selon les besoins de chaque salle, avec des corps adaptés à l'énergie disponible. Il place lui-même conteneurs et extensions au RCL 2, tours au RCL 3, routes dès que la salle est équipée (extensions et conteneurs construits) ou au plus tard au RCL 3 et le stockage au RCL 4. Dès le RCL 1, des mineurs s'installent sur les sources et des transporteurs acheminent l'énergie. Les tours défendent, soignent et réparent ; des murs ferment les sorties, des défenseurs sont créés face aux hostiles et le mode sans échec sert de dernier recours. Un éclaireur explore les salles voisines : leurs sources sont exploitées à distance, et le bot revendique une nouvelle salle dès que le GCL le permet.
+L'objectif à terme est un bot autonome capable de gérer ses salles : récolte d'énergie, création de créeps, construction et défense. Pour l'instant, le bot se limite au strict minimum : il maintient récolteurs, améliorateurs et constructeurs selon les besoins de chaque salle, avec des corps adaptés à l'énergie disponible. Il place lui-même conteneurs et extensions au RCL 2, tours au RCL 3, routes dès que la salle est équipée (extensions et conteneurs construits) ou au plus tard au RCL 3 et le stockage au RCL 4. Dès le RCL 1, des mineurs s'installent sur les sources et des transporteurs acheminent l'énergie. Les tours défendent, soignent et réparent ; des murs ferment les sorties, des défenseurs sont créés face aux hostiles et le mode sans échec sert de dernier recours. Un éclaireur explore les salles voisines : dès le RCL 2, leurs sources sont exploitées à distance par des mineurs et des transporteurs, et le bot revendique une nouvelle salle dès que le GCL le permet.
 
 ## Prérequis
 
@@ -59,6 +59,7 @@ screeps-bot/
 │   ├── intel.js             # renseignements sur les salles explorées (Memory.rooms[*].intel)
 │   ├── memory.js            # nettoyage de Memory (créeps morts)
 │   ├── move.js              # déplacements : moveTo avec contournement des créeps en cas de blocage
+│   ├── remoteMining.js      # récolte distante : salles et sources exploitées, besoins en mineurs et transporteurs
 │   ├── planner.js           # stockage, tours, extensions, routes, conteneurs, murs (tous les 100 ticks et à chaque montée de RCL)
 │   ├── sources.js           # sources et conteneurs en cache, récolte et collecte d'énergie
 │   ├── spawner.js           # création des créeps selon les effectifs voulus
@@ -71,11 +72,13 @@ screeps-bot/
 │       ├── hauler.js        # transporte l'énergie des conteneurs vers spawn, extensions, tours
 │       ├── miner.js         # récolte statique sur une source (conteneur, ou au sol)
 │       ├── pioneer.js       # amorce la nouvelle salle (construit son spawn)
-│       ├── remote.js        # récolte dans une salle voisine, livre au stockage
+│       ├── remoteHauler.js  # ramasse l'énergie d'une source distante et la rapporte
+│       ├── remoteMiner.js   # récolte statique sur une source distante, l'énergie tombe au sol
 │       ├── scout.js         # explore les salles voisines
 │       └── upgrader.js      # puise l'énergie et améliore le contrôleur
 ├── docs/
 │   ├── architecture.md      # architecture prévue
+│   ├── harabibot-analysis.md # comparaison avec harabibot v2 : pistes pour l'early game
 │   └── screeps-reference.md # aide-mémoire de l'API Screeps
 ├── .editorconfig
 ├── .gitignore
@@ -92,4 +95,5 @@ screeps-bot/
 - [AGENTS.md](AGENTS.md) : règles à suivre pour les agents IA travaillant sur le dépôt
 - [ROADMAP.md](ROADMAP.md) : étapes de développement prévues
 - [docs/architecture.md](docs/architecture.md) : architecture prévue
+- [docs/harabibot-analysis.md](docs/harabibot-analysis.md) : pourquoi l'early game de harabibot v2 est meilleur, pistes à reprendre
 - [docs/screeps-reference.md](docs/screeps-reference.md) : concepts de base de Screeps

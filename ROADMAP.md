@@ -56,7 +56,7 @@
 - [x] Exploration des salles voisines (`scout`)
 - [x] Choix d'une salle à revendiquer selon les sources et la distance
 - [x] Rôle `claimer` et créeps d'amorçage de la nouvelle salle (`pioneer`)
-- [x] Récolte dans les salles adjacentes non revendiquées (remote mining, rôle `remote`)
+- [x] Récolte dans les salles adjacentes non revendiquées (remote mining : `remoteMiner` posé au sol et `remoteHauler`, dès le RCL 2)
 - [x] Gestion multi-salles : chaque salle possédée gérée indépendamment
 - [x] Créeps inoccupés (source vide ou encombrée) envoyés récolter dans une salle voisine sûre
 - [ ] Réservation des salles de remote mining (`reserver`), si le rendement le justifie
@@ -81,6 +81,20 @@ Priorité actuelle, avant les phases avancées : tirer le maximum des premiers R
 - [x] Upgraders en pause quand le stockage est bas ou la salle attaquée, sauf risque de rétrogradation
 - [x] Remplacement anticipé étendu aux upgraders (trajet noté au contrôleur) et aux haulers (durée de spawn)
 - [x] Chantiers non entamés depuis 5 000 ticks retirés (`Memory.sites`)
+- [x] Récolte distante dès le RCL 2 (mineur et transporteurs, dernière priorité du spawn) au lieu d'attendre le stockage
+- [ ] Conteneurs et routes dans les salles distantes (builder distant)
+
+Pistes tirées de l'[analyse de harabibot v2](docs/harabibot-analysis.md), par impact estimé :
+
+- [ ] Énergie livrée aux upgraders et builders : dépôt fixe près du contrôleur dès le RCL 1 (tas, puis conteneur), alimenté par les haulers ; upgraders fixes riches en `WORK` ; plus de `sources.collect` pour ces rôles
+- [ ] Effectifs sur le revenu net soutenable (énergie/tick, entretien des créeps déduit) : `WORK` des upgraders = revenu, puissance des builders = revenu, aucun upgrader pendant les chantiers, builders convertis en upgraders ensuite
+- [ ] Haulers 1:1 avant les routes, trajet chargé compté à part dans `haulCapacity` (marais à 5) ; passage en 2:1 seulement avec routes
+- [ ] `MOVE` des mineurs choisis selon le trajet (minimiser temps de spawn / vie productive)
+- [ ] Premier mineur et haulers créés avec `energyAvailable` au démarrage, sans attendre la capacité pleine
+- [ ] Hub près du contrôleur (stockage à portée 4) et extensions classées par distance au hub et proximité des chemins de source
+- [ ] Chantiers concentrés : 3 actifs au plus, tous les builders sur le prioritaire (spawn, extensions, tour, conteneur du hub)
+- [ ] Gestionnaire de trafic global (intentions, échanges, zones de travail des créeps fixes) au lieu de `moveTo` et contournement
+- [ ] Haulers envoyés selon l'énergie prévue à l'arrivée (stock − réservé + régénération en route), nouveau trajet dans le même tick après livraison
 
 ## Phase 7 : logistique avancée (RCL 5-6)
 

@@ -2,9 +2,12 @@ const move = require('../move');
 const sources = require('../sources');
 
 // Ramasse l'énergie au sol, dans les pierres tombales, les ruines puis les conteneurs des sources.
+// L'énergie posée près du contrôleur (par les remoteHauler) est laissée aux upgraders et aux builders.
 function collect(creep) {
+  const controller = creep.room.controller;
   const dropped = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
-    filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50,
+    filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50
+      && !(controller && r.pos.inRangeTo(controller, 3)),
   });
   if (dropped) {
     if (creep.pickup(dropped) === ERR_NOT_IN_RANGE) {
@@ -111,3 +114,6 @@ module.exports.run = function (creep) {
   if (creep.memory.working) deliver(creep);
   else collect(creep);
 };
+
+module.exports.deliver = deliver;
+module.exports.deliveryTarget = deliveryTarget;
