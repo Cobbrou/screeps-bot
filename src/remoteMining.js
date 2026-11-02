@@ -29,7 +29,7 @@ const trips = {};
 function rooms(room) {
   if (room.controller.level < MIN_RCL) return [];
   const exp = Memory.expansion;
-  return Object.values(Game.map.describeExits(room.name))
+  return Object.values(Game.map.describeExits(room.name) || {})
     .filter((name) => intel.safe(name) && intel.get(name).sourcePos && (!exp || exp.target !== name))
     .sort((a, b) => intel.get(b).sourcePos.length - intel.get(a).sourcePos.length)
     .slice(0, MAX_ROOMS);

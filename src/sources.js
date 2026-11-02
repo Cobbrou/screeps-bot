@@ -206,7 +206,7 @@ function awayRoom(room) {
     const away = Game.creeps[name].memory.away;
     if (away) counts[away.to] = (counts[away.to] || 0) + 1;
   }
-  return Object.values(Game.map.describeExits(room.name))
+  return Object.values(Game.map.describeExits(room.name) || {})
     .find((name) => intel.safe(name) && (counts[name] || 0) < (intel.get(name).sources || 0) * AWAY_PER_SOURCE);
 }
 
