@@ -22,6 +22,9 @@ const SCOUT_REFRESH = 5000;
 // levée au-dessus de DOWNGRADE_HIGH (hystérésis : chaque amélioration ne rend que 100 ticks).
 const DOWNGRADE_LOW = 0.1;
 const DOWNGRADE_HIGH = 0.2;
+// Énergie dans un conteneur de source au-delà de laquelle on ajoute un hauler : l'estimation de haulCapacity ne suit pas.
+// ponytail: stock instantané, un hauler de plus par spawn tant que ça dure ; peut en créer un ou deux de trop.
+const HAUL_BACKLOG = CONTAINER_CAPACITY / 2;
 
 // Récolte statique dès le RCL 1 : même un mineur à 2 WORK posé sur la source (4 énergie/tick en continu)
 // rapporte bien plus qu'un harvester qui fait l'aller-retour. Sans conteneur, il pose l'énergie au sol.
@@ -133,9 +136,12 @@ function targets(room, roomCounts, miners, carry) {
     // Rétrogradation proche : les upgraders passent avant l'économie (une clé déjà posée garde sa place).
     // ponytail: tous les upgraders voulus passent en tête, pas seulement le premier ; l'urgence harvester couvre la famine.
     ...(urgent ? { upgrader } : {}),
-    // Un hauler de plus tant que la capacité des haulers vivants reste sous le besoin.
+    // Un hauler de plus tant que la capacité des haulers vivants reste sous le besoin, ou qu'un conteneur
+    // de source s'engorge (trajets plus lents ou plus longs que prévu : fatigue hors route, livraisons au contrôleur).
     hauler: (roomCounts.hauler || 0)
-      + (list.reduce((sum, s) => sum + haulCapacity(room, s, (miners[s.id] || {}).work), 0) > (carry || 0) ? 1 : 0),
+      + (list.reduce((sum, s) => sum + haulCapacity(room, s, (miners[s.id] || {}).work), 0) > (carry || 0)
+        || list.some((s) => { const box = sources.container(s); return box && box.store[RESOURCE_ENERGY] > HAUL_BACKLOG; })
+        ? 1 : 0),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
     // Builders avant upgraders : chaque structure (extensions d'abord) améliore la salle plus tôt.
     builder: sites.length ? 2 + (building ? extra : 0) : (needsRepair(room) ? 1 : 0),
