@@ -2,6 +2,8 @@
 const DANGEROUS = [ATTACK, RANGED_ATTACK, WORK, HEAL, CLAIM];
 // ponytail: plafond fixe des murs et remparts, à ajuster selon le budget énergie de la salle.
 const WALL_HITS_PER_RCL = 10000;
+// Salle enfermée (`Memory.enclosed`, voir expansion) : murs et remparts plus solides, voisins hostiles.
+const ENCLOSED_WALL_FACTOR = 2;
 // Les tours ne réparent qu'en dessous de cette fraction de la cible : pas d'énergie gaspillée pour quelques points.
 const REPAIR_RATIO = 0.8;
 // Défenseurs au plus par salle : au-delà, le mode sans échec prend le relais.
@@ -26,7 +28,8 @@ function threats(room) {
 // Points de vie visés à la réparation : les murs et remparts sont plafonnés selon le RCL.
 function repairTarget(s) {
   if (s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART) return s.hitsMax;
-  return Math.min(s.hitsMax, WALL_HITS_PER_RCL * s.room.controller.level);
+  const factor = Memory.enclosed ? ENCLOSED_WALL_FACTOR : 1;
+  return Math.min(s.hitsMax, WALL_HITS_PER_RCL * s.room.controller.level * factor);
 }
 
 // Structure la plus abîmée par rapport à sa cible (sous REPAIR_RATIO), ou null.

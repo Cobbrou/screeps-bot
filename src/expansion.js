@@ -7,6 +7,11 @@ const INTERVAL = 100;
 const MIN_RCL = 4;
 // ponytail: distance à vol d'oiseau, sans vérifier le trajet réel (Game.map.findRoute si les claimers se perdent).
 const MAX_DISTANCE = 5;
+// Enfermement : le GCL permet une salle de plus, mais aucune cible n'est trouvée depuis ENCLOSED_AFTER ticks
+// (voisines prises ou dangereuses). On cherche alors jusqu'à ENCLOSED_DISTANCE salles, et `Memory.enclosed`
+// renforce murs et remparts (defense) et pousse l'amélioration (spawner).
+const ENCLOSED_AFTER = 20000;
+const ENCLOSED_DISTANCE = 10;
 // Abandon de la cible si elle n'est pas revendiquée, ou si son spawn n'est pas construit, dans ce délai.
 const GIVE_UP = 5000;
 
@@ -17,8 +22,14 @@ function ownedRooms() {
 // Meilleure salle explorée à revendiquer : le plus de sources, puis la plus proche d'une salle d'origine.
 function choose() {
   const owned = ownedRooms();
-  if (owned.length >= Game.gcl.level) return;
+  if (owned.length >= Game.gcl.level) {
+    // Pas de salle de plus permise : l'absence de cible ne veut rien dire.
+    delete Memory.enclosedSince;
+    delete Memory.enclosed;
+    return;
+  }
   const homes = owned.filter((r) => r.controller.level >= MIN_RCL && r.storage);
+  const maxDistance = Memory.enclosed ? ENCLOSED_DISTANCE : MAX_DISTANCE;
   let best = null;
   let bestScore = -Infinity;
   for (const name in Memory.rooms) {
@@ -26,13 +37,21 @@ function choose() {
     for (const home of homes) {
       const distance = Game.map.getRoomLinearDistance(home.name, name);
       const score = intel.get(name).sources * 10 - distance;
-      if (distance <= MAX_DISTANCE && score > bestScore) {
+      if (distance <= maxDistance && score > bestScore) {
         bestScore = score;
         best = { target: name, from: home.name, since: Game.time };
       }
     }
   }
-  if (best) Memory.expansion = best;
+  if (best) {
+    Memory.expansion = best;
+    delete Memory.enclosedSince;
+    delete Memory.enclosed;
+  } else if (homes.length) {
+    // Sans salle d'origine prête (RCL 4 et stockage), l'absence de cible ne dit rien de l'entourage.
+    if (!Memory.enclosedSince) Memory.enclosedSince = Game.time;
+    if (Game.time - Memory.enclosedSince > ENCLOSED_AFTER) Memory.enclosed = true;
+  }
 }
 
 // Distance minimale entre le premier spawn et le contrôleur : le hub du planner (portée 2) et les postes

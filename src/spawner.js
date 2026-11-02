@@ -11,6 +11,9 @@ const REPAIR_RATIO = 0.5;
 // Avec un stockage, 1 énergie/tick de revenu en plus par tranche stockée : le stock se dépense en upgraders.
 // ponytail: à revoir au RCL 8 (15 énergie/tick d'amélioration au plus).
 const STORED_PER_ENERGY = 10000;
+// Salle enfermée (`Memory.enclosed`, voir expansion) : sans expansion possible, le stock part deux fois plus vite
+// dans l'amélioration (GCL et RCL).
+const ENCLOSED_STORED_PER_ENERGY = STORED_PER_ENERGY / 2;
 // Énergie/tick consommée par WORK, entretien du corps compris (coût / durée de vie) :
 // upgrader 1 (UPGRADE_CONTROLLER_POWER) et un demi-MOVE par WORK ; builder ~4 sur BUILD_POWER 5, une fois retirés
 // les temps morts (EFFECTIVE_BUILD_POWER de harabibot), corps polyvalent WORK/CARRY/MOVE.
@@ -101,7 +104,8 @@ function netIncome(room, miners, carry, remote, upkeep) {
   const need = list.reduce((sum, s) => sum + haulCapacity(room, s, work(s)), 0);
   const ratio = need ? Math.min(1, (carry || 0) / need) : 1;
   const local = list.reduce((sum, s) => sum + Math.min(work(s), MAX_MINER_WORK) * HARVEST_POWER, 0) * ratio;
-  const stored = room.storage ? Math.floor(room.storage.store[RESOURCE_ENERGY] / STORED_PER_ENERGY) : 0;
+  const perEnergy = Memory.enclosed ? ENCLOSED_STORED_PER_ENERGY : STORED_PER_ENERGY;
+  const stored = room.storage ? Math.floor(room.storage.store[RESOURCE_ENERGY] / perEnergy) : 0;
   return local + remoteMining.income(room, remote) + stored - (upkeep || 0);
 }
 

@@ -61,7 +61,7 @@
 - [x] Créeps inoccupés (source vide ou encombrée) envoyés récolter dans une salle voisine sûre
 - [x] Réservation des salles de remote mining (`reserver`), si le rendement le justifie
 - [x] Mineur distant avec 1 `CARRY` qui construit et entretient son conteneur, transporteurs appelés selon le stock
-- [ ] Détection d'enfermement : une seule salle depuis longtemps, voisines hostiles ; adapter la stratégie
+- [x] Détection d'enfermement : aucune cible d'expansion depuis 20 000 ticks ; recherche à 10 salles, murs doublés, stock poussé dans l'amélioration
 
 ## Retravail des bases (RCL 1-3)
 
