@@ -36,8 +36,10 @@ function choose() {
   for (const name in Memory.rooms) {
     if (!intel.safe(name) || !intel.get(name).sources) continue;
     for (const home of homes) {
-      // Vol d'oiseau d'abord : findRoute seulement pour les salles assez proches.
-      if (Game.map.getRoomLinearDistance(home.name, name) > maxDistance) continue;
+      // Vol d'oiseau d'abord : findRoute seulement pour les salles assez proches, et seulement si le score
+      // optimiste (trajet aussi court que le vol d'oiseau) peut battre le meilleur.
+      const linear = Game.map.getRoomLinearDistance(home.name, name);
+      if (linear > maxDistance || intel.get(name).sources * 10 - linear <= bestScore) continue;
       const path = intel.route(home.name, name);
       if (!path || path.length > maxDistance) continue;
       const score = intel.get(name).sources * 10 - path.length;
@@ -124,6 +126,8 @@ module.exports.run = function () {
   if (taken || unreachable || Game.time - exp.since > GIVE_UP) {
     if (room) intel.record(room);
     delete Memory.expansion;
+    // Nouvelle cible dès ce tick : sans elle, le claimer en route se suiciderait en attendant le prochain INTERVAL.
+    choose();
   }
 };
 
