@@ -6,8 +6,15 @@ const INTERVAL = 100;
 const MAX_RADIUS = 8;
 // Types placés par le plan de base, dans l'ordre d'attribution des cases à RCL égal.
 const PLANNED = [STRUCTURE_STORAGE, STRUCTURE_TOWER, STRUCTURE_EXTENSION];
+// Types ajoutés au plan après coup (planLinks, planExtras), posés selon le RCL comme les autres.
+const EXTRA = [STRUCTURE_LINK, STRUCTURE_TERMINAL, STRUCTURE_EXTRACTOR, STRUCTURE_LAB];
+// Bloc de labs 4 × 4 (décalages depuis son coin) : les 2 labs d'entrée au centre sont à portée 2 de tous les autres
+// (runReaction). La diagonale reste libre pour le passage ; les 8 labs de sortie la touchent tous, coins opposés vides.
+const LAB_INPUTS = [[1, 2], [2, 1]];
+const LAB_OUTPUTS = [[0, 1], [0, 2], [1, 0], [1, 3], [2, 0], [2, 3], [3, 1], [3, 2]];
+const LAB_PATH = [[0, 0], [1, 1], [2, 2], [3, 3]];
 // Structures vitales couvertes d'un rempart une fois la ceinture de murs posée.
-const CORE = [STRUCTURE_SPAWN, STRUCTURE_TOWER, STRUCTURE_STORAGE];
+const CORE = [STRUCTURE_SPAWN, STRUCTURE_TOWER, STRUCTURE_STORAGE, STRUCTURE_TERMINAL];
 // Chantiers laissés libres sur le compte (MAX_CONSTRUCTION_SITES) pour le spawn d'expansion.
 const SITE_MARGIN = 20;
 // RCL à partir duquel les routes sont posées sans condition ; avant, seulement une fois la salle équipée.
@@ -89,7 +96,7 @@ function costMatrix(room) {
   for (const id in room.memory.remoteRoads) {
     for (const k of room.memory.remoteRoads[id].path[room.name] || []) costs.set(Math.floor(k / 50), k % 50, 1);
   }
-  for (const type of [...PLANNED, STRUCTURE_LINK]) {
+  for (const type of [...PLANNED, ...EXTRA]) {
     for (const k of (room.memory.plan && room.memory.plan[type]) || []) costs.set(Math.floor(k / 50), k % 50, 255);
   }
   const objects = [...room.find(FIND_STRUCTURES), ...room.find(FIND_MY_CONSTRUCTION_SITES)];
@@ -106,6 +113,17 @@ function costMatrix(room) {
 // Distance (en cases, diagonales comprises) entre deux cases codées x * 50 + y.
 function range(a, b) {
   return Math.max(Math.abs(Math.floor(a / 50) - Math.floor(b / 50)), Math.abs(a % 50 - b % 50));
+}
+
+// Cases (x * 50 + y) à exactement `r` cases de k.
+function around(k, r) {
+  const cells = [];
+  for (let dx = -r; dx <= r; dx++) {
+    for (let dy = -r; dy <= r; dy++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) === r) cells.push(k + dx * 50 + dy);
+    }
+  }
+  return cells;
 }
 
 // Hub du contrôleur : case du conteneur provisoire (dépôt des upgraders aux RCL 1 à 3, tas au sol avant le RCL 2)
@@ -251,15 +269,6 @@ function planLinks(room, plan, costs) {
     const y = k % 50;
     return x >= 2 && x <= 47 && y >= 2 && y <= 47 && terrain.get(x, y) !== TERRAIN_MASK_WALL && costs.get(x, y) === 0;
   };
-  const around = (k, r) => {
-    const cells = [];
-    for (let dx = -r; dx <= r; dx++) {
-      for (let dy = -r; dy <= r; dy++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) === r) cells.push(k + dx * 50 + dy);
-      }
-    }
-    return cells;
-  };
   const storage = plan.hub.storage;
   const ctrl = room.controller.pos;
   const posts = around(storage, 1).filter((p) => terrain.get(Math.floor(p / 50), p % 50) !== TERRAIN_MASK_WALL
@@ -285,6 +294,57 @@ function planLinks(room, plan, costs) {
     const src = source.pos.x * 50 + source.pos.y;
     const cell = around(box, 1).filter((k) => k !== src && free(k)).sort((a, b) => (range(a, src) === 1) - (range(b, src) === 1))[0];
     if (cell !== undefined) take(cell);
+  }
+}
+
+// Terminal, extracteur et labs (RCL 6 à 8), ajoutés une fois au plan (plan.terminal, plan.extractor, plan.lab).
+// Cases libres : ni mur, ni coût non nul (structure, route gardée, case du plan), ni portée 2 d'une source,
+// du minerai ou du contrôleur, ni voisine du hub (postes des upgraders).
+// Terminal : première case libre à portée 2 à 4 du stockage. Extracteur : sur le minerai.
+// Labs : bloc 4 × 4 libre (LAB_*) le plus proche du stockage dont la diagonale est joignable depuis le stockage ;
+// labs d'entrée d'abord, posés aux premiers RCL. Pas de bloc libre : pas de labs.
+// ponytail: diagonale des labs sans route, bloc 4 × 4 fixe ; route ou disposition libre si les labs servent beaucoup.
+function planExtras(room, plan, costs) {
+  if (plan.terminal) return;
+  const terrain = room.getTerrain();
+  const mineral = room.find(FIND_MINERALS)[0];
+  const avoid = [...sources.list(room), room.controller, ...(mineral ? [mineral] : [])].map((o) => o.pos.x * 50 + o.pos.y);
+  const hubCells = plan.hub ? [plan.hub.container, plan.hub.storage].filter((k) => k !== undefined) : [];
+  const free = (k) => {
+    const x = Math.floor(k / 50);
+    const y = k % 50;
+    return x >= 2 && x <= 47 && y >= 2 && y <= 47 && terrain.get(x, y) !== TERRAIN_MASK_WALL && costs.get(x, y) === 0
+      && !avoid.some((a) => range(a, k) <= 2) && !hubCells.some((h) => range(h, k) <= 1);
+  };
+  const take = (type, k) => {
+    plan[type].push(k);
+    costs.set(Math.floor(k / 50), k % 50, 255);
+  };
+  const storage = plan[STRUCTURE_STORAGE][0];
+  plan.extractor = mineral ? [mineral.pos.x * 50 + mineral.pos.y] : [];
+  plan.terminal = [];
+  plan.lab = [];
+  for (let r = 2; r <= 4 && !plan.terminal.length; r++) {
+    const k = around(storage, r).find(free);
+    if (k !== undefined) take(STRUCTURE_TERMINAL, k);
+  }
+  const blocks = [];
+  for (let x = 2; x <= 44; x++) {
+    for (let y = 2; y <= 44; y++) {
+      const cell = ([dx, dy]) => (x + dx) * 50 + y + dy;
+      if ([...LAB_INPUTS, ...LAB_OUTPUTS, ...LAB_PATH].map(cell).every(free)) blocks.push({ x, y, d: range(storage, cell([1, 1])) });
+    }
+  }
+  const from = new RoomPosition(Math.floor(storage / 50), storage % 50, room.name);
+  for (const { x, y } of blocks.sort((a, b) => a.d - b.d).slice(0, 5)) {
+    const labs = [...LAB_INPUTS, ...LAB_OUTPUTS].map(([dx, dy]) => (x + dx) * 50 + y + dy);
+    const blocked = costs.clone();
+    for (const k of labs) blocked.set(Math.floor(k / 50), k % 50, 255);
+    const goals = [0, 3].map((d) => ({ pos: new RoomPosition(x + d, y + d, room.name), range: 0 }));
+    const result = PathFinder.search(from, goals, { plainCost: 2, swampCost: 10, maxRooms: 1, roomCallback: () => blocked });
+    if (result.incomplete) continue;
+    for (const k of labs) take(STRUCTURE_LAB, k);
+    break;
   }
 }
 
@@ -511,6 +571,12 @@ module.exports.run = function () {
     // Liens (RCL 5), une fois les routes connues : ils passent avant les routes dans les places libres.
     planLinks(room, plan, costs);
     if (plan.link) buildPlan(room, plan, STRUCTURE_LINK);
+    // Terminal, extracteur et labs (RCL 6), puis le conteneur du minerai au bout de son chemin, avec l'extracteur.
+    // ponytail: pas de route jusqu'au minerai (mineur peu fréquent) ; à poser si son transport coûte trop.
+    planExtras(room, plan, costs);
+    for (const type of [STRUCTURE_TERMINAL, STRUCTURE_EXTRACTOR, STRUCTURE_LAB]) buildPlan(room, plan, type);
+    const mineral = room.find(FIND_MINERALS)[0];
+    if (mineral) planRoute(room, spawn, mineral, 1, costs, CONTROLLER_STRUCTURES[STRUCTURE_EXTRACTOR][room.controller.level] > 0);
     // Routes après tous les conteneurs : elles passent en dernier dans les places libres.
     for (const path of paths) if (path) planRoad(room, path, roads);
     // Routes de service des extensions et tours, après les routes principales.
