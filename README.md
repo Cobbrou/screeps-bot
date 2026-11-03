@@ -80,6 +80,7 @@ screeps-bot/
 │       └── upgrader.js      # posté au dépôt du contrôleur, améliore sans aller chercher l'énergie
 ├── docs/
 │   ├── architecture.md      # architecture prévue
+│   ├── e25s3-analysis.md    # état de E25S3 et corrections à apporter (relevé du 2026-11-03)
 │   ├── harabibot-analysis.md # comparaison avec harabibot v2 : pistes pour l'early game
 │   ├── harabibot-planner-analysis.md # comparaison des planners : pistes pour le plan de base
 │   ├── screeps-reference.md # aide-mémoire de l'API Screeps
@@ -100,6 +101,7 @@ screeps-bot/
 - [AGENTS.md](AGENTS.md) : règles à suivre pour les agents IA travaillant sur le dépôt
 - [ROADMAP.md](ROADMAP.md) : étapes de développement prévues
 - [docs/architecture.md](docs/architecture.md) : architecture prévue
+- [docs/e25s3-analysis.md](docs/e25s3-analysis.md) : analyse de la salle E25S3 (bugs, CPU, économie, défense), corrections classées
 - [docs/harabibot-analysis.md](docs/harabibot-analysis.md) : pourquoi l'early game de harabibot v2 est meilleur, pistes à reprendre
 - [docs/harabibot-planner-analysis.md](docs/harabibot-planner-analysis.md) : planner de harabibot v2 comparé au nôtre, améliorations du plan de base
 - [docs/screeps-reference.md](docs/screeps-reference.md) : concepts de base de Screeps
