@@ -7,6 +7,10 @@ const REUSE_PATH = 20;
 // Ticks pendant lesquels le chemin de contournement est suivi : au-delà, on revient au chemin normal (routes).
 // Sans cette limite, le détour resterait en cache REUSE_PATH ticks, même une fois le passage libéré.
 const DETOUR_TICKS = 3;
+// Rôles collés aux routes : plaine à 10 et marais à 50 (route à 1), ils ne quittent la route que s'ils y sont obligés
+// (case visée hors route, route coupée). Recherche plus large : l'écart route/plaine élargit l'exploration.
+const ROAD_ROLES = new Set(['miner', 'hauler', 'remoteMiner', 'remoteHauler']);
+const ROAD_COSTS = { plainCost: 10, swampCost: 50, maxOps: 6000 };
 
 // Dernière position connue de chaque créep, par nom, gardée hors de `Memory` : écrite à chaque déplacement,
 // elle alourdirait la sérialisation. Perdue au reset du global, ce qui remet juste le compteur à zéro.
@@ -45,7 +49,8 @@ function blockExits(costs) {
 // piétine : on détecte ce blocage et on force un nouveau chemin qui les contourne.
 function to(creep, target, opts = {}) {
   // Plaine à 2 et marais à 10 (1 et 5 par défaut) : la route (1) devient moins chère que la plaine, les créeps la suivent.
-  opts = Object.assign({ reusePath: REUSE_PATH, plainCost: 2, swampCost: 10 }, opts);
+  opts = Object.assign({ reusePath: REUSE_PATH, plainCost: 2, swampCost: 10 },
+    ROAD_ROLES.has(creep.memory.role) ? ROAD_COSTS : null, opts);
   const here = `${creep.pos.roomName}:${creep.pos.x}:${creep.pos.y}`;
   const last = lastSeen[creep.name];
   // Ne compte que les appels de ticks consécutifs : un créep qui travaille sur place n'est pas bloqué.
