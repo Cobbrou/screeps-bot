@@ -192,7 +192,8 @@ function rclFor(type, n) {
 // ses structures jusqu'au RCL 8, calculés une fois et gardés dans room.memory.plan. Les positions ne dérivent plus
 // au gré des constructions. Le stockage va sur la case du hub ; les structures et chantiers déjà présents font
 // partie du plan d'emblée ; le reste prend les cases de planCells, les plus proches du spawn allant aux structures
-// des plus bas RCL (à RCL égal, dans l'ordre de PLANNED).
+// des plus bas RCL (à RCL égal, dans l'ordre de PLANNED), sauf les extensions d'avant le RCL 4 qui prennent
+// d'abord les cases touchant un chemin de source.
 // La n-ième case d'un type est posée dès que le RCL autorise n + 1 structures de ce type (rclFor).
 // ponytail: jamais recalculé (spawn détruit, damier trop petit pour tout placer) ; delete room.memory.plan pour le refaire.
 function basePlan(room, spawn, costs) {
@@ -212,12 +213,23 @@ function basePlan(room, spawn, costs) {
   }
   // Tri stable : à RCL égal, l'ordre de PLANNED est conservé.
   wanted.sort((a, b) => a.rcl - b.rcl);
+  // Chemins des sources tracés avant le damier (gardés pour planRoute, leurs cases interdites au plan) :
+  // les extensions d'avant le RCL 4 prennent d'abord les cases qui touchent un chemin de source,
+  // que les haulers remplissent en passant.
+  const touching = new Set();
+  for (const source of sources.list(room)) {
+    for (const pos of routePath(room, spawn, source, 1, costs) || []) {
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) touching.add((pos.x + dx) * 50 + pos.y + dy);
+    }
+  }
   const cells = planCells(room, spawn, costs, hub);
-  wanted.forEach((w, i) => {
-    if (i >= cells.length) return;
-    plan[w.type].push(cells[i]);
-    costs.set(Math.floor(cells[i] / 50), cells[i] % 50, 255);
-  });
+  for (const w of wanted) {
+    if (!cells.length) break;
+    const i = w.type === STRUCTURE_EXTENSION && w.rcl < 4 ? Math.max(0, cells.findIndex((k) => touching.has(k))) : 0;
+    const [k] = cells.splice(i, 1);
+    plan[w.type].push(k);
+    costs.set(Math.floor(k / 50), k % 50, 255);
+  }
   room.memory.plan = plan;
   return plan;
 }
@@ -310,12 +322,11 @@ function planContainer(room, target, range, end, wanted) {
   if (wanted && !built && !sites.length) place(room, end, STRUCTURE_CONTAINER);
 }
 
-// Chemin du spawn jusqu'à la cible, terminé par un conteneur si `withContainer`. Renvoie le chemin sans son bout
-// (les cases de la route, posée ensuite par planRoad), ou undefined.
+// Chemin du spawn jusqu'à la cible (bout compris), ou undefined ; ses cases passent à 1 dans `costs`.
 // Le chemin est gardé en mémoire (cases codées x * 50 + y) : le recalculer à chaque passage le ferait dévier
 // au gré des nouvelles structures et laisserait des tronçons orphelins. Il n'est recalculé que s'il est bloqué.
 // Il est calculé même sans conteneur ni route : le spawner s'en sert pour dimensionner les haulers.
-function planRoute(room, spawn, target, range, costs, withContainer) {
+function routePath(room, spawn, target, range, costs) {
   if (!room.memory.routes) room.memory.routes = {};
   const saved = room.memory.routes[target.id];
   let path = saved && saved.map((k) => new RoomPosition(Math.floor(k / 50), k % 50, room.name));
@@ -333,6 +344,14 @@ function planRoute(room, spawn, target, range, costs, withContainer) {
   }
   // Les routes suivantes réutilisent celle-ci.
   for (const pos of path) costs.set(pos.x, pos.y, 1);
+  return path;
+}
+
+// Chemin du spawn jusqu'à la cible (routePath), terminé par un conteneur si `withContainer`. Renvoie le chemin
+// sans son bout (les cases de la route, posée ensuite par planRoad), ou undefined.
+function planRoute(room, spawn, target, range, costs, withContainer) {
+  let path = routePath(room, spawn, target, range, costs);
+  if (!path) return;
   path = path.slice();
   const end = path.pop();
   planContainer(room, target, range, end, withContainer);
