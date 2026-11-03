@@ -3,13 +3,25 @@ const sources = require('../sources');
 const defense = require('../defense');
 
 // Sous ce stock d'énergie dans le stockage, l'amélioration s'arrête : l'énergie va au spawn et aux tours.
+// Elle ne reprend qu'au-dessus de STORAGE_HIGH (hystérésis : sans elle, upgraders créés puis mis en pause
+// en boucle autour du seuil).
 const STORAGE_LOW = 10000;
+const STORAGE_HIGH = 15000;
+
+// Vrai si le stockage est bas (drapeau room.memory.storageLow, avec hystérésis). Sans stockage : faux.
+function storageLow(room) {
+  if (!room.storage) return false;
+  const energy = room.storage.store[RESOURCE_ENERGY];
+  if (energy < STORAGE_LOW) room.memory.storageLow = true;
+  else if (energy > STORAGE_HIGH) delete room.memory.storageLow;
+  return !!room.memory.storageLow;
+}
 
 // Vrai si l'amélioration doit attendre : stockage bas, ou hostiles dangereux hors mode sans échec.
 // Jamais en cas de rétrogradation proche (drapeau room.memory.downgrade posé par le spawner).
 function paused(room) {
   if (room.memory.downgrade) return false;
-  if (room.storage && room.storage.store[RESOURCE_ENERGY] < STORAGE_LOW) return true;
+  if (storageLow(room)) return true;
   return !room.controller.safeMode && defense.threats(room).length > 0;
 }
 
