@@ -113,9 +113,13 @@ function run(creep) {
   const spot = post(creep, depot);
   if (spot && !creep.pos.isEqualTo(spot)) move.to(creep, spot, { range: 0 });
   else if (!spot && !creep.pos.inRangeTo(room.controller, 3)) move.to(creep, room.controller, { range: 3 });
-  if (creep.pos.isNearTo(depot.pos) && !paused(room) && creep.store.getFreeCapacity(RESOURCE_ENERGY)) {
+  // Lien du hub (RCL 5) d'abord : l'énergie des sources liées y arrive sans hauler.
+  const link = sources.hubLink(room);
+  const fromLink = link && link.store[RESOURCE_ENERGY] && creep.pos.isNearTo(link);
+  if ((fromLink || creep.pos.isNearTo(depot.pos)) && !paused(room) && creep.store.getFreeCapacity(RESOURCE_ENERGY)) {
     const pile = !depot.container && sources.depotPile(depot);
-    if (pile) creep.pickup(pile);
+    if (fromLink) creep.withdraw(link, RESOURCE_ENERGY);
+    else if (pile) creep.pickup(pile);
     else if (depot.container && depot.container.store[RESOURCE_ENERGY]) creep.withdraw(depot.container, RESOURCE_ENERGY);
   }
   if (creep.store[RESOURCE_ENERGY]) creep.upgradeController(room.controller);

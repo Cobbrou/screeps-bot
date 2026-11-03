@@ -137,6 +137,27 @@ function depot(room) {
   return box ? { pos, container: box } : { pos };
 }
 
+// Lien construit sur la case k (x * 50 + y) de room.memory.plan.link, ou undefined.
+// Le premier lien du plan est celui du hub (récepteur, vidé par les upgraders), les suivants ceux des sources.
+function planLink(room, i) {
+  const k = room.memory.plan && room.memory.plan.link && room.memory.plan.link[i];
+  if (k === undefined) return undefined;
+  return room.lookForAt(LOOK_STRUCTURES, Math.floor(k / 50), k % 50).find((s) => s.structureType === STRUCTURE_LINK);
+}
+
+function hubLink(room) {
+  return planLink(room, 0);
+}
+
+// Lien construit à côté du conteneur de la source (hors lien du hub), ou undefined.
+function sourceLink(source) {
+  const box = container(source);
+  const hub = hubLink(source.room);
+  return box && box.pos.findInRange(FIND_MY_STRUCTURES, 1, {
+    filter: (s) => s.structureType === STRUCTURE_LINK && s !== hub,
+  })[0];
+}
+
 // Énergie posée au sol sur la case du dépôt, ou undefined.
 function depotPile(d) {
   return d.pos.lookFor(LOOK_RESOURCES).find((r) => r.resourceType === RESOURCE_ENERGY);
@@ -322,4 +343,4 @@ function collect(creep) {
   if (creep.withdraw(store, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, store);
 }
 
-module.exports = { list, spots, container, waitSpot, depot, depotPile, harvest, harvestSource, collect, goBack, stepAway, forget };
+module.exports = { list, spots, container, waitSpot, depot, depotPile, hubLink, sourceLink, harvest, harvestSource, collect, goBack, stepAway, forget };

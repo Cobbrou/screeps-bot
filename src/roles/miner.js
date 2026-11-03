@@ -23,4 +23,19 @@ module.exports.run = function (creep) {
     if (!creep.pos.isEqualTo(dest)) return move.to(creep, dest, { range: 0 });
   }
   sources.harvestSource(creep, source);
+  feedLink(creep, source);
 };
+
+// Lien de la source (RCL 5) : le mineur (1 CARRY) y verse ce qu'il récolte, et le lien envoie au lien du hub
+// dès qu'il peut en remettre LINK_SEND. Lien ou hub plein (upgraders en pause) : la récolte déborde
+// dans le conteneur, que les haulers vident comme avant.
+const LINK_SEND = LINK_CAPACITY / 2;
+function feedLink(creep, source) {
+  if (!creep.store.getCapacity()) return;
+  const link = sources.sourceLink(source);
+  if (!link) return;
+  if (creep.store[RESOURCE_ENERGY] && link.store.getFreeCapacity(RESOURCE_ENERGY)) creep.transfer(link, RESOURCE_ENERGY);
+  const hub = !link.cooldown && sources.hubLink(creep.room);
+  const amount = hub ? Math.min(link.store[RESOURCE_ENERGY], hub.store.getFreeCapacity(RESOURCE_ENERGY)) : 0;
+  if (amount >= LINK_SEND) link.transferEnergy(hub, amount);
+}

@@ -223,6 +223,10 @@ function repeat(unit, energy, rest = []) {
 // `target` le mineur distant à sa salle (réservée ou non).
 function buildBody(role, energy, room, sourceId, target) {
   if (role === 'miner') {
+    // Un CARRY pour verser la récolte dans le lien de la source, s'il est construit.
+    const source = sourceId && Game.getObjectById(sourceId);
+    const carry = source && sources.sourceLink(source) ? [CARRY] : [];
+    energy -= carry.length * BODYPART_COST[CARRY];
     const work = Math.min(Math.floor((energy - BODYPART_COST[MOVE]) / BODYPART_COST[WORK]), MAX_MINER_WORK);
     if (work <= 0) return [];
     // Le mineur ne se déplace qu'une fois jusqu'à son conteneur : MOVE choisis, dans l'énergie restante,
@@ -240,7 +244,7 @@ function buildBody(role, energy, room, sourceId, target) {
         moves = m;
       }
     }
-    return [...Array(work).fill(WORK), ...Array(moves).fill(MOVE)];
+    return [...Array(work).fill(WORK), ...carry, ...Array(moves).fill(MOVE)];
   }
   if (role === 'hauler') {
     return room && haulerRatio(room) === 2 ? repeat([CARRY, CARRY, MOVE], energy, [[CARRY, MOVE]]) : repeat([CARRY, MOVE], energy);

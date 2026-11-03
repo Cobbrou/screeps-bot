@@ -49,7 +49,7 @@ function priority(room, type) {
   if (type === STRUCTURE_EXTENSION && capacity < 650) return 1;
   if (type === STRUCTURE_TOWER) return 2;
   if (type === STRUCTURE_EXTENSION && capacity < 800) return 3;
-  if (type === STRUCTURE_STORAGE) return 4;
+  if (type === STRUCTURE_STORAGE || type === STRUCTURE_LINK) return 4;
   if (type === STRUCTURE_EXTENSION) return 5;
   if (type === STRUCTURE_CONTAINER) return 6;
   if (type === STRUCTURE_ROAD) return 7;
@@ -89,7 +89,7 @@ function costMatrix(room) {
   for (const id in room.memory.remoteRoads) {
     for (const k of room.memory.remoteRoads[id].path[room.name] || []) costs.set(Math.floor(k / 50), k % 50, 1);
   }
-  for (const type of PLANNED) {
+  for (const type of [...PLANNED, STRUCTURE_LINK]) {
     for (const k of (room.memory.plan && room.memory.plan[type]) || []) costs.set(Math.floor(k / 50), k % 50, 255);
   }
   const objects = [...room.find(FIND_STRUCTURES), ...room.find(FIND_MY_CONSTRUCTION_SITES)];
@@ -220,6 +220,60 @@ function basePlan(room, spawn, costs) {
   });
   room.memory.plan = plan;
   return plan;
+}
+
+// Cases des liens, ajoutées une fois au plan (room.memory.plan.link) quand le stockage du hub et les routes
+// des sources sont connus. D'abord le lien du hub : case libre à portée 2 du stockage qui touche le plus de postes
+// d'upgraders (voisins du stockage, à portée 3 du contrôleur). Puis un lien par source, de la route la plus longue
+// à la plus courte, sur une case libre voisine du conteneur (bout de la route), si possible pas collée à la source.
+// Pas de case pour le hub : liste vide, rien n'est reposé.
+// ponytail: liens des sources seulement, pas de lien du contrôleur séparé ; à revoir avec les chaînes d'upgraders.
+function planLinks(room, plan, costs) {
+  if (plan.link || !plan.hub || plan.hub.storage === undefined) return;
+  const list = sources.list(room);
+  const routes = room.memory.routes || {};
+  if (!list.every((s) => routes[s.id])) return;
+  const terrain = room.getTerrain();
+  const free = (k) => {
+    const x = Math.floor(k / 50);
+    const y = k % 50;
+    return x >= 2 && x <= 47 && y >= 2 && y <= 47 && terrain.get(x, y) !== TERRAIN_MASK_WALL && costs.get(x, y) === 0;
+  };
+  const around = (k, r) => {
+    const cells = [];
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dy = -r; dy <= r; dy++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) === r) cells.push(k + dx * 50 + dy);
+      }
+    }
+    return cells;
+  };
+  const storage = plan.hub.storage;
+  const ctrl = room.controller.pos;
+  const posts = around(storage, 1).filter((p) => terrain.get(Math.floor(p / 50), p % 50) !== TERRAIN_MASK_WALL
+    && costs.get(Math.floor(p / 50), p % 50) !== 255 && ctrl.getRangeTo(Math.floor(p / 50), p % 50) <= 3);
+  let hub;
+  let best = 0;
+  for (const k of around(storage, 2).filter(free)) {
+    const n = posts.filter((p) => range(p, k) === 1).length;
+    if (n > best) {
+      best = n;
+      hub = k;
+    }
+  }
+  plan.link = [];
+  if (hub === undefined) return;
+  const take = (k) => {
+    plan.link.push(k);
+    costs.set(Math.floor(k / 50), k % 50, 255);
+  };
+  take(hub);
+  for (const source of list.slice().sort((a, b) => routes[b.id].length - routes[a.id].length)) {
+    const box = routes[source.id][routes[source.id].length - 1];
+    const src = source.pos.x * 50 + source.pos.y;
+    const cell = around(box, 1).filter((k) => k !== src && free(k)).sort((a, b) => (range(a, src) === 1) - (range(b, src) === 1))[0];
+    if (cell !== undefined) take(cell);
+  }
 }
 
 // Pose les structures du plan de ce type que le RCL autorise et qui manquent (ni la structure ni un chantier
@@ -412,6 +466,9 @@ module.exports.run = function () {
       const box = stored && pos.lookFor(LOOK_STRUCTURES).find((s) => s.structureType === STRUCTURE_CONTAINER);
       if (box) box.destroy();
     }
+    // Liens (RCL 5), une fois les routes connues : ils passent avant les routes dans les places libres.
+    planLinks(room, plan, costs);
+    if (plan.link) buildPlan(room, plan, STRUCTURE_LINK);
     // Routes après tous les conteneurs : elles passent en dernier dans les places libres.
     for (const path of paths) if (path) planRoad(room, path, roads);
     // Routes des sources distantes dont le conteneur est construit, en même temps que celles de la salle :
