@@ -1,10 +1,14 @@
 const move = require('../move');
 
 // Rejoint la salle visée par l'expansion par le trajet sûr (move.travel) et en revendique le contrôleur.
-// Suit la cible actuelle, qui peut avoir changé depuis sa création ; sans expansion en cours, attend.
+// Suit la cible actuelle, qui peut avoir changé depuis sa création ; sans expansion en cours, se suicide :
+// attendre sa mort ne sert à rien (un nouveau claimer est créé si une expansion reprend).
 module.exports.run = function (creep) {
   const exp = Memory.expansion;
-  if (!exp) return;
+  if (!exp) {
+    creep.suicide();
+    return;
+  }
   if (creep.room.name !== exp.target) {
     move.travel(creep, exp.target);
     return;

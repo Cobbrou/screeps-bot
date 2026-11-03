@@ -371,9 +371,18 @@ module.exports.run = function () {
     // Premier mineur ou premier hauler de la salle : créé avec l'énergie disponible au lieu d'attendre la capacité
     // pleine, la récolte démarre plus tôt. Au moins l'énergie que le spawn régénère seul (300) : pas de corps minuscule.
     const startup = (role === 'miner' || role === 'hauler') && !roomCounts[role];
-    const energy = emergency ? room.energyAvailable
+    let energy = emergency ? room.energyAvailable
       : startup ? Math.min(room.energyCapacityAvailable, Math.max(SPAWN_ENERGY_CAPACITY, room.energyAvailable))
         : room.energyCapacityAvailable;
+    // Hauler plafonné à sa part du besoin (une source chacun) : à la capacité pleine de la salle, il porte plusieurs
+    // fois la production et paie son entretien pour rien. Le renfort HAUL_BACKLOG couvre les écarts.
+    if (role === 'hauler' && !emergency) {
+      const list = sources.list(room);
+      const share = list.reduce((sum, s) => sum + haulCapacity(room, s, (miners[s.id] || {}).work), 0) / list.length;
+      const ratio = haulerRatio(room);
+      const units = Math.max(1, Math.ceil(share / (ratio * CARRY_CAPACITY)));
+      energy = Math.min(energy, units * (ratio * BODYPART_COST[CARRY] + BODYPART_COST[MOVE]));
+    }
     const body = buildBody(role, energy, room, memory.sourceId, memory.target);
     if (!body.length) continue;
     if (spawn.spawnCreep(body, `${role}-${spawn.name}-${Game.time}`, { memory }) === OK) {

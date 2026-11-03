@@ -105,6 +105,21 @@ Pistes tirées de l'[analyse du planner de harabibot v2](docs/harabibot-planner-
 - [ ] Chaînes d'upgraders (harabibot) pour éloigner le stockage à portée 4, si les 7-8 postes autour du hub ne suffisent plus
 - [ ] Extensions de part et d'autre de routes de service (courtes diagonales, routes du noyau et des sources) au lieu du damier sans route ; avant le RCL 4, d'abord celles qui touchent un chemin de source ; routes posées au RCL des structures qu'elles desservent (au moins 3)
 
+## Corrections tirées de l'analyse de E25S3
+
+Priorité immédiate, d'après l'[analyse de E25S3](docs/e25s3-analysis.md) : l'amélioration est presque à l'arrêt pendant que la tour finance les murs.
+
+- [x] Tours : murs et remparts non réparés tant que le stockage est bas (`room.memory.storageLow`), sauf rempart près de disparaître
+- [x] `claimer` sans expansion en cours : suicide au lieu d'attendre sa mort
+- [x] `WORK` compté comme menace seulement chez l'`Invader` : un mineur de passage n'est plus visé, ne met plus l'amélioration en pause et ne bloque plus les pixels
+- [x] Commentaire de `damagedStructure` corrigé (nouvelle recherche tous les 10 ticks, pas de cible gardée jusqu'au bout)
+- [x] Enfermement (`Memory.enclosed`) : plus de doublement des murs, seul le bonus d'amélioration reste
+- [x] Corps des haulers plafonné à leur part du besoin (une source chacun) au lieu de la capacité pleine de la salle
+- [x] `LOW_BUCKET` à 500 : la génération de pixels ne fait plus sauter planner et expansion
+- [ ] Vérifier en console `Game.map.getRoomStatus('E26S3')` : si `normal`, `intel.avoid` ne distingue pas la zone de respawn et un claimer repartira vers E27S3
+- [ ] Surveiller le trajet noté par les mineurs (`travel: 213` pour 14 cases) : successeur lancé trop tôt
+- [ ] RCL 5 : remparts sur le spawn, la tour et le stockage ; liens source lointaine → stockage (voir phase 7)
+
 ## Phase 7 : logistique avancée (RCL 5-6)
 
 - [ ] Plan de base : `filler` fixe au stockage, spawns suivants et liens à côté du stockage

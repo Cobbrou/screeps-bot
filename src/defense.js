@@ -1,11 +1,13 @@
 // Parties qui rendent un créep hostile dangereux (les éclaireurs ne déclenchent rien).
-const DANGEROUS = [ATTACK, RANGED_ATTACK, WORK, HEAL, CLAIM];
-// Joueurs amis : nos créeps n'entrent pas dans leurs salles (voir intel). Leurs créeps restent des menaces chez nous.
+// WORK seulement chez l'Invader : chez un joueur, c'est presque toujours un mineur ou un réparateur de passage,
+// et le viser risque une guerre (tours, amélioration en pause, pixels bloqués).
+// ponytail: un démanteleur joueur sans ATTACK est ignoré ; le compter au contact de nos structures s'il en vient un.
+const DANGEROUS = [ATTACK, RANGED_ATTACK, HEAL, CLAIM];
+const INVADER = 'Invader';
+// Joueurs amis : nos créeps n'entrent pas dans leurs salles (voir intel). Leurs créeps armés restent des menaces chez nous.
 const FRIENDS = ['vKDeath'];
 // ponytail: plafond fixe des murs et remparts, à ajuster selon le budget énergie de la salle.
 const WALL_HITS_PER_RCL = 10000;
-// Salle enfermée (`Memory.enclosed`, voir expansion) : murs et remparts plus solides, voisins hostiles.
-const ENCLOSED_WALL_FACTOR = 2;
 // Les tours ne réparent qu'en dessous de cette fraction de la cible : pas d'énergie gaspillée pour quelques points.
 const REPAIR_RATIO = 0.8;
 // Défenseurs au plus par salle : au-delà, le mode sans échec prend le relais.
@@ -26,19 +28,21 @@ const targetCache = {};
 // Hostiles dangereux présents dans la salle.
 function threats(room) {
   return room.find(FIND_HOSTILE_CREEPS, {
-    filter: (c) => c.body.some((p) => DANGEROUS.includes(p.type)),
+    filter: (c) => c.body.some((p) => DANGEROUS.includes(p.type) || (p.type === WORK && c.owner.username === INVADER)),
   });
 }
 
 // Points de vie visés à la réparation : les murs et remparts sont plafonnés selon le RCL.
 function repairTarget(s) {
   if (s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART) return s.hitsMax;
-  const factor = Memory.enclosed ? ENCLOSED_WALL_FACTOR : 1;
-  return Math.min(s.hitsMax, WALL_HITS_PER_RCL * s.room.controller.level * factor);
+  return Math.min(s.hitsMax, WALL_HITS_PER_RCL * s.room.controller.level);
 }
 
 // Structure la plus abîmée par rapport à sa cible (sous REPAIR_RATIO), ou null ; un rempart sous RAMPART_DYING d'abord.
-// Gardée jusqu'à réparation complète ; la salle n'est parcourue qu'une fois tous les REPAIR_SCAN_INTERVAL ticks.
+// Stockage bas (drapeau room.memory.storageLow, voir upgrader) : murs et remparts attendent, sauf rempart mourant,
+// pour que l'énergie aille d'abord à l'amélioration.
+// La cible est reprise jusqu'à la prochaine recherche, qui a lieu tous les REPAIR_SCAN_INTERVAL ticks et prend
+// la pire structure : un mur s'arrête donc vers REPAIR_RATIO de sa cible, dès qu'un autre est plus abîmé.
 function damagedStructure(room) {
   const cached = repairCache[room.name];
   if (cached && Game.time - cached.time < REPAIR_SCAN_INTERVAL) {
@@ -48,8 +52,11 @@ function damagedStructure(room) {
   }
   let damaged = null;
   let worst = REPAIR_RATIO;
+  const saving = room.memory.storageLow;
   for (const s of room.find(FIND_STRUCTURES)) {
-    const ratio = s.structureType === STRUCTURE_RAMPART && s.hits <= RAMPART_DYING ? -1 : s.hits / repairTarget(s);
+    const dying = s.structureType === STRUCTURE_RAMPART && s.hits <= RAMPART_DYING;
+    if (saving && !dying && (s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART)) continue;
+    const ratio = dying ? -1 : s.hits / repairTarget(s);
     if (s.hitsMax && ratio < worst) {
       worst = ratio;
       damaged = s;

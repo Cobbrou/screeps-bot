@@ -1,7 +1,8 @@
 const defense = require('./defense');
 
 // Sous ce seuil de bucket, les modules non essentiels (planner) sont sautés.
-const LOW_BUCKET = 2000;
+// Bas pour que la génération de pixels (bucket vidé à 0) ne les fasse sauter que quelques dizaines de ticks.
+const LOW_BUCKET = 500;
 
 // CPU consommé par module sur le tick en cours.
 let modules = {};

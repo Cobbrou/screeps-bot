@@ -9,7 +9,7 @@ const MIN_RCL = 4;
 const MAX_DISTANCE = 5;
 // Enfermement : le GCL permet une salle de plus, mais aucune cible n'est trouvée depuis ENCLOSED_AFTER ticks
 // (voisines prises ou dangereuses). On cherche alors jusqu'à ENCLOSED_DISTANCE salles, et `Memory.enclosed`
-// renforce murs et remparts (defense) et pousse l'amélioration (spawner).
+// pousse l'amélioration (spawner).
 const ENCLOSED_AFTER = 20000;
 const ENCLOSED_DISTANCE = 10;
 // Abandon de la cible si elle n'est pas revendiquée, ou si son spawn n'est pas construit, dans ce délai.
