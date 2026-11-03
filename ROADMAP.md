@@ -117,7 +117,7 @@ Priorité immédiate, d'après l'[analyse de E25S3](docs/e25s3-analysis.md) : l'
 - [x] Corps des haulers plafonné à leur part du besoin (une source chacun) au lieu de la capacité pleine de la salle
 - [x] `LOW_BUCKET` à 500 : la génération de pixels ne fait plus sauter planner et expansion
 - [x] Statut des zones vérifié en console : E25S3 et E27S3 en `respawn`, E26S3 en `normal` (évitée). Le seul trajet en `respawn` vers E27S3 passe par E25S4 et E26S4 (keepers, évitées) : `intel.route` ne trouve rien, aucun claimer n'y part
-- [ ] Surveiller le trajet noté par les mineurs (`travel: 213` pour 14 cases) : successeur lancé trop tôt
+- [x] Trajet noté par les mineurs (`travel: 213`, puis 220, pour 14 cases) : la source `…e63` n'a que la case du conteneur, le successeur attendait loin et comptait l'attente. Trajet noté dès qu'il touche la source ou le conteneur, attente collée au conteneur (mineurs locaux et distants)
 - [ ] RCL 5 : remparts sur le spawn, la tour et le stockage ; liens source lointaine → stockage (voir phase 7)
 
 ## Phase 7 : logistique avancée (RCL 5-6)

@@ -19,15 +19,23 @@ module.exports.run = function (creep) {
   const pos = new RoomPosition(source.x, source.y, source.room);
   const box = remoteMining.container(source);
   // Conteneur tenu par un autre créep (le mineur qu'il remplace) : attend sans bouger juste à côté, en récoltant.
-  const wait = box && !creep.pos.isEqualTo(box.pos) && box.pos.lookFor(LOOK_CREEPS).length
-    && sources.waitSpot(creep, pos, box);
+  // Sans case libre à côté du conteneur et de la source : attend collé au conteneur.
+  const taken = box && !creep.pos.isEqualTo(box.pos) && box.pos.lookFor(LOOK_CREEPS).length;
+  const wait = taken && sources.waitSpot(creep, pos, box);
+  // Temps de trajet noté à l'arrivée (à côté de la source ou du conteneur, attente derrière le mineur remplacé
+  // exclue) : le spawner lance le successeur pour qu'il arrive à la mort de celui-ci.
+  if (creep.memory.travel === undefined && (creep.pos.isNearTo(pos) || (box && creep.pos.isNearTo(box.pos)))) {
+    creep.memory.travel = CREEP_LIFE_TIME - creep.ticksToLive;
+  }
+  if (taken && !wait) {
+    if (!creep.pos.isNearTo(box.pos)) move.to(creep, box.pos, { range: 1 });
+    return;
+  }
   const dest = wait || (box && box.pos);
   if (dest ? !creep.pos.isEqualTo(dest) : !creep.pos.isNearTo(pos)) {
     move.to(creep, dest || pos, { range: dest ? 0 : 1 });
     return;
   }
-  // Temps de trajet noté à l'arrivée : le spawner lance le successeur pour qu'il arrive à la mort de celui-ci.
-  if (creep.memory.travel === undefined) creep.memory.travel = CREEP_LIFE_TIME - creep.ticksToLive;
   if (wait) {
     const target = Game.getObjectById(creep.memory.sourceId);
     if (target) sources.harvestSource(creep, target);
