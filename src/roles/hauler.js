@@ -178,33 +178,38 @@ function pickupNearby(creep) {
 // Livre au spawn, aux extensions et aux tours (s'il leur manque TOWER_REFILL, sauf hostiles), puis aux builders (sans stockage), puis au dépôt des upgraders
 // (sources.depot), puis au stockage.
 // Sans conteneur, le dépôt est une case (RoomPosition) où l'énergie est posée au sol, jusqu'à DEPOT_MAX.
-// Un builder n'est visé que s'il lui manque au moins la moitié de sa capacité, énergie des haulers déjà en route
-// vers lui déduite (`creep.memory.deliverId`) : pas de détour pour quelques points.
+// Structures et builders sont réservés (`creep.memory.deliverId`) : la place libre de chacun est comptée une fois
+// déduite l'énergie des autres transporteurs chargés qui l'ont déjà choisi. Sans ça, deux haulers visent la même
+// extension et le second fait le trajet pour rien.
+// ponytail: premier arrivé, premier servi ; un hauler plus proche ne reprend pas une réservation, à revoir si les livraisons traînent.
+// Un builder n'est visé que s'il lui manque au moins la moitié de sa capacité : pas de détour pour quelques points.
 // Avec un stockage, les builders y puisent eux-mêmes.
 // `skip` : structure ou builder qu'on vient de remplir ce tick, à ne plus viser.
 function deliveryTarget(creep, skip) {
   const room = creep.room;
   const threatened = defense.threats(room).length > 0;
-  // Réservation du builder visé : refaite à chaque choix, gardée seulement si un builder est retenu.
+  // Réservation refaite à chaque choix, gardée seulement si une structure ou un builder est retenu.
   delete creep.memory.deliverId;
-  const structure = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
-    filter: (s) => s !== skip && needsEnergy(s) && (s.structureType !== STRUCTURE_TOWER || threatened
-      || s.store.getFreeCapacity(RESOURCE_ENERGY) >= TOWER_REFILL),
-  });
-  if (structure) return structure;
-  if (!room.storage) {
-    // Énergie déjà en route vers chaque builder (autres transporteurs chargés qui l'ont choisi) :
-    // sans ça, tous les haulers chargés suivent le même builder à travers la salle.
-    const incoming = {};
-    for (const name in Game.creeps) {
-      const other = Game.creeps[name];
-      if (other !== creep && other.memory.working && other.memory.deliverId) {
-        incoming[other.memory.deliverId] = (incoming[other.memory.deliverId] || 0) + other.store[RESOURCE_ENERGY];
-      }
+  const incoming = {};
+  for (const name in Game.creeps) {
+    const other = Game.creeps[name];
+    // Même salle seulement : un remoteHauler qui rentre garde le deliverId de sa livraison précédente.
+    if (other !== creep && other.memory.working && other.memory.deliverId && other.room.name === room.name) {
+      incoming[other.memory.deliverId] = (incoming[other.memory.deliverId] || 0) + other.store[RESOURCE_ENERGY];
     }
+  }
+  const free = (o) => o.store.getFreeCapacity(RESOURCE_ENERGY) - (incoming[o.id] || 0);
+  const structure = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
+    filter: (s) => s !== skip && needsEnergy(s) && free(s) > 0
+      && (s.structureType !== STRUCTURE_TOWER || threatened || free(s) >= TOWER_REFILL),
+  });
+  if (structure) {
+    creep.memory.deliverId = structure.id;
+    return structure;
+  }
+  if (!room.storage) {
     const builder = creep.pos.findClosestByRange(FIND_MY_CREEPS, {
-      filter: (c) => c !== skip && c.memory.role === 'builder'
-        && c.store.getFreeCapacity(RESOURCE_ENERGY) - (incoming[c.id] || 0) >= c.store.getCapacity() / 2,
+      filter: (c) => c !== skip && c.memory.role === 'builder' && free(c) >= c.store.getCapacity() / 2,
     });
     if (builder) {
       creep.memory.deliverId = builder.id;
