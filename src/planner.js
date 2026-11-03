@@ -6,6 +6,8 @@ const INTERVAL = 100;
 const MAX_RADIUS = 8;
 // Types placés par le plan de base, dans l'ordre d'attribution des cases à RCL égal.
 const PLANNED = [STRUCTURE_STORAGE, STRUCTURE_TOWER, STRUCTURE_EXTENSION];
+// Structures vitales couvertes d'un rempart une fois la ceinture de murs posée.
+const CORE = [STRUCTURE_SPAWN, STRUCTURE_TOWER, STRUCTURE_STORAGE];
 // Chantiers laissés libres sur le compte (MAX_CONSTRUCTION_SITES) pour le spawn d'expansion.
 const SITE_MARGIN = 20;
 // RCL à partir duquel les routes sont posées sans condition ; avant, seulement une fois la salle équipée.
@@ -429,6 +431,10 @@ module.exports.run = function () {
     if (room.storage
       && room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length) {
       planWalls(room, costs);
+      // Remparts aussi sur les structures vitales : un attaquant qui passe la ceinture ne les détruit pas d'emblée.
+      for (const s of room.find(FIND_MY_STRUCTURES, { filter: (o) => CORE.includes(o.structureType) })) {
+        if (!s.pos.lookFor(LOOK_STRUCTURES).some((o) => o.structureType === STRUCTURE_RAMPART)) place(room, s.pos, STRUCTURE_RAMPART);
+      }
     }
     waiting[room.name] = blocked;
   }
