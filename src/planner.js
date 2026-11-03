@@ -339,6 +339,29 @@ function planRoute(room, spawn, target, range, costs, withContainer) {
   return path;
 }
 
+// Routes de service du damier : cases libres des diagonales dx - dy ≡ 1 (mod 4) autour du spawn. Toute case
+// du damier ((dx + dy) pair) touche par un côté une case de ces diagonales : les haulers remplissent extensions
+// et tours depuis la route. Seules les cases voisines d'une extension ou d'une tour déjà construite sont renvoyées
+// (route posée au RCL de ce qu'elle dessert), et seulement si rien n'y est prévu (coût nul : ni structure,
+// ni route, ni case du plan).
+function serviceRoads(room, spawn, costs) {
+  const terrain = room.getTerrain();
+  const roads = new Map();
+  for (const s of room.find(FIND_MY_STRUCTURES, {
+    filter: (o) => o.structureType === STRUCTURE_EXTENSION || o.structureType === STRUCTURE_TOWER,
+  })) {
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = s.pos.x + dx;
+      const y = s.pos.y + dy;
+      const v = x - spawn.pos.x - (y - spawn.pos.y);
+      if (((v % 4) + 4) % 4 !== 1 || x < 1 || x > 48 || y < 1 || y > 48) continue;
+      if (terrain.get(x, y) === TERRAIN_MASK_WALL || costs.get(x, y) !== 0) continue;
+      roads.set(x * 50 + y, new RoomPosition(x, y, room.name));
+    }
+  }
+  return [...roads.values()];
+}
+
 // Route sur les cases du chemin ; sans route voulue, les chantiers de route pas encore entamés sont retirés.
 function planRoad(room, path, withRoad) {
   if (!withRoad) removeSites(path, STRUCTURE_ROAD);
@@ -471,6 +494,8 @@ module.exports.run = function () {
     if (plan.link) buildPlan(room, plan, STRUCTURE_LINK);
     // Routes après tous les conteneurs : elles passent en dernier dans les places libres.
     for (const path of paths) if (path) planRoad(room, path, roads);
+    // Routes de service des extensions et tours, après les routes principales.
+    if (roads) planRoad(room, serviceRoads(room, spawn, costs), true);
     // Routes des sources distantes dont le conteneur est construit, en même temps que celles de la salle :
     // la partie dans la salle passe par planRoad (places et priorité des chantiers), le reste par planRemoteRoad.
     if (roads) {

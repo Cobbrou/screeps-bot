@@ -103,7 +103,8 @@ Pistes tirées de l'[analyse du planner de harabibot v2](docs/harabibot-planner-
 - [x] Plan de base calculé une fois et gardé en mémoire (cases codées `x * 50 + y`, RCL par structure) ; le planner ne pose que la différence avec la salle (damier glouton autour du spawn, structures existantes reprises)
 - [x] Hub près du contrôleur : stockage et conteneur provisoire voisins à portée 2 (la portée 4 de harabibot ne laisse que 3 postes sans chaîne d'upgraders), postes des upgraders réservés, conteneur dépôt unique jusqu'au stockage puis détruit ; premier spawn d'une expansion à portée 5 au moins du contrôleur
 - [ ] Chaînes d'upgraders (harabibot) pour éloigner le stockage à portée 4, si les 7-8 postes autour du hub ne suffisent plus
-- [ ] Extensions de part et d'autre de routes de service (courtes diagonales, routes du noyau et des sources) au lieu du damier sans route ; avant le RCL 4, d'abord celles qui touchent un chemin de source ; routes posées au RCL des structures qu'elles desservent (au moins 3)
+- [x] Routes de service dans le damier : diagonales libres `dx - dy ≡ 1 (mod 4)` autour du spawn, que touche par un côté chaque case du damier (plan existant gardé) ; route posée à côté des extensions et tours construites, quand les routes sont voulues (RCL 3, ou salle équipée)
+- [ ] Avant le RCL 4, extensions qui touchent un chemin de source d'abord (les routes sont aujourd'hui tracées après le plan, autour de lui : à calculer avant pour les nouvelles salles)
 
 ## Corrections tirées de l'analyse de E25S3
 
