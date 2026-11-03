@@ -1,3 +1,5 @@
+const intel = require('./intel');
+
 // Ticks consécutifs sans bouger (hors fatigue) avant de recalculer le chemin en contournant les créeps.
 const STUCK_TICKS = 2;
 // Ticks pendant lesquels un chemin calculé est réutilisé (5 par défaut dans `moveTo`) : moins de pathfinding.
@@ -77,6 +79,23 @@ function to(creep, target, opts = {}) {
   } finally {
     delete creep.move;
   }
+}
+
+// Prochaine salle du trajet de chaque créep ({ from, to, next }), par nom : findRoute seulement à chaque changement de salle.
+const hops = {};
+
+// Rejoint la salle `roomName` salle par salle, par le trajet sûr d'intel.route (ni keepers, ni salles hostiles).
+// Faux si aucun trajet sûr : le créep reste sur place plutôt que de se faire tuer.
+function travel(creep, roomName) {
+  let hop = hops[creep.name];
+  if (!hop || hop.from !== creep.room.name || hop.to !== roomName) {
+    const r = intel.route(creep.room.name, roomName);
+    hop = hops[creep.name] = { from: creep.room.name, to: roomName, next: r && r.length ? r[0].room : null };
+  }
+  if (!hop.next) return false;
+  // maxRooms 2 : le chemin entre directement dans la salle suivante, sans détour par une autre.
+  to(creep, new RoomPosition(25, 25, hop.next), { range: 22, maxRooms: 2 });
+  return true;
 }
 
 // Pas d'une case dans une direction, à la place de `creep.move`.
@@ -159,6 +178,7 @@ function forget(name) {
   delete lastSeen[name];
   delete goals[name];
   delete detours[name];
+  delete hops[name];
 }
 
-module.exports = { to, step, run, forget };
+module.exports = { to, step, travel, run, forget };

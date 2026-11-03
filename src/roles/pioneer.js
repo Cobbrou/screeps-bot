@@ -1,10 +1,10 @@
 const move = require('../move');
 const builder = require('./builder');
 
-// Créep d'amorçage : rejoint la salle revendiquée puis y récolte et construit comme un builder (spawn d'abord).
+// Créep d'amorçage : rejoint la salle revendiquée par le trajet sûr (move.travel) puis y récolte et construit comme un builder (spawn d'abord).
 module.exports.run = function (creep) {
   if (creep.room.name !== creep.memory.target) {
-    move.to(creep, new RoomPosition(25, 25, creep.memory.target), { range: 22 });
+    move.travel(creep, creep.memory.target);
     return;
   }
   builder.run(creep);

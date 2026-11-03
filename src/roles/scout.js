@@ -1,18 +1,8 @@
 const move = require('../move');
 const intel = require('../intel');
 
-// Salle à Source Keepers : coordonnées 4 à 6 dans le secteur de 10 × 10, hors salle centrale (5, 5).
-// Les keepers tuent l'éclaireur, qui n'y apprendrait rien d'utile (pas de contrôleur).
-function keeperRoom(name) {
-  const m = /^[WE](\d+)[NS](\d+)$/.exec(name);
-  if (!m) return false;
-  const x = m[1] % 10;
-  const y = m[2] % 10;
-  return x >= 4 && x <= 6 && y >= 4 && y <= 6 && !(x === 5 && y === 5);
-}
-
 // Voisines où l'éclaireur peut aller : même statut (zones novices ou fermées infranchissables),
-// salles à keepers évitées sauf s'il n'y a rien d'autre (éclaireur déjà dans un secteur de keepers).
+// salles à keepers évitées (les keepers tuent l'éclaireur, qui n'y apprendrait rien d'utile) sauf s'il n'y a rien d'autre (éclaireur déjà dans un secteur de keepers).
 // getRoomStatus renvoie undefined dans le simulateur (salle « sim ») : pas de statut, pas de voisine.
 function exits(here) {
   const statusOf = (name) => (Game.map.getRoomStatus(name) || {}).status;
@@ -20,7 +10,7 @@ function exits(here) {
   if (!status) return [];
   const open = Object.values(Game.map.describeExits(here) || {})
     .filter((name) => statusOf(name) === status);
-  const calm = open.filter((name) => !keeperRoom(name));
+  const calm = open.filter((name) => !intel.keeperRoom(name));
   return calm.length ? calm : open;
 }
 

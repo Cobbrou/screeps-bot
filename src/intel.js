@@ -46,6 +46,36 @@ function reservedByMe(name) {
   return !!(i && i.reserved && i.reserved === me());
 }
 
+// Salle à Source Keepers : coordonnées 4 à 6 dans le secteur de 10 × 10, hors salle centrale (5, 5).
+function keeperRoom(name) {
+  const m = /^[WE](\d+)[NS](\d+)$/.exec(name);
+  if (!m) return false;
+  const x = m[1] % 10;
+  const y = m[2] % 10;
+  return x >= 4 && x <= 6 && y >= 4 && y <= 6 && !(x === 5 && y === 5);
+}
+
+// Statut de la salle (normal, novice, respawn, closed) ; undefined dans le simulateur.
+function status(name) {
+  return (Game.map.getRoomStatus(name) || {}).status;
+}
+
+// Vrai si un créep fragile (claimer, pioneer) ne doit pas traverser la salle : keepers, statut différent de `zone`
+// (zones séparées par des murs indestructibles), possédée par un autre joueur (tours) ou hostiles récents.
+function avoid(name, zone) {
+  const i = get(name);
+  return keeperRoom(name) || status(name) !== zone
+    || !!(i && i.owner && i.owner !== me()) || !!(i && Game.time - i.hostile < HOSTILE_COOLDOWN);
+}
+
+// Salles à traverser de `from` à `to` (format de Game.map.findRoute) sans passer par une salle à éviter (avoid),
+// ou null sans trajet sûr.
+function route(from, to) {
+  const zone = status(from);
+  const r = Game.map.findRoute(from, to, { routeCallback: (name) => (avoid(name, zone) ? Infinity : 1) });
+  return r === ERR_NO_PATH ? null : r;
+}
+
 // Vrai si la salle a un contrôleur libre (ni possédé, ni réservé par un autre) et pas d'hostiles récents.
 function safe(name) {
   const i = get(name);
@@ -55,4 +85,4 @@ function safe(name) {
     && Game.time - i.hostile > HOSTILE_COOLDOWN);
 }
 
-module.exports = { get, record, skip, safe, me, reservedByMe };
+module.exports = { get, record, skip, safe, me, reservedByMe, keeperRoom, route };

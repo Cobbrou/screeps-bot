@@ -5,7 +5,7 @@ const sources = require('./sources');
 const INTERVAL = 100;
 // Salle d'origine : assez développée pour payer claimer (650) et pioneers.
 const MIN_RCL = 4;
-// ponytail: distance à vol d'oiseau, sans vérifier le trajet réel (Game.map.findRoute si les claimers se perdent).
+// Distance en salles du trajet sûr (intel.route : ni keepers, ni salles hostiles, ni autre zone).
 const MAX_DISTANCE = 5;
 // Enfermement : le GCL permet une salle de plus, mais aucune cible n'est trouvée depuis ENCLOSED_AFTER ticks
 // (voisines prises ou dangereuses). On cherche alors jusqu'à ENCLOSED_DISTANCE salles, et `Memory.enclosed`
@@ -19,7 +19,8 @@ function ownedRooms() {
   return Object.values(Game.rooms).filter((r) => r.controller && r.controller.my);
 }
 
-// Meilleure salle explorée à revendiquer : le plus de sources, puis la plus proche d'une salle d'origine.
+// Meilleure salle explorée à revendiquer : le plus de sources, puis la plus proche d'une salle d'origine
+// par un trajet sûr (sans trajet sûr, claimer et pioneers seraient tués en route).
 function choose() {
   const owned = ownedRooms();
   if (owned.length >= Game.gcl.level) {
@@ -35,9 +36,12 @@ function choose() {
   for (const name in Memory.rooms) {
     if (!intel.safe(name) || !intel.get(name).sources) continue;
     for (const home of homes) {
-      const distance = Game.map.getRoomLinearDistance(home.name, name);
-      const score = intel.get(name).sources * 10 - distance;
-      if (distance <= maxDistance && score > bestScore) {
+      // Vol d'oiseau d'abord : findRoute seulement pour les salles assez proches.
+      if (Game.map.getRoomLinearDistance(home.name, name) > maxDistance) continue;
+      const path = intel.route(home.name, name);
+      if (!path || path.length > maxDistance) continue;
+      const score = intel.get(name).sources * 10 - path.length;
+      if (score > bestScore) {
         bestScore = score;
         best = { target: name, from: home.name, since: Game.time };
       }
@@ -113,10 +117,11 @@ module.exports.run = function () {
     if (Game.time % INTERVAL === 0) placeSpawn(room);
     return;
   }
-  // Prise ou réservée par un autre joueur, ou trop longue à atteindre : on change de cible.
+  // Prise ou réservée par un autre joueur, trop longue à atteindre, ou plus de trajet sûr : on change de cible.
   const c = room && room.controller;
   const taken = c && (c.owner || (c.reservation && c.reservation.username !== intel.me()));
-  if (taken || Game.time - exp.since > GIVE_UP) {
+  const unreachable = Game.time % INTERVAL === 0 && !intel.route(exp.from, exp.target);
+  if (taken || unreachable || Game.time - exp.since > GIVE_UP) {
     if (room) intel.record(room);
     delete Memory.expansion;
   }
