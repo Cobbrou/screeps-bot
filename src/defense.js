@@ -12,6 +12,9 @@ const MAX_DEFENDERS = 4;
 const CLAIMER_ALERT_RANGE = 5;
 // Ticks entre deux recherches de la structure à réparer : parcourir toute la salle (murs compris) coûte cher.
 const REPAIR_SCAN_INTERVAL = 10;
+// Rempart à ce nombre de PV ou moins : réparé avant tout le reste, sinon le decay le détruit (un rempart neuf
+// n'a que 1 PV) pendant que la tour fait la tournée des murs au même ratio.
+const RAMPART_DYING = 2 * RAMPART_DECAY_AMOUNT;
 
 // Structure à réparer par salle et tick de la dernière recherche, gardés jusqu'au reset du global.
 const repairCache = {};
@@ -32,7 +35,7 @@ function repairTarget(s) {
   return Math.min(s.hitsMax, WALL_HITS_PER_RCL * s.room.controller.level * factor);
 }
 
-// Structure la plus abîmée par rapport à sa cible (sous REPAIR_RATIO), ou null.
+// Structure la plus abîmée par rapport à sa cible (sous REPAIR_RATIO), ou null ; un rempart sous RAMPART_DYING d'abord.
 // Gardée jusqu'à réparation complète ; la salle n'est parcourue qu'une fois tous les REPAIR_SCAN_INTERVAL ticks.
 function damagedStructure(room) {
   const cached = repairCache[room.name];
@@ -44,7 +47,7 @@ function damagedStructure(room) {
   let damaged = null;
   let worst = REPAIR_RATIO;
   for (const s of room.find(FIND_STRUCTURES)) {
-    const ratio = s.hits / repairTarget(s);
+    const ratio = s.structureType === STRUCTURE_RAMPART && s.hits <= RAMPART_DYING ? -1 : s.hits / repairTarget(s);
     if (s.hitsMax && ratio < worst) {
       worst = ratio;
       damaged = s;
