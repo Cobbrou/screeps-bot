@@ -24,13 +24,16 @@ Consignes pour les agents IA qui travaillent sur ce dépôt.
 ## Sécurité
 
 - Ne jamais afficher, écrire, copier ni commiter `secrets.json` ou un token, même partiellement.
-- Ne jamais lancer `npm run deploy` ni `npm run watch` (qui déploie aussi) sans demande explicite de l'utilisateur.
-- Ne pas faire de commit git sans demande explicite.
+- Ne jamais lancer `npm run watch` (déploiement continu) sans demande explicite de l'utilisateur.
 - Commiter directement sur `main` : ne jamais créer de branche.
 
-## Vérification
+## Vérification, commit et déploiement
 
-Lancer `npm run build` après chaque modification et s'assurer qu'il passe sans erreur.
+Après chaque modification, sans attendre de demande :
+
+1. Lancer `npm run build` et s'assurer qu'il passe sans erreur. En cas d'échec : corriger, ne pas commiter.
+2. Commiter sur `main` les seuls fichiers modifiés pour la tâche (message au format Conventional Commits, en français).
+3. Si `src/` a changé : lancer `npm run deploy`, puis vérifier via l'API que le code déployé contient la modification.
 
 ## Maintenance de la documentation
 
