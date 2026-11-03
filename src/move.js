@@ -25,6 +25,17 @@ function intend(creep, dir) {
   intents[creep.name] = { creep, dir };
 }
 
+// Rend infranchissables les cases du bord (sorties) dans la matrice de coûts.
+function blockExits(costs) {
+  for (let i = 0; i < 50; i++) {
+    costs.set(i, 0, 255);
+    costs.set(i, 49, 255);
+    costs.set(0, i, 255);
+    costs.set(49, i, 255);
+  }
+  return costs;
+}
+
 // Remplace `creep.moveTo` : même signature et même code de retour.
 // Le chemin est calculé par `moveTo`, mais le pas est seulement noté : `run` l'exécute en fin de tick,
 // en poussant les créeps immobiles qui barrent la route.
@@ -50,6 +61,11 @@ function to(creep, target, opts = {}) {
     delete detours[creep.name];
   }
   const pos = target.pos || target;
+  // Cible dans la salle : cases de sortie interdites. Un pas dessus fait changer de salle (ex. : longer une ligne
+  // de murs collée au bord), où le créep peut se faire tuer.
+  if (pos.roomName === creep.pos.roomName) {
+    opts = Object.assign({ maxRooms: 1, costCallback: (roomName, costs) => blockExits(costs) }, opts);
+  }
   goals[creep.name] = { x: pos.x, y: pos.y, roomName: pos.roomName };
   // `moveTo` (et `moveByPath` qu'il appelle) finit toujours par `this.move(direction)` : on intercepte ce pas.
   creep.move = (dir) => {

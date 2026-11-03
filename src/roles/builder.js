@@ -55,7 +55,7 @@ function build(creep) {
   if (!site) return false;
   // Portée 3 : le créep peut construire en s'écartant de la source qu'il bloquerait.
   const result = creep.build(site);
-  if (result === ERR_NOT_IN_RANGE) move.to(creep, site);
+  if (result === ERR_NOT_IN_RANGE) move.to(creep, site, { range: 3 });
   else if (result === OK) sources.stepAway(creep);
   return true;
 }
