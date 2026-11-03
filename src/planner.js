@@ -252,6 +252,31 @@ function basePlan(room, spawn, costs) {
   return plan;
 }
 
+// Coins du spawn (diagonales) : extensions, pour fermer le damier autour de lui ; ses côtés restent des routes
+// de sortie. Ajoutés une fois au plan (plan.corners), juste après les extensions déjà permises par le RCL,
+// à la place des dernières prévues (les plus lointaines). Routes et chantiers qui y passaient sont retirés :
+// les chemins gardés deviennent bloqués et sont recalculés par les côtés.
+function planCorners(room, spawn, plan, costs) {
+  if (plan.corners) return;
+  plan.corners = true;
+  const terrain = room.getTerrain();
+  const used = new Set();
+  for (const type of [...PLANNED, ...EXTRA]) for (const k of plan[type] || []) used.add(k);
+  const corners = [[-1, -1], [1, -1], [-1, 1], [1, 1]]
+    .map(([dx, dy]) => new RoomPosition(spawn.pos.x + dx, spawn.pos.y + dy, room.name))
+    .filter((pos) => terrain.get(pos.x, pos.y) !== TERRAIN_MASK_WALL && !used.has(pos.x * 50 + pos.y)
+      && pos.lookFor(LOOK_STRUCTURES).every((s) => s.structureType === STRUCTURE_ROAD));
+  const ext = plan[STRUCTURE_EXTENSION];
+  const allowed = CONTROLLER_STRUCTURES[STRUCTURE_EXTENSION][room.controller.level];
+  ext.splice(Math.min(ext.length, allowed), 0, ...corners.map((pos) => pos.x * 50 + pos.y));
+  ext.length = Math.min(ext.length, CONTROLLER_STRUCTURES[STRUCTURE_EXTENSION][8]);
+  for (const pos of corners) {
+    costs.set(pos.x, pos.y, 255);
+    for (const s of pos.lookFor(LOOK_STRUCTURES)) s.destroy();
+    for (const s of pos.lookFor(LOOK_CONSTRUCTION_SITES)) if (s.my) s.remove();
+  }
+}
+
 // Cases des liens, ajoutées une fois au plan (room.memory.plan.link) quand le stockage du hub et les routes
 // des sources sont connus. D'abord le lien du hub : case libre à portée 2 du stockage qui touche le plus de postes
 // d'upgraders (voisins du stockage, à portée 3 du contrôleur). Puis un lien par source, de la route la plus longue
@@ -542,6 +567,7 @@ module.exports.run = function () {
     if (room.memory.plan && !('hub' in room.memory.plan)) delete room.memory.plan;
     const costs = costMatrix(room);
     const plan = basePlan(room, spawn, costs);
+    planCorners(room, spawn, plan, costs);
     // Dans l'ordre de priority : les places libres vont d'abord aux structures prioritaires.
     const types = PLANNED.slice().sort((a, b) => priority(room, a) - priority(room, b));
     for (const type of types) buildPlan(room, plan, type);
