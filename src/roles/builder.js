@@ -45,7 +45,12 @@ function repair(creep, ratio) {
 function build(creep) {
   // Recalculé à chaque tick (3 chantiers actifs au plus, sans calcul de chemin) : un chantier
   // plus prioritaire apparu entre-temps remplace la cible en cours. siteId sert à wait.
-  const site = target(creep.room, creep.room.find(FIND_MY_CONSTRUCTION_SITES));
+  // Un créep (y compris le builder lui-même) sur le chantier d'une structure bloquante (mur...) empêche de la construire
+  // (ERR_INVALID_TARGET) : chantier ignoré tant que la case est occupée, sinon le builder s'y bloquerait indéfiniment.
+  const sites = creep.room.find(FIND_MY_CONSTRUCTION_SITES, {
+    filter: (s) => !OBSTACLE_OBJECT_TYPES.includes(s.structureType) || !s.pos.lookFor(LOOK_CREEPS).length,
+  });
+  const site = target(creep.room, sites);
   creep.memory.siteId = site ? site.id : undefined;
   if (!site) return false;
   // Portée 3 : le créep peut construire en s'écartant de la source qu'il bloquerait.
