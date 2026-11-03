@@ -1,5 +1,7 @@
 // Parties qui rendent un créep hostile dangereux (les éclaireurs ne déclenchent rien).
 const DANGEROUS = [ATTACK, RANGED_ATTACK, WORK, HEAL, CLAIM];
+// Joueurs amis : leurs créeps ne sont jamais des menaces, et nos créeps n'entrent pas dans leurs salles (voir intel).
+const FRIENDS = ['vKDeath'];
 // ponytail: plafond fixe des murs et remparts, à ajuster selon le budget énergie de la salle.
 const WALL_HITS_PER_RCL = 10000;
 // Salle enfermée (`Memory.enclosed`, voir expansion) : murs et remparts plus solides, voisins hostiles.
@@ -21,10 +23,10 @@ const repairCache = {};
 // Cible commune des tours et des défenseurs, par salle, recalculée à chaque tick.
 const targetCache = {};
 
-// Hostiles dangereux présents dans la salle.
+// Hostiles dangereux présents dans la salle (hors amis).
 function threats(room) {
   return room.find(FIND_HOSTILE_CREEPS, {
-    filter: (c) => c.body.some((p) => DANGEROUS.includes(p.type)),
+    filter: (c) => !FRIENDS.includes(c.owner.username) && c.body.some((p) => DANGEROUS.includes(p.type)),
   });
 }
 
@@ -179,5 +181,6 @@ module.exports.run = function () {
 };
 
 module.exports.threats = threats;
+module.exports.FRIENDS = FRIENDS;
 module.exports.target = target;
 module.exports.defenders = defenders;

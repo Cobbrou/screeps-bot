@@ -38,6 +38,13 @@ function me() {
   return spawn && spawn.owner.username;
 }
 
+// Vrai si la salle est possédée ou réservée par un ami (defense.FRIENDS) d'après le dernier renseignement :
+// aucun de nos créeps n'y va, pas même l'éclaireur.
+function friendly(name) {
+  const i = get(name);
+  return !!(i && (defense.FRIENDS.includes(i.owner) || defense.FRIENDS.includes(i.reserved)));
+}
+
 // Vrai si nous réservons la salle : contrôleur visible, sinon dernier renseignement.
 function reservedByMe(name) {
   const room = Game.rooms[name];
@@ -61,10 +68,10 @@ function status(name) {
 }
 
 // Vrai si un créep fragile (claimer, pioneer) ne doit pas traverser la salle : keepers, statut différent de `zone`
-// (zones séparées par des murs indestructibles), possédée par un autre joueur (tours) ou hostiles récents.
+// (zones séparées par des murs indestructibles), possédée par un autre joueur (tours), réservée par un ami ou hostiles récents.
 function avoid(name, zone) {
   const i = get(name);
-  return keeperRoom(name) || status(name) !== zone
+  return keeperRoom(name) || status(name) !== zone || friendly(name)
     || !!(i && i.owner && i.owner !== me()) || !!(i && Game.time - i.hostile < HOSTILE_COOLDOWN);
 }
 
@@ -85,4 +92,4 @@ function safe(name) {
     && Game.time - i.hostile > HOSTILE_COOLDOWN);
 }
 
-module.exports = { get, record, skip, safe, me, reservedByMe, keeperRoom, route };
+module.exports = { get, record, skip, safe, me, reservedByMe, keeperRoom, friendly, route };
