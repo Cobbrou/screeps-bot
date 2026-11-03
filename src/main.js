@@ -13,6 +13,7 @@ const roles = {
   builder: require('./roles/builder'),
   miner: require('./roles/miner'),
   hauler: require('./roles/hauler'),
+  filler: require('./roles/filler'),
   defender: require('./roles/defender'),
   scout: require('./roles/scout'),
   claimer: require('./roles/claimer'),

@@ -21,7 +21,7 @@ const ENCLOSED_STORED_PER_ENERGY = STORED_PER_ENERGY / 2;
 const UPGRADE_SPEND = UPGRADE_CONTROLLER_POWER + (BODYPART_COST[WORK] + BODYPART_COST[MOVE] / 2) / CREEP_LIFE_TIME;
 const BUILD_SPEND = 4 + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPART_COST[MOVE]) / CREEP_LIFE_TIME;
 // Rôles dont l'entretien est déduit du revenu : ceux qui récoltent et transportent.
-const ECONOMY_ROLES = ['miner', 'hauler', 'remoteMiner', 'remoteHauler', 'reserver'];
+const ECONOMY_ROLES = ['miner', 'hauler', 'filler', 'remoteMiner', 'remoteHauler', 'reserver'];
 // Renseignements sur une salle voisine jugés périmés après ce nombre de ticks : un éclaireur va les rafraîchir.
 const SCOUT_REFRESH = 5000;
 // Garde-fou de rétrogradation : priorité à l'amélioration sous DOWNGRADE_LOW de CONTROLLER_DOWNGRADE,
@@ -181,6 +181,8 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     // Rétrogradation proche : les upgraders passent avant l'économie (une clé déjà posée garde sa place).
     // ponytail: tous les upgraders voulus passent en tête, pas seulement le premier ; l'urgence harvester couvre la famine.
     ...(urgent ? { upgrader } : {}),
+    // Sources toutes liées (aucun hauler voulu) : un filler remplit spawn, extensions et tours depuis le stockage.
+    filler: room.storage && !need ? 1 : 0,
     // Un hauler de plus tant que la capacité des haulers vivants reste sous le besoin, ou qu'un conteneur
     // de source s'engorge (trajets plus lents ou plus longs que prévu : fatigue hors route, livraisons au contrôleur),
     // dans la limite de HAUL_BACKLOG_RATIO fois le besoin.
@@ -249,7 +251,7 @@ function buildBody(role, energy, room, sourceId, target) {
     }
     return [...Array(work).fill(WORK), ...carry, ...Array(moves).fill(MOVE)];
   }
-  if (role === 'hauler') {
+  if (role === 'hauler' || role === 'filler') {
     return room && haulerRatio(room) === 2 ? repeat([CARRY, CARRY, MOVE], energy, [[CARRY, MOVE]]) : repeat([CARRY, MOVE], energy);
   }
   // Rôles distants, hors route : un MOVE par partie, une case par tick (chargé pour le transporteur).
@@ -329,9 +331,10 @@ module.exports.run = function () {
     // Trajet noté à l'arrivée par les mineurs et l'upgrader ; les transporteurs n'ont pas de poste fixe,
     // seule la durée de spawn compte.
     const remoteRole = creep.memory.role === 'remoteMiner' || creep.memory.role === 'remoteHauler';
-    const lead = creep.memory.role === 'hauler' || creep.memory.role === 'remoteHauler' ? 0 : creep.memory.travel;
+    const lead = ['hauler', 'remoteHauler', 'filler'].includes(creep.memory.role) ? 0 : creep.memory.travel;
     const dying = lead !== undefined && creep.ticksToLive <= lead + creep.body.length * CREEP_SPAWN_TIME;
-    if (!(dying && creep.memory.role === 'upgrader')) {
+    // Upgrader et filler en fin de vie ne comptent plus : leur successeur prend la relève sans trou.
+    if (!(dying && (creep.memory.role === 'upgrader' || creep.memory.role === 'filler'))) {
       counts[room][creep.memory.role] = (counts[room][creep.memory.role] || 0) + 1;
     }
     if (creep.memory.role === 'miner') addMiner(creep.memory.sourceId, creep.body, dying);
@@ -350,9 +353,10 @@ module.exports.run = function () {
     const room = spawn.room;
     const roomCounts = counts[room.name] = counts[room.name] || {};
 
-    // Personne pour remplir spawn et extensions (ou haulers sans mineur pour les alimenter) :
+    // Personne pour remplir spawn et extensions (ou haulers sans mineur pour les alimenter, filler sans stock) :
     // récolteur avec l'énergie disponible.
-    const emergency = !roomCounts.harvester && (!roomCounts.hauler || !roomCounts.miner);
+    const fed = roomCounts.filler && room.storage && room.storage.store[RESOURCE_ENERGY] > 0;
+    const emergency = !roomCounts.harvester && !fed && (!roomCounts.hauler || !roomCounts.miner);
     const remoteNeed = remoteMining.missing(room, remote, reservers);
     const net = netIncome(room, miners, carry[room.name], remote, upkeep[room.name]);
     const wanted = targets(room, roomCounts, miners, carry[room.name], remoteNeed, net, work[room.name] || {});
@@ -377,7 +381,7 @@ module.exports.run = function () {
     }
     // Premier mineur ou premier hauler de la salle : créé avec l'énergie disponible au lieu d'attendre la capacité
     // pleine, la récolte démarre plus tôt. Au moins l'énergie que le spawn régénère seul (300) : pas de corps minuscule.
-    const startup = (role === 'miner' || role === 'hauler') && !roomCounts[role];
+    const startup = ['miner', 'hauler', 'filler'].includes(role) && !roomCounts[role];
     let energy = emergency ? room.energyAvailable
       : startup ? Math.min(room.energyCapacityAvailable, Math.max(SPAWN_ENERGY_CAPACITY, room.energyAvailable))
         : room.energyCapacityAvailable;
@@ -389,6 +393,12 @@ module.exports.run = function () {
       const share = needs.reduce((sum, n) => sum + n, 0) / Math.max(1, needs.length);
       const ratio = haulerRatio(room);
       const units = Math.max(1, Math.ceil(share / (ratio * CARRY_CAPACITY)));
+      energy = Math.min(energy, units * (ratio * BODYPART_COST[CARRY] + BODYPART_COST[MOVE]));
+    }
+    // Filler : de quoi remplir la moitié de la capacité de la salle par trajet.
+    if (role === 'filler') {
+      const ratio = haulerRatio(room);
+      const units = Math.ceil(room.energyCapacityAvailable / 2 / (ratio * CARRY_CAPACITY));
       energy = Math.min(energy, units * (ratio * BODYPART_COST[CARRY] + BODYPART_COST[MOVE]));
     }
     const body = buildBody(role, energy, room, memory.sourceId, memory.target);

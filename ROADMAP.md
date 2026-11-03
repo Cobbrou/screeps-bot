@@ -129,7 +129,7 @@ Priorité immédiate, d'après l'[analyse de E25S3](docs/e25s3-analysis.md) : l'
 - [ ] Planner : terminal, extracteur et son conteneur, labs (RCL 6) ajoutés au plan
 - [x] Liens (`STRUCTURE_LINK`) : plan `room.memory.plan.link` (hub à portée 2 du stockage puis sources, route la plus longue d'abord) ; mineur à 1 `CARRY` qui remplit le lien de sa source, envoi au lien du hub par 400 au moins, upgraders qui y puisent avant le stockage ; lien plein : la récolte déborde dans le conteneur
 - [x] Haulers dimensionnés sans les sources liées (besoin nul tant que les upgraders ne sont pas en pause), corps à la part d'une source non liée
-- [ ] Remplacement des `harvester` par un `filler` dédié au spawn et aux extensions depuis le stockage
+- [x] `filler` dédié au spawn, aux extensions et aux tours depuis le stockage, quand les sources sont toutes liées (plus de hauler voulu) : sinon le dernier hauler mort déclenchait l'urgence `harvester`
 - [ ] Nombre d'`upgrader` et taille des corps selon l'énergie stockée
 - [ ] Extracteur et mineur de minerai (RCL 6)
 - [ ] Terminal (RCL 6) : équilibrage de l'énergie entre nos salles
