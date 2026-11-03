@@ -34,6 +34,9 @@ const HAUL_BACKLOG = CONTAINER_CAPACITY / 2;
 // Plafond de ce renfort : capacité des haulers au plus HAUL_BACKLOG_RATIO fois le besoin estimé. Sans lui, quand
 // spawn et extensions sont pleins, les haulers restent pleins, les conteneurs s'engorgent et les renforts s'enchaînent.
 const HAUL_BACKLOG_RATIO = 3;
+// Marge sur le besoin d'une source pour la taille d'un hauler : haulCapacity ne compte que le chemin du planner,
+// pas les livraisons au contrôleur, aux tours et aux extensions éloignées, ni les ticks de ramassage et de livraison.
+const HAUL_SHARE_MARGIN = 1.5;
 // Ticks entre deux relevés du terrain et des routes sur le chemin d'une source.
 const ROUTE_SCAN_INTERVAL = 100;
 
@@ -386,12 +389,12 @@ module.exports.run = function () {
     let energy = emergency ? room.energyAvailable
       : startup ? Math.min(room.energyCapacityAvailable, Math.max(SPAWN_ENERGY_CAPACITY, room.energyAvailable))
         : room.energyCapacityAvailable;
-    // Hauler plafonné à sa part du besoin (une source chacun) : à la capacité pleine de la salle, il porte plusieurs
-    // fois la production et paie son entretien pour rien. Le renfort HAUL_BACKLOG couvre les écarts.
+    // Hauler plafonné au besoin de la source la plus exigeante, avec la marge HAUL_SHARE_MARGIN : à la capacité
+    // pleine de la salle, il porte plusieurs fois la production et paie son entretien pour rien. Le renfort
+    // HAUL_BACKLOG couvre les écarts. Les sources liées (besoin nul) ne comptent pas.
     if (role === 'hauler' && !emergency) {
-      // Part d'une source à transporter : les sources liées (besoin nul) ne comptent pas.
-      const needs = sources.list(room).map((s) => haulCapacity(room, s, (miners[s.id] || {}).work)).filter((n) => n > 0);
-      const share = needs.reduce((sum, n) => sum + n, 0) / Math.max(1, needs.length);
+      const share = HAUL_SHARE_MARGIN
+        * Math.max(0, ...sources.list(room).map((s) => haulCapacity(room, s, (miners[s.id] || {}).work)));
       const ratio = haulerRatio(room);
       const units = Math.max(1, Math.ceil(share / (ratio * CARRY_CAPACITY)));
       energy = Math.min(energy, units * (ratio * BODYPART_COST[CARRY] + BODYPART_COST[MOVE]));
