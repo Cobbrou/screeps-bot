@@ -116,7 +116,7 @@ Priorité immédiate, d'après l'[analyse de E25S3](docs/e25s3-analysis.md) : l'
 - [x] Enfermement (`Memory.enclosed`) : plus de doublement des murs, seul le bonus d'amélioration reste
 - [x] Corps des haulers plafonné à leur part du besoin (une source chacun) au lieu de la capacité pleine de la salle
 - [x] `LOW_BUCKET` à 500 : la génération de pixels ne fait plus sauter planner et expansion
-- [ ] Vérifier en console `Game.map.getRoomStatus('E26S3')` : si `normal`, `intel.avoid` ne distingue pas la zone de respawn et un claimer repartira vers E27S3
+- [x] Statut des zones vérifié en console : E25S3 et E27S3 en `respawn`, E26S3 en `normal` (évitée). Le seul trajet en `respawn` vers E27S3 passe par E25S4 et E26S4 (keepers, évitées) : `intel.route` ne trouve rien, aucun claimer n'y part
 - [ ] Surveiller le trajet noté par les mineurs (`travel: 213` pour 14 cases) : successeur lancé trop tôt
 - [ ] RCL 5 : remparts sur le spawn, la tour et le stockage ; liens source lointaine → stockage (voir phase 7)
 
