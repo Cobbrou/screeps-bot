@@ -90,6 +90,9 @@ function needsMiner(source, miners) {
 // ponytail: chemin de la route du planner, alors que les haulers livrent aussi aux tours et au contrôleur.
 function haulCapacity(room, source, work) {
   if (!work) return 0;
+  // Source liée (son lien et celui du hub construits) : l'énergie part au hub par le lien, sans hauler.
+  // Sauf upgraders en pause : le lien reste plein et la récolte déborde dans le conteneur.
+  if (sources.sourceLink(source) && sources.hubLink(room) && !upgraders.paused(room)) return 0;
   const rate = Math.min(work, MAX_MINER_WORK) * HARVEST_POWER;
   const scan = routeTerrain(room, source.id);
   // Sans route connue : la capacité d'un hauler neuf.
@@ -381,8 +384,9 @@ module.exports.run = function () {
     // Hauler plafonné à sa part du besoin (une source chacun) : à la capacité pleine de la salle, il porte plusieurs
     // fois la production et paie son entretien pour rien. Le renfort HAUL_BACKLOG couvre les écarts.
     if (role === 'hauler' && !emergency) {
-      const list = sources.list(room);
-      const share = list.reduce((sum, s) => sum + haulCapacity(room, s, (miners[s.id] || {}).work), 0) / list.length;
+      // Part d'une source à transporter : les sources liées (besoin nul) ne comptent pas.
+      const needs = sources.list(room).map((s) => haulCapacity(room, s, (miners[s.id] || {}).work)).filter((n) => n > 0);
+      const share = needs.reduce((sum, n) => sum + n, 0) / Math.max(1, needs.length);
       const ratio = haulerRatio(room);
       const units = Math.max(1, Math.ceil(share / (ratio * CARRY_CAPACITY)));
       energy = Math.min(energy, units * (ratio * BODYPART_COST[CARRY] + BODYPART_COST[MOVE]));
