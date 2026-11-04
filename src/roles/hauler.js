@@ -75,7 +75,8 @@ function pickupTarget(creep) {
   const roomSources = sources.list(room);
   const dropped = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
     filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50
-      && !(controller && r.pos.inRangeTo(controller, 3)) && !roomSources.some((s) => r.pos.inRangeTo(s, 1)),
+      && !(controller && r.pos.inRangeTo(controller, 3)) && !roomSources.some((s) => r.pos.inRangeTo(s, 1))
+      && move.reachable(creep, r),
   });
   if (dropped) return dropped;
 
@@ -83,7 +84,7 @@ function pickupTarget(creep) {
   if (target && target.store[RESOURCE_ENERGY]) return target;
   delete creep.memory.pickupId;
   if (!creep.memory.haul) {
-    const remains = [...room.find(FIND_TOMBSTONES), ...room.find(FIND_RUINS)].filter((o) => o.store[RESOURCE_ENERGY] > 0);
+    const remains = [...room.find(FIND_TOMBSTONES), ...room.find(FIND_RUINS)].filter((o) => o.store[RESOURCE_ENERGY] > 0 && move.reachable(creep, o));
     target = creep.pos.findClosestByRange(remains);
     if (target) {
       creep.memory.pickupId = target.id;

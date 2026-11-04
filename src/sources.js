@@ -320,7 +320,7 @@ function collect(creep) {
   const controller = creep.room.controller;
   const pile = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
     filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50
-      && !(controller && r.pos.inRangeTo(controller, 3)),
+      && !(controller && r.pos.inRangeTo(controller, 3)) && move.reachable(creep, r),
   });
   if (pile) {
     if (creep.pickup(pile) === ERR_NOT_IN_RANGE) move.to(creep, pile);

@@ -7,7 +7,7 @@ const isRoad = (s) => s.structureType === STRUCTURE_ROAD;
 // Énergie prise sur place : tas au sol, puis conteneur de source, sinon récolte de la source active la plus proche.
 function refuel(creep) {
   const pile = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
-    filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50,
+    filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50 && move.reachable(creep, r),
   });
   if (pile) {
     if (creep.pickup(pile) === ERR_NOT_IN_RANGE) move.to(creep, pile);

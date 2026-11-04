@@ -103,6 +103,22 @@ function travel(creep, roomName) {
   return true;
 }
 
+// Accessibilité de chaque objet au sol (tas, tombe, ruine), par id, gardée jusqu'au reset du global : le chemin
+// n'est calculé qu'une fois par objet. Ces objets vivent peu, le cache n'a pas à suivre les murs qui changent.
+const reach = {};
+
+// Vrai si un chemin mène à côté de la cible dans la salle. Une cible enfermée (poche derrière les murs de la zone
+// de respawn, où un envahisseur est mort) retiendrait sinon le créep contre le mur tant qu'elle existe.
+function reachable(creep, target) {
+  if (reach[target.id] === undefined) {
+    const path = creep.pos.findPathTo(target.pos, { ignoreCreeps: true, range: 1, maxRooms: 1, maxOps: ROAD_COSTS.maxOps,
+      costCallback: (roomName, costs) => blockExits(costs) });
+    const end = path.length ? path[path.length - 1] : creep.pos;
+    reach[target.id] = target.pos.inRangeTo(end.x, end.y, 1);
+  }
+  return reach[target.id];
+}
+
 // Pas d'une case dans une direction, à la place de `creep.move`.
 function step(creep, dir) {
   intend(creep, dir);
@@ -186,4 +202,4 @@ function forget(name) {
   delete hops[name];
 }
 
-module.exports = { to, step, travel, run, forget };
+module.exports = { to, step, travel, reachable, run, forget };
