@@ -2,6 +2,9 @@ const intel = require('./intel');
 
 // Ticks consécutifs sans bouger (hors fatigue) avant de recalculer le chemin en contournant les créeps.
 const STUCK_TICKS = 2;
+// Pareil pour un créep des rôles routiers posé sur une route : la voie est unique et le marais coûte jusqu'à 10 ticks
+// par case à un créep chargé. Il attend son tour dans la file ; ce délai ne sert qu'à sortir d'un vrai blocage.
+const ROAD_STUCK_TICKS = 25;
 // Ticks pendant lesquels un chemin calculé est réutilisé (5 par défaut dans `moveTo`) : moins de pathfinding.
 const REUSE_PATH = 20;
 // Ticks pendant lesquels le chemin de contournement est suivi : au-delà, on revient au chemin normal (routes).
@@ -31,6 +34,11 @@ function intend(creep, dir) {
   intents[creep.name] = { creep, dir };
 }
 
+const onRoad = (room, x, y) => room.lookForAt(LOOK_STRUCTURES, x, y).some((s) => s.structureType === STRUCTURE_ROAD);
+
+// Vrai si le créep doit rester sur la route où il se trouve. Sans route sous lui (salle pas encore équipée), il circule librement.
+const roadBound = (creep) => ROAD_ROLES.has(creep.memory.role) && onRoad(creep.room, creep.pos.x, creep.pos.y);
+
 // Rend infranchissables les cases du bord (sorties) dans la matrice de coûts.
 function blockExits(costs) {
   for (let i = 0; i < 50; i++) {
@@ -57,7 +65,7 @@ function to(creep, target, opts = {}) {
   const stuck = last && last.pos === here && last.time === Game.time - 1 && creep.fatigue === 0
     ? last.n + 1 : 0;
   lastSeen[creep.name] = { pos: here, time: Game.time, n: stuck };
-  if (stuck >= STUCK_TICKS) {
+  if (stuck >= STUCK_TICKS && (stuck >= ROAD_STUCK_TICKS || !roadBound(creep))) {
     // Oublie le chemin en cache, qui traverse le créep gênant.
     delete creep.memory._move;
     opts = Object.assign({}, opts, { ignoreCreeps: false });
@@ -146,6 +154,7 @@ function free(room, p, at, dests) {
 
 // Pousse un créep immobile hors de la case `from` voulue par un autre : d'abord en échangeant leurs places,
 // sinon vers une case libre voisine, sans jamais s'éloigner de sa zone de travail (`goals`).
+// Un créep des rôles routiers posé sur une route n'en est pas poussé : seul un échange peut le déplacer.
 // Un créep fixe (mineur sur son conteneur) ne bouge donc pas. Vrai si un pas a été donné.
 function push(creep, swap, at, dests) {
   if (creep.fatigue > 0 || !creep.getActiveBodyparts(MOVE)) return false;
@@ -158,9 +167,10 @@ function push(creep, swap, at, dests) {
     creep.move(swapDir);
     return true;
   }
+  const keepRoad = roadBound(creep);
   for (let dir = 1; dir <= 8; dir++) {
     const p = offset(creep.pos, dir);
-    if (near(p) && free(creep.room, p, at, dests)) {
+    if (near(p) && free(creep.room, p, at, dests) && (!keepRoad || onRoad(creep.room, p.x, p.y))) {
       creep.move(dir);
       dests.add(key(p.roomName, p.x, p.y));
       return true;
