@@ -343,4 +343,13 @@ function collect(creep) {
   if (creep.withdraw(store, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, store);
 }
 
-module.exports = { list, spots, container, waitSpot, depot, depotPile, hubLink, sourceLink, harvest, harvestSource, collect, goBack, stepAway, forget };
+// Où puiser au pied d'une source : le tas (il se perd), sauf s'il rapporte moins que le conteneur. Conteneur plein,
+// la récolte déborde au sol : ce tas de quelques points, repris tick après tick, remplirait le créep à 10/tick,
+// alors qu'un retrait le remplit d'un coup. Undefined s'il n'y a rien à prendre.
+function pickFrom(pile, box, free) {
+  const inBox = box ? box.store[RESOURCE_ENERGY] : 0;
+  if (pile && pile.amount >= Math.min(free, inBox)) return pile;
+  return inBox ? box : undefined;
+}
+
+module.exports = { list, spots, container, waitSpot, depot, depotPile, hubLink, sourceLink, harvest, harvestSource, collect, goBack, stepAway, forget, pickFrom };

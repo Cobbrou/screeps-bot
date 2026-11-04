@@ -65,7 +65,7 @@ function dispatch(creep) {
 }
 
 // Où prendre l'énergie : tas hors des sources, pierre tombale ou ruine (en début de trajet), sinon la source
-// attribuée pour le trajet (`creep.memory.haul`, choisie par dispatch) : son tas, puis son conteneur.
+// attribuée pour le trajet (`creep.memory.haul`, choisie par dispatch) : son tas ou son conteneur (sources.pickFrom).
 // Le stockage remplace une source trop maigre quand spawn ou extensions attendent.
 // Retourne l'objet où puiser, ou { wait, range } : où attendre que la source produise.
 // L'énergie posée près du contrôleur (par les remoteHauler) est laissée aux upgraders et aux builders.
@@ -106,10 +106,9 @@ function pickupTarget(creep) {
     creep.memory.pickupId = storage.id;
     return storage;
   }
-  const pile = pileAt(source);
-  if (pile) return pile;
   const box = sources.container(source);
-  if (box && box.store[RESOURCE_ENERGY]) return box;
+  const from = sources.pickFrom(pileAt(source), box, free);
+  if (from) return from;
   // À portée 2 de la source sans conteneur : les cases voisines restent aux mineurs.
   return { wait: box || source, range: box ? 1 : 2 };
 }
