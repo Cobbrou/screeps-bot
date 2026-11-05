@@ -597,12 +597,13 @@ module.exports.run = function () {
     // Liens (RCL 5), une fois les routes connues : ils passent avant les routes dans les places libres.
     planLinks(room, plan, costs);
     if (plan.link) buildPlan(room, plan, STRUCTURE_LINK);
-    // Terminal, extracteur et labs (RCL 6), puis le conteneur du minerai au bout de son chemin, avec l'extracteur.
+    // Terminal, extracteur, labs et conteneur du minerai : cases réservées au plan, mais rien n'est posé tant qu'aucun
+    // code ne les utilise (275 000 d'énergie au RCL 6, et leurs chantiers bloquent les nouveaux upgraders).
+    // ponytail: à réactiver type par type avec buildPlan, et wanted à true pour le conteneur, quand leur code existe.
     // ponytail: pas de route jusqu'au minerai (mineur peu fréquent) ; à poser si son transport coûte trop.
     planExtras(room, plan, costs);
-    for (const type of [STRUCTURE_TERMINAL, STRUCTURE_EXTRACTOR, STRUCTURE_LAB]) buildPlan(room, plan, type);
     const mineral = room.find(FIND_MINERALS)[0];
-    if (mineral) planRoute(room, spawn, mineral, 1, costs, CONTROLLER_STRUCTURES[STRUCTURE_EXTRACTOR][room.controller.level] > 0);
+    if (mineral) planRoute(room, spawn, mineral, 1, costs, false);
     // Routes après tous les conteneurs : elles passent en dernier dans les places libres.
     for (const path of paths) if (path) planRoad(room, path, roads);
     // Routes de service des extensions et tours, après les routes principales.
