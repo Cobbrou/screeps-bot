@@ -185,8 +185,9 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     // ponytail: tous les upgraders voulus passent en tête, pas seulement le premier ; l'urgence harvester couvre la famine.
     ...(urgent ? { upgrader } : {}),
     // Sources toutes liées (aucun hauler voulu) : un filler remplit spawn, extensions et tours depuis le stockage.
-    // Lien du hub exigé : sans lui, un besoin nul veut dire « pas de mineur actif », et c'est le mineur qui doit passer.
-    filler: room.storage && sources.hubLink(room) && !need ? 1 : 0,
+    // Lien du hub et de chaque source exigés : sinon un besoin nul veut dire « pas de mineur actif » (mineur en fin de vie
+    // sur une source sans lien), et c'est le mineur qui doit passer, pas 81 ticks de spawn de filler.
+    filler: room.storage && sources.hubLink(room) && !need && list.every((s) => sources.sourceLink(s)) ? 1 : 0,
     // Un hauler de plus tant que la capacité des haulers vivants reste sous le besoin, ou qu'un conteneur
     // de source s'engorge (trajets plus lents ou plus longs que prévu : fatigue hors route, livraisons au contrôleur),
     // dans la limite de HAUL_BACKLOG_RATIO fois le besoin.
