@@ -9,6 +9,8 @@ const RESERVED_RATE = SOURCE_ENERGY_CAPACITY / ENERGY_REGEN_TIME;
 // RCL minimal : au RCL 1, la salle n'a que son spawn et ses propres sources occupent le temps de spawn.
 const MIN_RCL = 2;
 const MAX_ROOMS = 2;
+// Capacité sous laquelle aucun défenseur distant n'est créé : 4 RANGED_ATTACK, un corps plus petit se ferait tuer pour rien.
+const MIN_DEFENSE_ENERGY = 800;
 // Corps du reserver : 2 CLAIM, la réservation gagne 2 ticks par tick et en perd 1.
 const RESERVER_UNIT = [CLAIM, MOVE];
 const RESERVER_UNITS = 2;
@@ -141,6 +143,12 @@ function safe(creep) {
   return intel.safe(creep.memory.target);
 }
 
+// Salle voisine à défendre contre des Invaders (intel.invaded), ou undefined.
+function invaded(room) {
+  if (room.controller.level < MIN_RCL || room.energyCapacityAvailable < MIN_DEFENSE_ENERGY) return undefined;
+  return Object.values(Game.map.describeExits(room.name) || {}).find((name) => intel.invaded(name));
+}
+
 // Ramène le créep dans sa salle, où il attend que la salle visée redevienne sûre.
 function retreat(creep) {
   if (creep.room.name !== creep.memory.room) {
@@ -247,7 +255,7 @@ function roadWork(room) {
 }
 
 module.exports = {
-  RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, minerWork, container, missing, income, safe, retreat,
+  RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, minerWork, container, missing, income, safe, invaded, retreat,
   roads, paved, roadWork, roadCells,
 };
 

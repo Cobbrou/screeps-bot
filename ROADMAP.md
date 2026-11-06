@@ -125,7 +125,7 @@ Priorité immédiate, d'après l'[analyse de E25S3](docs/e25s3-analysis.md) : l'
 
 - [x] Plan de base : spawns suivants à côté du stockage (lien du hub déjà à portée 2)
 - [ ] `filler` : lien près du premier spawn (RCL 7, 4e lien) pour raccourcir ses trajets. Filler fixe au stockage écarté : le stockage est au hub du contrôleur, à 16 cases du spawn sur E25S3, hors de portée des extensions
-- [ ] Créeps sur chemins pré-calculés et mis en cache dans la salle : moins de pathfinding
+- [ ] Créeps sur chemins pré-calculés et mis en cache dans la salle : moins de pathfinding (pas urgent : 3 CPU sur 20 au 2026-11-06)
 
 - [x] Planner : terminal (portée 2 à 4 du stockage), extracteur et conteneur du minerai au bout de son chemin, 10 labs en bloc 4 × 4 (labs d'entrée au centre, diagonale libre) ajoutés au plan (RCL 6), cases réservées sans rien poser tant que leur code n'existe pas (extracteur et conteneur du minerai posés depuis)
 - [x] Liens (`STRUCTURE_LINK`) : plan `room.memory.plan.link` (hub à portée 2 du stockage puis sources, route la plus longue d'abord, sauf la source la plus proche du spawn) ; mineur à 1 `CARRY` qui remplit le lien de sa source, envoi au lien du hub par 400 au moins, upgraders qui y puisent avant le stockage ; lien plein : la récolte déborde dans le conteneur
@@ -142,11 +142,14 @@ Priorité immédiate, d'après l'[analyse de E25S3](docs/e25s3-analysis.md) : l'
 - [ ] Achat d'énergie ou de minerais manquants quand les crédits le permettent
 - [ ] Laboratoires : réactions de base
 
+En attente du marché : relevé du 2026-11-06 sur shard0, ordres réels (les prix moyens sur 14 jours sont trompeurs, énergie à 10 de moyenne). Énergie vendue à 3 000 au moins, soit aucun achat possible. H acheté à ~550, GH à 225 et KH à 67 : un produit de nos labs rapporterait moins que H brut. À revoir si ces ordres changent, ou pour les boosts.
+
 ## Phase 9 : défense et attaque avancées (RCL 7+)
 
 - [x] Planner : 2e spawn (RCL 7), factory, observer, puis 3e spawn, power spawn et nuker (RCL 8) ajoutés au plan (cases réservées près du stockage ; seuls les spawns sont posés)
 - [ ] Remparts par coupe minimale (min-cut) autour de la base au lieu de la ceinture aux sorties, une fois le plan gardé
-- [ ] Défense des salles de remote mining (créeps distants, tours de garde)
+- [x] Défense des salles de remote mining : `remoteDefender` contre les Invaders, salle rendue aux mineurs dès qu'elle est vide (actif quand la récolte distante reprendra : zone de respawn de E25S3 jusqu'au 2026-12-01)
+- [ ] Cœurs d'Invader dans les salles distantes
 - [ ] Boosts des défenseurs depuis les laboratoires
 - [ ] Escouades d'attaque (soin + attaque) contre les salles hostiles voisines
 

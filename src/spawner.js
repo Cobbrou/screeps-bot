@@ -205,6 +205,8 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
           && list.some((s) => { const box = sources.container(s); return box && box.store[RESOURCE_ENERGY] > HAUL_BACKLOG; }))
         ? 1 : 0),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
+    // Après la récolte locale : il rend ses sources à la salle distante envahie.
+    remoteDefender: remoteMining.invaded(room) ? 1 : 0,
     // Builders avant upgraders : chaque structure (extensions d'abord) améliore la salle plus tôt.
     builder,
     upgrader,
@@ -292,7 +294,7 @@ function buildBody(role, energy, room, sourceId, target) {
   if (role === 'mineralMiner') return repeat([WORK, WORK, MOVE], energy);
   if (role === 'mineralHauler') return repeat([CARRY, MOVE], Math.min(energy, mineralHauler.LOAD / CARRY_CAPACITY * cost([CARRY, MOVE])));
   if (role === 'remoteBuilder') return repeat([WORK, CARRY, MOVE], Math.min(energy, 4 * cost([WORK, CARRY, MOVE])));
-  if (role === 'defender') return repeat([RANGED_ATTACK, MOVE], energy);
+  if (role === 'defender' || role === 'remoteDefender') return repeat([RANGED_ATTACK, MOVE], energy);
   if (role === 'scout') return [MOVE];
   if (role === 'claimer') return energy >= BODYPART_COST[CLAIM] + BODYPART_COST[MOVE] ? [CLAIM, MOVE] : [];
   // Upgrader nourri au dépôt du contrôleur (tas puis conteneur) : il ne bouge plus une fois posté,
@@ -394,6 +396,7 @@ module.exports.run = function () {
     if (role === 'claimer' || role === 'pioneer') memory.target = Memory.expansion.target;
     if (role === 'reserver') memory.target = remoteNeed.reserver;
     if (role === 'remoteBuilder') memory.target = remoteMining.roadWork(room);
+    if (role === 'remoteDefender') memory.target = remoteMining.invaded(room);
     if (role === 'remoteMiner' || role === 'remoteHauler') {
       const source = role === 'remoteMiner' ? remoteNeed.miner : remoteNeed.hauler;
       Object.assign(memory, { target: source.room, sourceId: source.id, x: source.x, y: source.y });

@@ -14,6 +14,7 @@ function record(room) {
   const c = room.controller;
   const previous = room.memory.intel;
   const sources = room.find(FIND_SOURCES);
+  const threats = defense.threats(room);
   room.memory.intel = {
     time: Game.time,
     sources: sources.length,
@@ -21,7 +22,9 @@ function record(room) {
     controller: !!c,
     owner: c && c.owner ? c.owner.username : null,
     reserved: c && c.reservation ? c.reservation.username : null,
-    hostile: defense.threats(room).length ? Game.time : (previous && previous.hostile) || 0,
+    hostile: threats.length ? Game.time : (previous && previous.hostile) || 0,
+    // Vrai si les derniers hostiles vus n'étaient que des Invaders : seuls ceux-là sont chassés (remoteDefender).
+    invader: threats.length ? threats.every((c) => c.owner.username === defense.INVADER) : !!(previous && previous.invader),
   };
 }
 
@@ -92,4 +95,18 @@ function safe(name) {
     && Game.time - i.hostile > HOSTILE_COOLDOWN);
 }
 
-module.exports = { get, record, skip, safe, me, reservedByMe, keeperRoom, friendly, route };
+// Vrai si la salle serait sûre (voir safe) sans les Invaders qui y sont passés depuis moins de HOSTILE_COOLDOWN ticks.
+// ponytail: cœur d'Invader ignoré (salle réservée par `Invader`, jamais sûre) ; à attaquer si ça coupe la récolte.
+function invaded(name) {
+  const i = get(name);
+  return !!(i && i.invader && i.controller && !i.owner && (!i.reserved || i.reserved === me())
+    && Game.time - i.hostile <= HOSTILE_COOLDOWN);
+}
+
+// Salle vue vide par notre défenseur : elle redevient sûre tout de suite.
+function clear(name) {
+  const i = get(name);
+  if (i) Object.assign(i, { hostile: 0, invader: false });
+}
+
+module.exports = { get, record, skip, safe, invaded, clear, me, reservedByMe, keeperRoom, friendly, route };

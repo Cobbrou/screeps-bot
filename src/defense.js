@@ -189,5 +189,6 @@ module.exports.run = function () {
 
 module.exports.threats = threats;
 module.exports.FRIENDS = FRIENDS;
+module.exports.INVADER = INVADER;
 module.exports.target = target;
 module.exports.defenders = defenders;
