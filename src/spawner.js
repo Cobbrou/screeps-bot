@@ -13,7 +13,8 @@ const MAX_MINER_WORK = 5;
 const MIN_UPGRADER_WORK = 4;
 // Sans tour, un builder est créé dès qu'une structure passe sous cette part de ses points de vie (comme l'urgence du builder).
 const REPAIR_RATIO = 0.5;
-// Avec un stockage, 1 énergie/tick de revenu en plus par tranche stockée : le stock se dépense en upgraders.
+// Avec un stockage, 1 énergie/tick de revenu en plus par tranche stockée au-dessus du seuil de reprise des upgraders
+// (STORAGE_HIGH) : le stock se dépense en upgraders, sans ramener la salle à la pause du stockage bas.
 // ponytail: à revoir au RCL 8 (15 énergie/tick d'amélioration au plus).
 const STORED_PER_ENERGY = 10000;
 // Salle enfermée (`Memory.enclosed`, voir expansion) : sans expansion possible, le stock part deux fois plus vite
@@ -119,7 +120,7 @@ function netIncome(room, miners, carry, remote, upkeep) {
   const ratio = need ? Math.min(1, (carry || 0) / need) : 1;
   const local = list.reduce((sum, s) => sum + Math.min(work(s), MAX_MINER_WORK) * HARVEST_POWER, 0) * ratio;
   const perEnergy = Memory.enclosed ? ENCLOSED_STORED_PER_ENERGY : STORED_PER_ENERGY;
-  const stored = room.storage ? Math.floor(room.storage.store[RESOURCE_ENERGY] / perEnergy) : 0;
+  const stored = room.storage ? Math.floor(Math.max(room.storage.store[RESOURCE_ENERGY] - upgraders.STORAGE_HIGH, 0) / perEnergy) : 0;
   return local + remoteMining.income(room, remote) + stored - (upkeep || 0);
 }
 

@@ -132,4 +132,4 @@ function spots(room) {
   return Math.max(1, posts(room, d).length);
 }
 
-module.exports = { run, paused, spots };
+module.exports = { run, paused, spots, STORAGE_HIGH };
