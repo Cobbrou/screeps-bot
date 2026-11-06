@@ -3,10 +3,14 @@ const defense = require('./defense');
 const intel = require('./intel');
 const expansion = require('./expansion');
 const upgraders = require('./roles/upgrader');
+const mineralMiner = require('./roles/mineralMiner');
+const mineralHauler = require('./roles/mineralHauler');
 const scout = require('./roles/scout');
 const remoteMining = require('./remoteMining');
 
 const MAX_MINER_WORK = 5;
+// Plus petit upgrader créé : au-dessous, il occupe un poste et du temps de spawn pour presque rien.
+const MIN_UPGRADER_WORK = 4;
 // Sans tour, un builder est créé dès qu'une structure passe sous cette part de ses points de vie (comme l'urgence du builder).
 const REPAIR_RATIO = 0.5;
 // Avec un stockage, 1 énergie/tick de revenu en plus par tranche stockée : le stock se dépense en upgraders.
@@ -21,7 +25,7 @@ const ENCLOSED_STORED_PER_ENERGY = STORED_PER_ENERGY / 2;
 const UPGRADE_SPEND = UPGRADE_CONTROLLER_POWER + (BODYPART_COST[WORK] + BODYPART_COST[MOVE] / 2) / CREEP_LIFE_TIME;
 const BUILD_SPEND = 4 + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPART_COST[MOVE]) / CREEP_LIFE_TIME;
 // Rôles dont l'entretien est déduit du revenu : ceux qui récoltent et transportent.
-const ECONOMY_ROLES = ['miner', 'hauler', 'filler', 'remoteMiner', 'remoteHauler', 'reserver'];
+const ECONOMY_ROLES = ['miner', 'hauler', 'filler', 'remoteMiner', 'remoteHauler', 'reserver', 'mineralMiner', 'mineralHauler'];
 // Renseignements sur une salle voisine jugés périmés après ce nombre de ticks : un éclaireur va les rafraîchir.
 const SCOUT_REFRESH = 5000;
 // Garde-fou de rétrogradation : priorité à l'amélioration sous DOWNGRADE_LOW de CONTROLLER_DOWNGRADE,
@@ -157,7 +161,6 @@ function downgrading(room) {
 // Upgraders et builders se partagent le revenu sans se le disputer : pendant les chantiers (hors murs et remparts,
 // trop longs), tout va aux builders et aucun upgrader n'est créé ; ensuite les builders deviennent upgraders.
 // Un créep de plus tant que les WORK vivants restent sous revenu / consommation par WORK.
-// ponytail: le dernier créep peut dépasser le revenu d'un corps entier ; dimensionner le corps au manque si ça gaspille.
 function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   const list = sources.list(room);
   const expanding = Memory.expansion && Memory.expansion.from === room.name;
@@ -212,6 +215,9 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     remoteBuilder: remoteMining.roadWork(room) ? 1 : 0,
     // Réservation en tout dernier : elle double le débit des sources distantes déjà tenues.
     reserver: (roomCounts.reserver || 0) + (remoteNeed.reserver ? 1 : 0),
+    // Minerai après toute l'économie d'énergie : un mineur, et un transporteur quand le conteneur vaut un voyage.
+    mineralMiner: mineralMiner.wanted(room) ? 1 : 0,
+    mineralHauler: mineralHauler.ready(room) ? 1 : 0,
   };
 }
 
@@ -277,6 +283,9 @@ function buildBody(role, energy, room, sourceId, target) {
       ? repeat([CARRY, CARRY, MOVE], energy, [[CARRY, MOVE]]) : repeat([CARRY, MOVE], energy);
   }
   // Constructeur distant : corps polyvalent, 4 motifs au plus (les chantiers de route sont posés 5 par 5).
+  // Minerai, hors route : le mineur ne fait qu'un trajet (2 WORK par MOVE), le transporteur avance d'une case par tick chargé.
+  if (role === 'mineralMiner') return repeat([WORK, WORK, MOVE], energy);
+  if (role === 'mineralHauler') return repeat([CARRY, MOVE], Math.min(energy, mineralHauler.LOAD / CARRY_CAPACITY * cost([CARRY, MOVE])));
   if (role === 'remoteBuilder') return repeat([WORK, CARRY, MOVE], Math.min(energy, 4 * cost([WORK, CARRY, MOVE])));
   if (role === 'defender') return repeat([RANGED_ATTACK, MOVE], energy);
   if (role === 'scout') return [MOVE];
@@ -405,6 +414,13 @@ module.exports.run = function () {
       const ratio = haulerRatio(room);
       const units = Math.ceil(room.energyCapacityAvailable / 2 / (ratio * CARRY_CAPACITY));
       energy = Math.min(energy, units * (ratio * BODYPART_COST[CARRY] + BODYPART_COST[MOVE]));
+    }
+    // Upgrader : corps au manque de WORK, pas à la capacité de la salle (deux corps pleins de 14 WORK dépensaient 28/tick
+    // pour ~20 de revenu, jusqu'à la pause du stockage bas).
+    if (role === 'upgrader' && !emergency) {
+      const lack = Math.ceil(net / UPGRADE_SPEND - ((work[room.name] || {}).upgrader || 0));
+      const parts = Math.max(lack, MIN_UPGRADER_WORK);
+      energy = Math.min(energy, BODYPART_COST[CARRY] + parts * BODYPART_COST[WORK] + Math.ceil(parts / 2) * BODYPART_COST[MOVE]);
     }
     const body = buildBody(role, energy, room, memory.sourceId, memory.target);
     if (!body.length) continue;

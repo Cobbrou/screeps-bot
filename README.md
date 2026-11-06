@@ -73,6 +73,8 @@ screeps-bot/
 │       ├── hauler.js        # transporte l'énergie des conteneurs vers spawn, extensions, tours, dépôt du contrôleur
 │       ├── miner.js         # récolte statique sur une source (conteneur, ou au sol)
 │       ├── pioneer.js       # amorce la nouvelle salle (construit son spawn)
+│       ├── mineralHauler.js # vide le conteneur du minerai dans le stockage
+│       ├── mineralMiner.js  # récolte le minerai depuis son conteneur (extracteur, RCL 6)
 │       ├── remoteBuilder.js # construit et entretient les routes des salles distantes
 │       ├── remoteHauler.js  # ramasse l'énergie d'une source distante (sol, conteneur) et la rapporte
 │       ├── remoteMiner.js   # récolte statique sur une source distante, construit et entretient son conteneur

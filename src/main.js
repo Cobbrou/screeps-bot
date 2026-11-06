@@ -22,6 +22,8 @@ const roles = {
   remoteHauler: require('./roles/remoteHauler'),
   reserver: require('./roles/reserver'),
   remoteBuilder: require('./roles/remoteBuilder'),
+  mineralMiner: require('./roles/mineralMiner'),
+  mineralHauler: require('./roles/mineralHauler'),
 };
 
 module.exports.loop = function () {
