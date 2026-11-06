@@ -128,7 +128,7 @@ Priorité immédiate, d'après l'[analyse de E25S3](docs/e25s3-analysis.md) : l'
 - [ ] Créeps sur chemins pré-calculés et mis en cache dans la salle : moins de pathfinding
 
 - [x] Planner : terminal (portée 2 à 4 du stockage), extracteur et conteneur du minerai au bout de son chemin, 10 labs en bloc 4 × 4 (labs d'entrée au centre, diagonale libre) ajoutés au plan (RCL 6), cases réservées sans rien poser tant que leur code n'existe pas (extracteur et conteneur du minerai posés depuis)
-- [x] Liens (`STRUCTURE_LINK`) : plan `room.memory.plan.link` (hub à portée 2 du stockage puis sources, route la plus longue d'abord) ; mineur à 1 `CARRY` qui remplit le lien de sa source, envoi au lien du hub par 400 au moins, upgraders qui y puisent avant le stockage ; lien plein : la récolte déborde dans le conteneur
+- [x] Liens (`STRUCTURE_LINK`) : plan `room.memory.plan.link` (hub à portée 2 du stockage puis sources, route la plus longue d'abord, sauf la source la plus proche du spawn) ; mineur à 1 `CARRY` qui remplit le lien de sa source, envoi au lien du hub par 400 au moins, upgraders qui y puisent avant le stockage ; lien plein : la récolte déborde dans le conteneur
 - [x] Haulers dimensionnés sans les sources liées (besoin nul tant que les upgraders ne sont pas en pause), corps à la part d'une source non liée
 - [x] `filler` dédié au spawn, aux extensions et aux tours depuis le stockage, quand les sources sont toutes liées (plus de hauler voulu) : sinon le dernier hauler mort déclenchait l'urgence `harvester`
 - [x] Nombre d'`upgrader` et taille des corps selon l'énergie stockée : stock compté dans le revenu net, corps limité au manque de `WORK` (4 au moins), upgrader créé seulement si son corps entre dans le revenu

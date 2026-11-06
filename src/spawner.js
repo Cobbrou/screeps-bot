@@ -99,8 +99,9 @@ function needsMiner(source, miners) {
 function haulCapacity(room, source, work) {
   if (!work) return 0;
   // Source liée (son lien et celui du hub construits) : l'énergie part au hub par le lien, sans hauler.
-  // Sauf upgraders en pause : le lien reste plein et la récolte déborde dans le conteneur.
-  if (sources.sourceLink(source) && sources.hubLink(room) && !upgraders.paused(room)) return 0;
+  // Sauf si son conteneur s'engorge : le lien n'absorbe plus la récolte (mineur sans CARRY, lien du hub jamais vidé).
+  const box = sources.container(source);
+  if (sources.sourceLink(source) && sources.hubLink(room) && (!box || box.store[RESOURCE_ENERGY] <= HAUL_BACKLOG)) return 0;
   const rate = Math.min(work, MAX_MINER_WORK) * HARVEST_POWER;
   const scan = routeTerrain(room, source.id);
   // Sans route connue : la capacité d'un hauler neuf.

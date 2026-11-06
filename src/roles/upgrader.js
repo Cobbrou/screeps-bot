@@ -92,9 +92,16 @@ function post(creep, depot) {
   return k === undefined ? undefined : new RoomPosition(Math.floor(k / 50), k % 50, creep.room.name);
 }
 
+// Pause : l'upgrader qui touche le lien du hub et le stockage verse l'un dans l'autre, un retrait puis un dépôt.
+// Le lien ne reste pas plein et la source liée continue d'envoyer sa récolte, qui remonte le stockage.
+function drainLink(creep, link) {
+  if (creep.store[RESOURCE_ENERGY]) creep.transfer(creep.room.storage, RESOURCE_ENERGY);
+  else creep.withdraw(link, RESOURCE_ENERGY);
+}
+
 // Poste fixe à côté du dépôt : les haulers y apportent l'énergie, l'upgrader ne marche plus. À chaque tick
 // il améliore avec ce qu'il porte et reprend au dépôt ce qui lui manque (permis au même tick ; l'énergie prise
-// ne sert qu'au tick suivant). En pause, il finit ce qu'il porte sans en reprendre.
+// ne sert qu'au tick suivant). En pause, il finit ce qu'il porte sans en reprendre, sauf s'il peut vider le lien.
 // Sans poste libre (plus d'upgraders que de postes), il se contente de rester à portée du contrôleur.
 function run(creep) {
   const room = creep.room;
@@ -115,6 +122,11 @@ function run(creep) {
   else if (!spot && !creep.pos.inRangeTo(room.controller, 3)) move.to(creep, room.controller, { range: 3 });
   // Lien du hub (RCL 5) d'abord : l'énergie des sources liées y arrive sans hauler.
   const link = sources.hubLink(room);
+  if (link && room.storage && depot.container === room.storage && paused(room)
+    && creep.pos.isNearTo(link) && creep.pos.isNearTo(room.storage)) {
+    drainLink(creep, link);
+    return;
+  }
   const fromLink = link && link.store[RESOURCE_ENERGY] && creep.pos.isNearTo(link);
   if ((fromLink || creep.pos.isNearTo(depot.pos)) && !paused(room) && creep.store.getFreeCapacity(RESOURCE_ENERGY)) {
     const pile = !depot.container && sources.depotPile(depot);

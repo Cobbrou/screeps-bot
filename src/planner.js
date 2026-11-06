@@ -283,11 +283,19 @@ function planCorners(room, spawn, plan, costs) {
 // des sources sont connus. D'abord le lien du hub : case libre à portée 2 du stockage qui touche le plus de postes
 // d'upgraders (voisins du stockage, à portée 3 du contrôleur). Puis un lien par source, de la route la plus longue
 // à la plus courte, sur une case libre voisine du conteneur (bout de la route), si possible pas collée à la source.
+// La source la plus proche du spawn n'a pas de lien : ses haulers remplissent spawn et extensions, puis le stockage,
+// que les liens n'alimentent pas. Un plan d'avant cette règle perd sa dernière case (celle de cette source).
 // Pas de case pour le hub : liste vide, rien n'est reposé.
+// ponytail: une source seule garde son lien, sans hauler pour le stockage ; à revoir pour les salles à une source.
 // ponytail: liens des sources seulement, pas de lien du contrôleur séparé ; à revoir avec les chaînes d'upgraders.
 function planLinks(room, plan, costs) {
-  if (plan.link || !plan.hub || plan.hub.storage === undefined) return;
   const list = sources.list(room);
+  const linked = Math.max(1, list.length - 1);
+  if (plan.link) {
+    plan.link.length = Math.min(plan.link.length, 1 + linked);
+    return;
+  }
+  if (!plan.hub || plan.hub.storage === undefined) return;
   const routes = room.memory.routes || {};
   if (!list.every((s) => routes[s.id])) return;
   const terrain = room.getTerrain();
@@ -316,7 +324,7 @@ function planLinks(room, plan, costs) {
     costs.set(Math.floor(k / 50), k % 50, 255);
   };
   take(hub);
-  for (const source of list.slice().sort((a, b) => routes[b.id].length - routes[a.id].length)) {
+  for (const source of list.slice().sort((a, b) => routes[b.id].length - routes[a.id].length).slice(0, linked)) {
     const box = routes[source.id][routes[source.id].length - 1];
     const src = source.pos.x * 50 + source.pos.y;
     const cell = around(box, 1).filter((k) => k !== src && free(k)).sort((a, b) => (range(a, src) === 1) - (range(b, src) === 1))[0];
@@ -379,12 +387,9 @@ function planExtras(room, plan, costs) {
   }
 }
 
-// Spawns suivants (RCL 7 et 8), factory, power spawn, nuker et observer, ajoutés une fois au plan : cases libres les
-// plus proches du stockage, en damier autour de lui pour laisser passer les créeps, sans structure (rempart de porte).
-// plan.spawn commence par les spawns existants. L'énergie d'un spawn vient de toute la salle : le suivant peut être au hub.
-// Seuls les spawns sont posés : les autres types restent réservés tant qu'aucun code ne les utilise.
-function planLate(room, plan, costs) {
-  if (plan[STRUCTURE_SPAWN]) return;
+// Cases libres les plus proches du stockage, en damier autour de lui pour laisser passer les créeps,
+// sans structure (rempart de porte), hors diagonale de service des labs.
+function lateCells(room, plan, costs) {
   const free = freeCell(room, plan, costs);
   const storage = plan[STRUCTURE_STORAGE][0];
   const even = (k) => (Math.floor(k / 50) + k % 50 + Math.floor(storage / 50) + storage % 50) % 2 === 0;
@@ -397,6 +402,15 @@ function planLate(room, plan, costs) {
     cells.push(...around(storage, r).filter((k) => even(k) && free(k) && !labPath.includes(k)
       && !room.lookForAt(LOOK_STRUCTURES, Math.floor(k / 50), k % 50).length));
   }
+  return cells;
+}
+
+// Spawns suivants (RCL 7 et 8), factory, power spawn, nuker et observer, ajoutés une fois au plan (lateCells).
+// plan.spawn commence par les spawns existants. L'énergie d'un spawn vient de toute la salle : le suivant peut être au hub.
+// Seuls les spawns sont posés : les autres types restent réservés tant qu'aucun code ne les utilise.
+function planLate(room, plan, costs) {
+  if (plan[STRUCTURE_SPAWN]) return;
+  const cells = lateCells(room, plan, costs);
   plan[STRUCTURE_SPAWN] = room.find(FIND_MY_SPAWNS).map((s) => s.pos.x * 50 + s.pos.y);
   for (const type of LATE) {
     plan[type] = plan[type] || [];
@@ -405,6 +419,25 @@ function planLate(room, plan, costs) {
       plan[type].push(k);
       costs.set(Math.floor(k / 50), k % 50, 255);
     }
+  }
+}
+
+// Tours des RCL 7 et 8 : déplacées une fois au plan (plan.hubTowers) sur les cases de lateCells. Les 2 premières
+// restent au spawn ; les suivantes couvrent le hub, stockage et contrôleur, à l'écart du damier.
+// Une tour déjà construite ou en chantier garde sa case.
+function planHubTowers(room, plan, costs) {
+  if (plan.hubTowers) return;
+  plan.hubTowers = true;
+  const cells = lateCells(room, plan, costs);
+  const towers = plan[STRUCTURE_TOWER];
+  for (let i = CONTROLLER_STRUCTURES[STRUCTURE_TOWER][6]; i < towers.length && cells.length; i++) {
+    const x = Math.floor(towers[i] / 50);
+    const y = towers[i] % 50;
+    if (room.lookForAt(LOOK_CONSTRUCTION_SITES, x, y).length) continue;
+    if (room.lookForAt(LOOK_STRUCTURES, x, y).some((s) => s.structureType === STRUCTURE_TOWER)) continue;
+    const k = cells.shift();
+    towers[i] = k;
+    costs.set(Math.floor(k / 50), k % 50, 255);
   }
 }
 
@@ -637,6 +670,7 @@ module.exports.run = function () {
     // ponytail: pas de route jusqu'au minerai (mineur peu fréquent) ; à poser si son transport coûte trop.
     planExtras(room, plan, costs);
     planLate(room, plan, costs);
+    planHubTowers(room, plan, costs);
     buildPlan(room, plan, STRUCTURE_SPAWN);
     buildPlan(room, plan, STRUCTURE_EXTRACTOR);
     const mineral = room.find(FIND_MINERALS)[0];
