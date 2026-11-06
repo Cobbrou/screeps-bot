@@ -161,7 +161,9 @@ function downgrading(room) {
 // `net` : revenu net (netIncome) ; `work` : WORK vivants des upgraders et des builders.
 // Upgraders et builders se partagent le revenu sans se le disputer : pendant les chantiers (hors murs et remparts,
 // trop longs), tout va aux builders et aucun upgrader n'est créé ; ensuite les builders deviennent upgraders.
-// Un créep de plus tant que les WORK vivants restent sous revenu / consommation par WORK.
+// Un upgrader de plus seulement si son corps entre dans le revenu (revenu / consommation par WORK) : sans ça,
+// un dernier corps de MIN_UPGRADER_WORK fait dépasser le revenu et vide le stockage jusqu'à la pause.
+// Builders : un créep de plus tant que les WORK vivants restent sous revenu / consommation par WORK.
 function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   const list = sources.list(room);
   const expanding = Memory.expansion && Memory.expansion.from === room.name;
@@ -170,11 +172,14 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   const sites = room.find(FIND_MY_CONSTRUCTION_SITES);
   const building = sites.some((s) => s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART);
   const up = roomCounts.upgrader || 0;
+  // Plus petit corps d'upgrader possible ici : avant les extensions, la capacité ne permet pas MIN_UPGRADER_WORK.
+  const step = Math.min(MIN_UPGRADER_WORK, buildBody('upgrader', room.energyCapacityAvailable, room).filter((p) => p === WORK).length);
+  const funded = up ? (work.upgrader || 0) + step <= net / UPGRADE_SPEND : net > 0;
   // Rétrogradation proche : au moins un upgrader, même pendant les chantiers.
   // Pendant les chantiers, l'effectif voulu avant eux (room.memory.upgraders) est maintenu : les upgraders
   // en fin de vie sont remplacés, seule l'augmentation attend la fin des chantiers.
   const moreUp = !upgraders.paused(room) && up < upgraders.spots(room)
-    && ((urgent && !up) || (building ? up < (room.memory.upgraders || 0) : (work.upgrader || 0) < net / UPGRADE_SPEND));
+    && ((urgent && !up) || (building ? up < (room.memory.upgraders || 0) : funded));
   const upgrader = up + (moreUp ? 1 : 0);
   if (!building) room.memory.upgraders = upgrader;
   const need = list.reduce((sum, s) => sum + haulCapacity(room, s, (miners[s.id] || {}).work), 0);
@@ -419,7 +424,7 @@ module.exports.run = function () {
     // Upgrader : corps au manque de WORK, pas à la capacité de la salle (deux corps pleins de 14 WORK dépensaient 28/tick
     // pour ~20 de revenu, jusqu'à la pause du stockage bas).
     if (role === 'upgrader' && !emergency) {
-      const lack = Math.ceil(net / UPGRADE_SPEND - ((work[room.name] || {}).upgrader || 0));
+      const lack = Math.floor(net / UPGRADE_SPEND - ((work[room.name] || {}).upgrader || 0));
       const parts = Math.max(lack, MIN_UPGRADER_WORK);
       energy = Math.min(energy, BODYPART_COST[CARRY] + parts * BODYPART_COST[WORK] + Math.ceil(parts / 2) * BODYPART_COST[MOVE]);
     }
