@@ -39,6 +39,7 @@ function repairTarget(s) {
 }
 
 // Structure la plus abîmée par rapport à sa cible (sous REPAIR_RATIO), ou null ; un rempart sous RAMPART_DYING d'abord.
+// Murs hors de la coupe (room.memory.plan.cut) ignorés : ils ne s'usent pas, l'ancienne ceinture reste telle quelle.
 // Stockage bas (drapeau room.memory.storageLow, voir upgrader) : murs et remparts attendent, sauf rempart mourant,
 // pour que l'énergie aille d'abord à l'amélioration.
 // La cible est reprise jusqu'à la prochaine recherche, qui a lieu tous les REPAIR_SCAN_INTERVAL ticks et prend
@@ -53,7 +54,9 @@ function damagedStructure(room) {
   let damaged = null;
   let worst = REPAIR_RATIO;
   const saving = room.memory.storageLow;
+  const cut = new Set(room.memory.plan && room.memory.plan.cut);
   for (const s of room.find(FIND_STRUCTURES)) {
+    if (s.structureType === STRUCTURE_WALL && !cut.has(s.pos.x * 50 + s.pos.y)) continue;
     const dying = s.structureType === STRUCTURE_RAMPART && s.hits <= RAMPART_DYING;
     if (saving && !dying && (s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART)) continue;
     const ratio = dying ? -1 : s.hits / repairTarget(s);

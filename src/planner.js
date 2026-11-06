@@ -1,5 +1,6 @@
 const sources = require('./sources');
 const remoteMining = require('./remoteMining');
+const minCut = require('./minCut');
 
 // Le plan est recalculé tous les INTERVAL ticks : les chantiers manquants sont recréés.
 const INTERVAL = 100;
@@ -15,7 +16,7 @@ const EXTRA = [STRUCTURE_LINK, STRUCTURE_TERMINAL, STRUCTURE_EXTRACTOR, STRUCTUR
 const LAB_INPUTS = [[1, 2], [2, 1]];
 const LAB_OUTPUTS = [[0, 1], [0, 2], [1, 0], [1, 3], [2, 0], [2, 3], [3, 1], [3, 2]];
 const LAB_PATH = [[0, 0], [1, 1], [2, 2], [3, 3]];
-// Structures vitales couvertes d'un rempart une fois la ceinture de murs posée.
+// Structures vitales couvertes d'un rempart une fois la coupe de murs posée.
 const CORE = [STRUCTURE_SPAWN, STRUCTURE_TOWER, STRUCTURE_STORAGE, STRUCTURE_TERMINAL];
 // Chantiers laissés libres sur le compte (MAX_CONSTRUCTION_SITES) pour le spawn d'expansion.
 const SITE_MARGIN = 20;
@@ -23,6 +24,10 @@ const SITE_MARGIN = 20;
 const ROAD_MIN_RCL = 3;
 // RCL à partir duquel les conteneurs sont posés.
 const CONTAINER_MIN_RCL = 2;
+// Marge gardée autour de la base par la coupe : un RANGED_ATTACK resté dehors n'atteint aucune structure.
+const CUT_MARGIN = 3;
+// Coût d'une barrière neuve dans la coupe, contre 1 pour une case déjà barrée : les murs existants sont repris.
+const CUT_NEW_COST = 2;
 
 // Chantier non entamé depuis ce nombre de ticks retiré (inaccessible, salle perdue, plan obsolète) :
 // il libère une place sur MAX_CONSTRUCTION_SITES. Rien n'est perdu ; le planner le repose s'il est toujours voulu.
@@ -560,35 +565,52 @@ function planRemoteRoad(name, cells, posted) {
   }
 }
 
-// Ceinture de murs à 2 cases des sorties : tout chemin depuis une sortie la traverse.
-// Remparts sur les routes et au milieu de chaque côté pour laisser passer nos créeps.
-function planWalls(room, costs) {
+// Coupe minimale entre la base et les sorties, calculée une fois (plan.cut) quand le plan est complet : base, sources,
+// contrôleur et minerai, à CUT_MARGIN cases près. Les barrières déjà posées (ancienne ceinture) coûtent moins cher.
+// Une porte par tronçon (plan.gates), la case sans mur la plus proche de son milieu, sinon son milieu (mur remplacé
+// par buildCut), pour laisser passer nos créeps.
+function planCut(room, plan) {
+  if (plan.cut) return;
   const terrain = room.getTerrain();
-  const near = new Set();
-  for (const e of room.find(FIND_EXIT)) {
-    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) near.add((e.x + dx) * 50 + e.y + dy);
-  }
-  for (const side of [FIND_EXIT_TOP, FIND_EXIT_RIGHT, FIND_EXIT_BOTTOM, FIND_EXIT_LEFT]) {
-    const exits = room.find(side);
-    if (!exits.length) continue;
-    const ring = new Map();
-    for (const e of exits) {
-      for (let dx = -2; dx <= 2; dx++) {
-        for (let dy = -2; dy <= 2; dy++) {
-          const x = e.x + dx;
-          const y = e.y + dy;
-          const key = x * 50 + y;
-          if (x < 1 || x > 48 || y < 1 || y > 48 || near.has(key) || ring.has(key)) continue;
-          if (terrain.get(x, y) !== TERRAIN_MASK_WALL) ring.set(key, new RoomPosition(x, y, room.name));
-        }
+  const walkable = (x, y) => terrain.get(x, y) !== TERRAIN_MASK_WALL;
+  const cells = [].concat(...Object.values(plan).filter(Array.isArray));
+  if (plan.hub) cells.push(plan.hub.container);
+  for (const o of [...sources.list(room), room.controller, ...room.find(FIND_MINERALS)]) cells.push(o.pos.x * 50 + o.pos.y);
+  const base = new Set();
+  for (const k of cells) {
+    for (let x = Math.floor(k / 50) - CUT_MARGIN; x <= Math.floor(k / 50) + CUT_MARGIN; x++) {
+      for (let y = k % 50 - CUT_MARGIN; y <= k % 50 + CUT_MARGIN; y++) {
+        if (x >= 0 && x < 50 && y >= 0 && y < 50 && walkable(x, y)) base.add(x * 50 + y);
       }
     }
-    const gate = exits[Math.floor(exits.length / 2)].findClosestByRange([...ring.values()]);
-    for (const pos of ring.values()) {
-      const cost = costs.get(pos.x, pos.y);
-      if (cost === 255) continue;
-      place(room, pos, cost === 1 || pos.isEqualTo(gate) ? STRUCTURE_RAMPART : STRUCTURE_WALL);
+  }
+  const barriers = room.find(FIND_STRUCTURES, { filter: (s) => isBarrier(s.structureType) });
+  const barred = new Set(barriers.map((s) => s.pos.x * 50 + s.pos.y));
+  const walls = new Set(barriers.filter((s) => s.structureType === STRUCTURE_WALL).map((s) => s.pos.x * 50 + s.pos.y));
+  plan.cut = minCut(walkable, base, (x, y) => (barred.has(x * 50 + y) ? 1 : CUT_NEW_COST));
+  plan.gates = [];
+  const left = new Set(plan.cut);
+  for (const first of plan.cut) {
+    if (!left.delete(first)) continue;
+    const group = [first];
+    for (let i = 0; i < group.length; i++) {
+      for (const k of around(group[i], 1)) if (left.delete(k)) group.push(k);
     }
+    const middle = group[Math.floor(group.length / 2)];
+    const open = group.filter((k) => !walls.has(k)).sort((p, q) => range(p, middle) - range(q, middle));
+    plan.gates.push(open.length ? open[0] : middle);
+  }
+}
+
+// Pose les barrières manquantes de la coupe : mur, ou rempart sur les portes, les routes et les cases prévues
+// pour une structure (coût non nul), qu'un mur bloquerait. Un mur sur une porte est détruit : un rempart ne s'y pose pas.
+function buildCut(room, plan, costs) {
+  for (const k of plan.cut) {
+    const pos = new RoomPosition(Math.floor(k / 50), k % 50, room.name);
+    const barrier = pos.lookFor(LOOK_STRUCTURES).find((s) => isBarrier(s.structureType));
+    if (barrier && barrier.structureType === STRUCTURE_WALL && plan.gates.includes(k)) barrier.destroy();
+    if (barrier) continue;
+    place(room, pos, costs.get(pos.x, pos.y) !== 0 || plan.gates.includes(k) ? STRUCTURE_RAMPART : STRUCTURE_WALL);
   }
 }
 
@@ -697,8 +719,9 @@ module.exports.run = function () {
     // avant, les remonter à leur plafond prendrait l'essentiel de l'énergie de la salle.
     if (room.storage
       && room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length) {
-      planWalls(room, costs);
-      // Remparts aussi sur les structures vitales : un attaquant qui passe la ceinture ne les détruit pas d'emblée.
+      planCut(room, plan);
+      buildCut(room, plan, costs);
+      // Remparts aussi sur les structures vitales : un attaquant qui passe la coupe ne les détruit pas d'emblée.
       for (const s of room.find(FIND_MY_STRUCTURES, { filter: (o) => CORE.includes(o.structureType) })) {
         if (!s.pos.lookFor(LOOK_STRUCTURES).some((o) => o.structureType === STRUCTURE_RAMPART)) place(room, s.pos, STRUCTURE_RAMPART);
       }

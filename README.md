@@ -43,6 +43,7 @@ Pour un serveur privé sans token, remplacer `token` par `email` et `password`.
 | Commande | Effet |
 |----------|-------|
 | `npm run build` | Bundle `src/main.js` vers `dist/main.js`, sans envoi |
+| `npm test` | Vérifie la coupe minimale hors du jeu |
 | `npm run deploy` | Build puis envoi du code sur le serveur défini dans `secrets.json` |
 | `npm run watch` | Rebuild et envoi à chaque modification de `src/` |
 
@@ -59,9 +60,10 @@ screeps-bot/
 │   ├── intel.js             # renseignements sur les salles explorées (Memory.rooms[*].intel)
 │   ├── market.js            # vente du minerai au meilleur ordre d'achat, équilibrage de l'énergie entre salles
 │   ├── memory.js            # nettoyage de Memory (créeps morts)
+│   ├── minCut.js            # coupe minimale entre la base et les sorties (flot de Dinic, sans objet du jeu)
 │   ├── move.js              # déplacements : moveTo avec contournement des créeps en cas de blocage
 │   ├── remoteMining.js      # récolte distante : salles et sources exploitées, besoins en mineurs, transporteurs et reservers
-│   ├── planner.js           # plan de base gardé (hub du contrôleur, stockage, tours, extensions), routes, conteneurs, murs (tous les 100 ticks et à chaque montée de RCL)
+│   ├── planner.js           # plan de base gardé (hub du contrôleur, stockage, tours, extensions), routes, conteneurs, coupe de murs (tous les 100 ticks et à chaque montée de RCL)
 │   ├── sources.js           # sources et conteneurs en cache, récolte et collecte d'énergie
 │   ├── spawner.js           # création des créeps selon les effectifs voulus (upgraders et builders sur le revenu net)
 │   ├── stats.js             # CPU par module, indicateurs dans Memory.stats, bucket bas, pixels
@@ -83,6 +85,8 @@ screeps-bot/
 │       ├── reserver.js      # réserve le contrôleur d'une salle de récolte distante
 │       ├── scout.js         # explore les salles voisines
 │       └── upgrader.js      # posté au dépôt du contrôleur, améliore sans aller chercher l'énergie
+├── test/
+│   └── minCut.test.js       # vérifie que la coupe sépare la base des sorties
 ├── docs/
 │   ├── architecture.md      # architecture prévue
 │   ├── e25s3-analysis.md    # état de E25S3 et corrections à apporter (relevé du 2026-11-03)
