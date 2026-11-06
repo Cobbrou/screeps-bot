@@ -50,4 +50,20 @@ assert.deepStrictEqual(minCut(walkable, new Set([2 * 50 + 22]), one), []);
 const cheap = (x) => (x === 25 ? 1 : 100);
 assert(minCut(walkable, base, cheap).every((k) => Math.floor(k / 50) === 25));
 
+// Portes : deux tronçons vers la même sortie n'en demandent qu'une, sur la case préférée.
+const twoHoles = (x, y) => {
+  if (x <= 0 || y <= 0 || x >= 49 || y >= 49) return x === 0 && y >= 20 && y <= 25;
+  return x !== 20 || (y >= 10 && y <= 11) || (y >= 30 && y <= 31);
+};
+const holes = [20 * 50 + 10, 20 * 50 + 11, 20 * 50 + 30, 20 * 50 + 31];
+assert.deepStrictEqual(minCut.gates(twoHoles, holes), [holes[0]]);
+assert.deepStrictEqual(minCut.gates(twoHoles, holes, [holes[3]]), [holes[3]]);
+
+// Une porte par côté : sorties à gauche et à droite, une cloison de chaque côté de la base.
+const twoSides = (x, y) => {
+  if (x <= 0 || y <= 0 || x >= 49 || y >= 49) return (x === 0 || x === 49) && y >= 20 && y <= 25;
+  return (x !== 20 && x !== 30) || y === 10;
+};
+assert.strictEqual(minCut.gates(twoSides, [20 * 50 + 10, 30 * 50 + 10]).length, 2);
+
 console.log('minCut : ok');

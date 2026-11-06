@@ -60,24 +60,25 @@ function build(creep) {
   return true;
 }
 
-// Remplace par une porte le mur signalé par le planner (room.memory.gateWall), une fois tous les chantiers finis :
-// mur détruit seulement à portée de construction, rempart posé au tick suivant. Vrai si le créep s'en occupe.
-function openGate(creep) {
-  const k = creep.room.memory.gateWall;
-  if (k === undefined) return false;
-  const pos = new RoomPosition(Math.floor(k / 50), k % 50, creep.room.name);
+// Remplace la barrière signalée par le planner (room.memory.swapBarrier), une fois tous les chantiers finis :
+// détruite seulement à portée de construction, nouveau chantier posé au tick suivant. Vrai si le créep s'en occupe.
+function swapBarrier(creep) {
+  const swap = creep.room.memory.swapBarrier;
+  if (!swap) return false;
+  const pos = new RoomPosition(Math.floor(swap.k / 50), swap.k % 50, creep.room.name);
   if (!creep.pos.inRangeTo(pos, 3)) {
     move.to(creep, pos, { range: 3 });
     return true;
   }
-  const wall = pos.lookFor(LOOK_STRUCTURES).find((s) => s.structureType === STRUCTURE_WALL);
-  if (wall) {
-    // Refusé tant qu'un hostile est dans la salle : le mur reste.
-    wall.destroy();
+  const old = pos.lookFor(LOOK_STRUCTURES)
+    .find((s) => s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART);
+  if (old) {
+    // Refusé tant qu'un hostile est dans la salle : la barrière reste.
+    old.destroy();
   } else {
-    // En cas d'échec, le planner repose le rempart à son prochain passage.
-    pos.createConstructionSite(STRUCTURE_RAMPART);
-    delete creep.room.memory.gateWall;
+    // En cas d'échec, le planner repose la barrière à son prochain passage.
+    pos.createConstructionSite(swap.type);
+    delete creep.room.memory.swapBarrier;
   }
   return true;
 }
@@ -102,7 +103,7 @@ function wait(creep) {
   if (target && !creep.pos.inRangeTo(target, 3)) move.to(creep, target, { range: 3 });
 }
 
-// Répare les structures très abîmées ; sinon construit les chantiers ; sinon ouvre la porte signalée ;
+// Répare les structures très abîmées ; sinon construit les chantiers ; sinon remplace la barrière signalée ;
 // sinon répare ce qui est sous REPAIR_RATIO ;
 // sinon améliore le contrôleur.
 // Sans stockage, les haulers apportent l'énergie (hauler.deliveryTarget) : le builder travaille dès qu'il en porte
@@ -127,7 +128,7 @@ module.exports.run = function (creep) {
   if (!creep.room.memory.downgrade) {
     if (repair(creep, URGENT_RATIO)) return;
     if (build(creep)) return;
-    if (openGate(creep)) return;
+    if (swapBarrier(creep)) return;
     if (repair(creep, REPAIR_RATIO)) return;
     // Plus rien à construire ni à réparer : le builder devient upgrader s'il reste une place au dépôt
     // (le spawner ne crée pas d'upgrader pendant les chantiers, ceux-ci prennent le relais).

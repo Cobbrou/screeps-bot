@@ -95,4 +95,54 @@ function minCut(walkable, base, cost) {
   }
 }
 
+// Portes de la coupe : le moins de cases qui relient toutes les zones qu'elle sépare, les zones qui donnent sur un même
+// côté de la salle comptant pour une seule (même voisine). `preferred` : cases essayées avant le reste de la coupe.
+function gates(walkable, cut, preferred = []) {
+  const closed = new Set(cut);
+  const zone = new Map();
+  // Union-find : un groupe par zone, 0 à 3 pour les côtés de la salle.
+  const parent = [0, 1, 2, 3];
+  const find = (a) => {
+    while (parent[a] !== a) a = parent[a] = parent[parent[a]];
+    return a;
+  };
+  const join = (a, b) => {
+    const [ra, rb] = [find(a), find(b)];
+    parent[ra] = rb;
+    return ra !== rb;
+  };
+  const near = (k) => NEIGHBORS.map(([dx, dy]) => [Math.floor(k / SIZE) + dx, k % SIZE + dy])
+    .filter(([x, y]) => x >= 0 && x < SIZE && y >= 0 && y < SIZE && walkable(x, y))
+    .map(([x, y]) => x * SIZE + y);
+  for (let k = 0; k < SIZE * SIZE; k++) {
+    if (zone.has(k) || closed.has(k) || !walkable(Math.floor(k / SIZE), k % SIZE)) continue;
+    const id = parent.length;
+    parent.push(id);
+    zone.set(k, id);
+    const stack = [k];
+    while (stack.length) {
+      const cell = stack.pop();
+      const x = Math.floor(cell / SIZE);
+      const y = cell % SIZE;
+      if (x === 0) join(id, 0);
+      if (y === 0) join(id, 1);
+      if (x === SIZE - 1) join(id, 2);
+      if (y === SIZE - 1) join(id, 3);
+      for (const n of near(cell)) {
+        if (zone.has(n) || closed.has(n)) continue;
+        zone.set(n, id);
+        stack.push(n);
+      }
+    }
+  }
+  const doors = [];
+  for (const k of new Set([...preferred.filter((c) => closed.has(c)), ...cut])) {
+    const zones = near(k).filter((n) => zone.has(n)).map((n) => zone.get(n));
+    // filter et non some : la case relie toutes les zones qu'elle touche.
+    if (zones.filter((z) => join(z, zones[0])).length) doors.push(k);
+  }
+  return doors;
+}
+
 module.exports = minCut;
+module.exports.gates = gates;
