@@ -603,12 +603,15 @@ function planCut(room, plan) {
 }
 
 // Pose les barrières manquantes de la coupe : mur, ou rempart sur les portes, les routes et les cases prévues
-// pour une structure (coût non nul), qu'un mur bloquerait. Un mur sur une porte est détruit : un rempart ne s'y pose pas.
+// pour une structure (coût non nul), qu'un mur bloquerait. Un mur sur une porte est signalé (room.memory.gateWall) :
+// un rempart ne s'y pose pas, et le builder le détruit une fois sur place pour ne pas ouvrir la base en attendant.
 function buildCut(room, plan, costs) {
   for (const k of plan.cut) {
     const pos = new RoomPosition(Math.floor(k / 50), k % 50, room.name);
     const barrier = pos.lookFor(LOOK_STRUCTURES).find((s) => isBarrier(s.structureType));
-    if (barrier && barrier.structureType === STRUCTURE_WALL && plan.gates.includes(k)) barrier.destroy();
+    if (barrier && barrier.structureType === STRUCTURE_WALL && plan.gates.includes(k) && room.memory.gateWall === undefined) {
+      room.memory.gateWall = k;
+    }
     if (barrier) continue;
     place(room, pos, costs.get(pos.x, pos.y) !== 0 || plan.gates.includes(k) ? STRUCTURE_RAMPART : STRUCTURE_WALL);
   }

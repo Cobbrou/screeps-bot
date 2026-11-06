@@ -185,7 +185,7 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   const bd = roomCounts.builder || 0;
   // Au moins un builder par chantier en cours, même à revenu nul ; murs et remparts seuls ou réparation : un seul.
   const builder = building ? bd + (!bd || (work.builder || 0) < net / BUILD_SPEND ? 1 : 0)
-    : (sites.length || needsRepair(room) ? 1 : 0);
+    : (sites.length || room.memory.gateWall !== undefined || needsRepair(room) ? 1 : 0);
   return {
     // Selon la menace que les tours ne couvrent pas (voir defense.defenders).
     defender: defense.defenders(room),

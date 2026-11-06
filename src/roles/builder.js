@@ -60,6 +60,28 @@ function build(creep) {
   return true;
 }
 
+// Remplace par une porte le mur signalé par le planner (room.memory.gateWall), une fois tous les chantiers finis :
+// mur détruit seulement à portée de construction, rempart posé au tick suivant. Vrai si le créep s'en occupe.
+function openGate(creep) {
+  const k = creep.room.memory.gateWall;
+  if (k === undefined) return false;
+  const pos = new RoomPosition(Math.floor(k / 50), k % 50, creep.room.name);
+  if (!creep.pos.inRangeTo(pos, 3)) {
+    move.to(creep, pos, { range: 3 });
+    return true;
+  }
+  const wall = pos.lookFor(LOOK_STRUCTURES).find((s) => s.structureType === STRUCTURE_WALL);
+  if (wall) {
+    // Refusé tant qu'un hostile est dans la salle : le mur reste.
+    wall.destroy();
+  } else {
+    // En cas d'échec, le planner repose le rempart à son prochain passage.
+    pos.createConstructionSite(STRUCTURE_RAMPART);
+    delete creep.room.memory.gateWall;
+  }
+  return true;
+}
+
 // Vrai si les haulers livrent les builders de la salle : pas de stockage (sinon le builder y puise lui-même)
 // et au moins un hauler vivant (sinon personne ne viendrait).
 function fed(room) {
@@ -80,7 +102,8 @@ function wait(creep) {
   if (target && !creep.pos.inRangeTo(target, 3)) move.to(creep, target, { range: 3 });
 }
 
-// Répare les structures très abîmées ; sinon construit les chantiers ; sinon répare ce qui est sous REPAIR_RATIO ;
+// Répare les structures très abîmées ; sinon construit les chantiers ; sinon ouvre la porte signalée ;
+// sinon répare ce qui est sous REPAIR_RATIO ;
 // sinon améliore le contrôleur.
 // Sans stockage, les haulers apportent l'énergie (hauler.deliveryTarget) : le builder travaille dès qu'il en porte
 // et attend sur place sinon, au lieu de marcher jusqu'aux sources. Avec stockage ou sans hauler, il se recharge seul.
@@ -104,6 +127,7 @@ module.exports.run = function (creep) {
   if (!creep.room.memory.downgrade) {
     if (repair(creep, URGENT_RATIO)) return;
     if (build(creep)) return;
+    if (openGate(creep)) return;
     if (repair(creep, REPAIR_RATIO)) return;
     // Plus rien à construire ni à réparer : le builder devient upgrader s'il reste une place au dépôt
     // (le spawner ne crée pas d'upgrader pendant les chantiers, ceux-ci prennent le relais).

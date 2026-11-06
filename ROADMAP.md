@@ -147,7 +147,7 @@ En attente du marché : relevé du 2026-11-06 sur shard0, ordres réels (les pri
 ## Phase 9 : défense et attaque avancées (RCL 7+)
 
 - [x] Planner : 2e spawn (RCL 7), factory, observer, puis 3e spawn, power spawn et nuker (RCL 8) ajoutés au plan (cases réservées près du stockage ; seuls les spawns sont posés)
-- [x] Remparts par coupe minimale (min-cut) autour de la base au lieu de la ceinture aux sorties : `plan.cut`, murs existants repris, ancienne ceinture laissée sans réparation
+- [x] Remparts par coupe minimale (min-cut) autour de la base au lieu de la ceinture aux sorties : `plan.cut`, murs existants repris, ancienne ceinture laissée sans réparation (remparts compris, sauf sur une structure) ; mur d'une porte détruit par le builder une fois sur place (`room.memory.gateWall`)
 - [x] Défense des salles de remote mining : `remoteDefender` contre les Invaders, salle rendue aux mineurs dès qu'elle est vide (actif quand la récolte distante reprendra : zone de respawn de E25S3 jusqu'au 2026-12-01)
 - [ ] Cœurs d'Invader dans les salles distantes
 - [ ] Boosts des défenseurs depuis les laboratoires
