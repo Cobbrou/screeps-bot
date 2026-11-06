@@ -67,7 +67,7 @@ function posts(room, depot) {
   }
   let list = cells.filter((k) => k === depotKey || !route.has(k));
   if (list.length === cells.length) {
-    const spawn = room.find(FIND_MY_SPAWNS)[0];
+    const spawn = sources.mainSpawn(room);
     const lane = spawn && cells.filter((k) => k !== depotKey)
       .sort((a, b) => spawn.pos.getRangeTo(Math.floor(a / 50), a % 50) - spawn.pos.getRangeTo(Math.floor(b / 50), b % 50))[0];
     list = cells.filter((k) => k !== lane);

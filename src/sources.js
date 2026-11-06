@@ -145,6 +145,14 @@ function planLink(room, i) {
   return room.lookForAt(LOOK_STRUCTURES, Math.floor(k / 50), k % 50).find((s) => s.structureType === STRUCTURE_LINK);
 }
 
+// Premier spawn de la salle, celui du plan : l'ordre de find n'est pas garanti avec plusieurs spawns, et le damier,
+// les routes et les trajets partent de lui.
+function mainSpawn(room) {
+  const spawns = room.find(FIND_MY_SPAWNS);
+  const k = room.memory.plan && room.memory.plan.spawn && room.memory.plan.spawn[0];
+  return spawns.find((s) => s.pos.x * 50 + s.pos.y === k) || spawns[0];
+}
+
 function hubLink(room) {
   return planLink(room, 0);
 }
@@ -352,4 +360,4 @@ function pickFrom(pile, box, free) {
   return inBox ? box : undefined;
 }
 
-module.exports = { list, spots, container, waitSpot, depot, depotPile, hubLink, sourceLink, harvest, harvestSource, collect, goBack, stepAway, forget, pickFrom };
+module.exports = { list, spots, container, waitSpot, depot, depotPile, mainSpawn, hubLink, sourceLink, harvest, harvestSource, collect, goBack, stepAway, forget, pickFrom };

@@ -1,6 +1,7 @@
 const intel = require('./intel');
 const move = require('./move');
 const defense = require('./defense');
+const sources = require('./sources');
 
 // Débit d'une source de salle non réservée (1 500 énergie par régénération) : 5 énergie/tick ; réservée : 10.
 const NEUTRAL_RATE = SOURCE_ENERGY_NEUTRAL_CAPACITY / ENERGY_REGEN_TIME;
@@ -48,7 +49,7 @@ function minerWork(name) {
 // Aller-retour (en ticks) entre le spawn de la salle et la source distante, ou null.
 function trip(room, source) {
   if (source.id in trips) return trips[source.id];
-  const spawn = room.find(FIND_MY_SPAWNS)[0];
+  const spawn = sources.mainSpawn(room);
   if (!spawn) return null;
   const result = PathFinder.search(spawn.pos, { pos: new RoomPosition(source.x, source.y, source.room), range: 1 }, {
     plainCost: 1,
@@ -177,7 +178,7 @@ function roadPath(room, source, homeCosts) {
     return costs && saved.path[name].some((k) => costs.get(Math.floor(k / 50), k % 50) === 255);
   });
   if (saved && !blocked) return saved.path;
-  const spawn = room.find(FIND_MY_SPAWNS)[0];
+  const spawn = sources.mainSpawn(room);
   if (!spawn) return undefined;
   const result = PathFinder.search(spawn.pos, { pos: new RoomPosition(source.x, source.y, source.room), range: 1 }, {
     plainCost: 2, swampCost: 10, maxRooms: 2, maxOps: 6000, roomCallback: callback,

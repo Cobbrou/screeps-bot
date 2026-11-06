@@ -1,5 +1,6 @@
 const move = require('../move');
 const hauler = require('./hauler');
+const sources = require('../sources');
 
 // Remplit spawn, extensions et tours depuis le stockage, quand les liens ont remplacé les haulers.
 // Toujours plein entre deux livraisons : rien à remplir, il complète sa charge au stockage puis attend près du spawn.
@@ -25,7 +26,7 @@ module.exports.run = function (creep) {
     if (creep.store.getFreeCapacity()) {
       creep.memory.working = false;
     } else {
-      const spawn = creep.room.find(FIND_MY_SPAWNS)[0];
+      const spawn = sources.mainSpawn(creep.room);
       if (spawn && !creep.pos.inRangeTo(spawn, 3)) move.to(creep, spawn, { range: 3 });
       return;
     }

@@ -6,8 +6,10 @@ const INTERVAL = 100;
 const MAX_RADIUS = 8;
 // Types placés par le plan de base, dans l'ordre d'attribution des cases à RCL égal.
 const PLANNED = [STRUCTURE_STORAGE, STRUCTURE_TOWER, STRUCTURE_EXTENSION];
-// Types ajoutés au plan après coup (planLinks, planExtras), posés selon le RCL comme les autres.
-const EXTRA = [STRUCTURE_LINK, STRUCTURE_TERMINAL, STRUCTURE_EXTRACTOR, STRUCTURE_LAB];
+// Structures des RCL 7 et 8, réservées près du stockage (planLate) dans cet ordre.
+const LATE = [STRUCTURE_SPAWN, STRUCTURE_FACTORY, STRUCTURE_POWER_SPAWN, STRUCTURE_NUKER, STRUCTURE_OBSERVER];
+// Types ajoutés au plan après coup (planLinks, planExtras, planLate), posés selon le RCL comme les autres.
+const EXTRA = [STRUCTURE_LINK, STRUCTURE_TERMINAL, STRUCTURE_EXTRACTOR, STRUCTURE_LAB, ...LATE];
 // Bloc de labs 4 × 4 (décalages depuis son coin) : les 2 labs d'entrée au centre sont à portée 2 de tous les autres
 // (runReaction). La diagonale reste libre pour le passage ; les 8 labs de sortie la touchent tous, coins opposés vides.
 const LAB_INPUTS = [[1, 2], [2, 1]];
@@ -322,25 +324,29 @@ function planLinks(room, plan, costs) {
   }
 }
 
-// Terminal, extracteur et labs (RCL 6 à 8), ajoutés une fois au plan (plan.terminal, plan.extractor, plan.lab).
-// Cases libres : ni mur, ni coût non nul (structure, route gardée, case du plan), ni portée 2 d'une source,
+// Test des cases libres : ni mur, ni coût non nul (structure, route gardée, case du plan), ni portée 2 d'une source,
 // du minerai ou du contrôleur, ni voisine du hub (postes des upgraders).
+function freeCell(room, plan, costs) {
+  const terrain = room.getTerrain();
+  const avoid = [...sources.list(room), room.controller, ...room.find(FIND_MINERALS)].map((o) => o.pos.x * 50 + o.pos.y);
+  const hubCells = plan.hub ? [plan.hub.container, plan.hub.storage].filter((k) => k !== undefined) : [];
+  return (k) => {
+    const x = Math.floor(k / 50);
+    const y = k % 50;
+    return x >= 2 && x <= 47 && y >= 2 && y <= 47 && terrain.get(x, y) !== TERRAIN_MASK_WALL && costs.get(x, y) === 0
+      && !avoid.some((a) => range(a, k) <= 2) && !hubCells.some((h) => range(h, k) <= 1);
+  };
+}
+
+// Terminal, extracteur et labs (RCL 6 à 8), ajoutés une fois au plan (plan.terminal, plan.extractor, plan.lab).
 // Terminal : première case libre à portée 2 à 4 du stockage. Extracteur : sur le minerai.
 // Labs : bloc 4 × 4 libre (LAB_*) le plus proche du stockage dont la diagonale est joignable depuis le stockage ;
 // labs d'entrée d'abord, posés aux premiers RCL. Pas de bloc libre : pas de labs.
 // ponytail: diagonale des labs sans route, bloc 4 × 4 fixe ; route ou disposition libre si les labs servent beaucoup.
 function planExtras(room, plan, costs) {
   if (plan.terminal) return;
-  const terrain = room.getTerrain();
   const mineral = room.find(FIND_MINERALS)[0];
-  const avoid = [...sources.list(room), room.controller, ...(mineral ? [mineral] : [])].map((o) => o.pos.x * 50 + o.pos.y);
-  const hubCells = plan.hub ? [plan.hub.container, plan.hub.storage].filter((k) => k !== undefined) : [];
-  const free = (k) => {
-    const x = Math.floor(k / 50);
-    const y = k % 50;
-    return x >= 2 && x <= 47 && y >= 2 && y <= 47 && terrain.get(x, y) !== TERRAIN_MASK_WALL && costs.get(x, y) === 0
-      && !avoid.some((a) => range(a, k) <= 2) && !hubCells.some((h) => range(h, k) <= 1);
-  };
+  const free = freeCell(room, plan, costs);
   const take = (type, k) => {
     plan[type].push(k);
     costs.set(Math.floor(k / 50), k % 50, 255);
@@ -370,6 +376,31 @@ function planExtras(room, plan, costs) {
     if (result.incomplete) continue;
     for (const k of labs) take(STRUCTURE_LAB, k);
     break;
+  }
+}
+
+// Spawns suivants (RCL 7 et 8), factory, power spawn, nuker et observer, ajoutés une fois au plan : cases libres les
+// plus proches du stockage, en damier autour de lui pour laisser passer les créeps, sans structure (rempart de porte).
+// plan.spawn commence par les spawns existants. L'énergie d'un spawn vient de toute la salle : le suivant peut être au hub.
+// Seuls les spawns sont posés : les autres types restent réservés tant qu'aucun code ne les utilise.
+function planLate(room, plan, costs) {
+  if (plan[STRUCTURE_SPAWN]) return;
+  const free = freeCell(room, plan, costs);
+  const storage = plan[STRUCTURE_STORAGE][0];
+  const even = (k) => (Math.floor(k / 50) + k % 50 + Math.floor(storage / 50) + storage % 50) % 2 === 0;
+  const cells = [];
+  for (let r = 2; r <= MAX_RADIUS; r++) {
+    cells.push(...around(storage, r).filter((k) => even(k) && free(k)
+      && !room.lookForAt(LOOK_STRUCTURES, Math.floor(k / 50), k % 50).length));
+  }
+  plan[STRUCTURE_SPAWN] = room.find(FIND_MY_SPAWNS).map((s) => s.pos.x * 50 + s.pos.y);
+  for (const type of LATE) {
+    plan[type] = plan[type] || [];
+    while (plan[type].length < CONTROLLER_STRUCTURES[type][8] && cells.length) {
+      const k = cells.shift();
+      plan[type].push(k);
+      costs.set(Math.floor(k / 50), k % 50, 255);
+    }
   }
 }
 
@@ -560,7 +591,7 @@ module.exports.run = function () {
     slots = MAX_ACTIVE_SITES - activeSites(room);
     blocked = false;
     waiting[room.name] = false;
-    const spawn = room.find(FIND_MY_SPAWNS)[0];
+    const spawn = sources.mainSpawn(room);
     if (!spawn) continue;
 
     // Plan d'avant le hub : refait (les structures construites sont reprises), avant costMatrix qui en bloquerait les cases.
@@ -601,6 +632,8 @@ module.exports.run = function () {
     // ponytail: à réactiver avec buildPlan quand leur code existe.
     // ponytail: pas de route jusqu'au minerai (mineur peu fréquent) ; à poser si son transport coûte trop.
     planExtras(room, plan, costs);
+    planLate(room, plan, costs);
+    buildPlan(room, plan, STRUCTURE_SPAWN);
     buildPlan(room, plan, STRUCTURE_EXTRACTOR);
     const mineral = room.find(FIND_MINERALS)[0];
     // Terminal seulement avec du minerai à vendre : 100 000 d'énergie, et son chantier bloque les nouveaux upgraders.

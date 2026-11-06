@@ -123,7 +123,8 @@ Priorité immédiate, d'après l'[analyse de E25S3](docs/e25s3-analysis.md) : l'
 
 ## Phase 7 : logistique avancée (RCL 5-6)
 
-- [ ] Plan de base : `filler` fixe au stockage, spawns suivants et liens à côté du stockage
+- [x] Plan de base : spawns suivants à côté du stockage (lien du hub déjà à portée 2)
+- [ ] `filler` : lien près du premier spawn (RCL 7, 4e lien) pour raccourcir ses trajets. Filler fixe au stockage écarté : le stockage est au hub du contrôleur, à 16 cases du spawn sur E25S3, hors de portée des extensions
 - [ ] Créeps sur chemins pré-calculés et mis en cache dans la salle : moins de pathfinding
 
 - [x] Planner : terminal (portée 2 à 4 du stockage), extracteur et conteneur du minerai au bout de son chemin, 10 labs en bloc 4 × 4 (labs d'entrée au centre, diagonale libre) ajoutés au plan (RCL 6), cases réservées sans rien poser tant que leur code n'existe pas (extracteur et conteneur du minerai posés depuis)
@@ -143,7 +144,7 @@ Priorité immédiate, d'après l'[analyse de E25S3](docs/e25s3-analysis.md) : l'
 
 ## Phase 9 : défense et attaque avancées (RCL 7+)
 
-- [ ] Planner : 2e spawn (RCL 7), factory, observer, puis 3e spawn, power spawn et nuker (RCL 8) ajoutés au plan
+- [x] Planner : 2e spawn (RCL 7), factory, observer, puis 3e spawn, power spawn et nuker (RCL 8) ajoutés au plan (cases réservées près du stockage ; seuls les spawns sont posés)
 - [ ] Remparts par coupe minimale (min-cut) autour de la base au lieu de la ceinture aux sorties, une fois le plan gardé
 - [ ] Défense des salles de remote mining (créeps distants, tours de garde)
 - [ ] Boosts des défenseurs depuis les laboratoires
