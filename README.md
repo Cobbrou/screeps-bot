@@ -57,7 +57,7 @@ screeps-bot/
 │   ├── defense.js           # tours, mode sans échec, détection des hostiles
 │   ├── expansion.js         # choix de la salle à revendiquer, pose de son premier spawn
 │   ├── intel.js             # renseignements sur les salles explorées (Memory.rooms[*].intel)
-│   ├── market.js            # vente du minerai du terminal au meilleur ordre d'achat
+│   ├── market.js            # vente du minerai au meilleur ordre d'achat, équilibrage de l'énergie entre salles
 │   ├── memory.js            # nettoyage de Memory (créeps morts)
 │   ├── move.js              # déplacements : moveTo avec contournement des créeps en cas de blocage
 │   ├── remoteMining.js      # récolte distante : salles et sources exploitées, besoins en mineurs, transporteurs et reservers

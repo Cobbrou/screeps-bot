@@ -133,7 +133,7 @@ Priorité immédiate, d'après l'[analyse de E25S3](docs/e25s3-analysis.md) : l'
 - [x] Nombre d'`upgrader` et taille des corps selon l'énergie stockée : stock compté dans le revenu net, corps limité au manque de `WORK` (4 au moins)
 - [x] Extracteur et mineur de minerai (RCL 6) : `mineralMiner` sur le conteneur du minerai, `mineralHauler` vers le stockage (100 000 au plus)
 - [x] Terminal (RCL 6) : posé dès que du minerai attend au stockage, rempli par le `mineralHauler` (minerai, 5 000 d'énergie)
-- [ ] Terminal : équilibrage de l'énergie entre nos salles
+- [x] Terminal : équilibrage de l'énergie entre nos salles (`market` : de la plus riche, 100 000 au moins, vers la plus pauvre, sous 50 000 ; le `mineralHauler` range l'envoi au stockage)
 
 ## Phase 8 : économie et marché (RCL 6+)
 

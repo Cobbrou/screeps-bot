@@ -15,8 +15,8 @@ const box = (room) => {
 // Première ressource présente : un Store peut garder des clés à 0.
 const carried = (object) => Object.keys(object.store).find((r) => object.store[r] > 0);
 
-// Prochain chargement de la salle, ou undefined : conteneur du minerai, puis minerai du stockage vers le terminal,
-// puis énergie du terminal. `alive` : le transporteur existe déjà, il finit aussi les restes et les petits appoints.
+// Prochain chargement de la salle, ou undefined : conteneur du minerai, puis énergie reçue en trop au terminal,
+// puis minerai du stockage vers le terminal, puis énergie du terminal. `alive` : le transporteur existe déjà, il finit aussi les restes et les petits appoints.
 function job(room, alive) {
   const { storage, terminal } = room;
   if (!storage) return undefined;
@@ -24,6 +24,7 @@ function job(room, alive) {
   const stock = source ? source.store.getUsedCapacity() : 0;
   if (stock >= LOAD || (alive && stock && !mineralMiner.wanted(room))) return { from: source, resource: carried(source) };
   if (!terminal) return undefined;
+  if (terminal.store[RESOURCE_ENERGY] >= TERMINAL_ENERGY + LOAD) return { from: terminal, resource: RESOURCE_ENERGY };
   const mineral = Object.keys(storage.store).find((r) => r !== RESOURCE_ENERGY && storage.store[r] > 0);
   if (mineral) return { from: storage, resource: mineral };
   const low = alive ? TERMINAL_ENERGY : TERMINAL_ENERGY / 2;
@@ -34,13 +35,15 @@ function job(room, alive) {
 // Vrai si la salle a besoin d'un transporteur.
 const ready = (room) => !!job(room, false);
 
-// Livre au terminal (au stockage sans terminal) ce qu'il porte, puis prend le chargement suivant.
+// Livre au terminal ce qu'il porte, puis prend le chargement suivant. Au stockage sans terminal, et pour l'énergie
+// dont le terminal n'a plus besoin (envoi reçu d'une autre salle).
 // Rien à prendre : attend le prochain voyage tant qu'un mineur est voulu, sinon se suicide.
 function run(creep) {
   const room = creep.room;
   const held = carried(creep);
   if (held) {
-    const dest = room.terminal || room.storage;
+    const { storage, terminal } = room;
+    const dest = !terminal || (held === RESOURCE_ENERGY && terminal.store[RESOURCE_ENERGY] >= TERMINAL_ENERGY) ? storage : terminal;
     if (dest && creep.transfer(dest, held) === ERR_NOT_IN_RANGE) move.to(creep, dest);
     return;
   }
