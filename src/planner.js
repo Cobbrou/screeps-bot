@@ -388,9 +388,13 @@ function planLate(room, plan, costs) {
   const free = freeCell(room, plan, costs);
   const storage = plan[STRUCTURE_STORAGE][0];
   const even = (k) => (Math.floor(k / 50) + k % 50 + Math.floor(storage / 50) + storage % 50) % 2 === 0;
+  // Diagonale de service des labs, retrouvée depuis le premier lab d'entrée : elle n'est pas gardée au plan.
+  const input = plan[STRUCTURE_LAB][0];
+  const corner = input - LAB_INPUTS[0][0] * 50 - LAB_INPUTS[0][1];
+  const labPath = plan[STRUCTURE_LAB].length ? LAB_PATH.map(([dx, dy]) => corner + dx * 50 + dy) : [];
   const cells = [];
   for (let r = 2; r <= MAX_RADIUS; r++) {
-    cells.push(...around(storage, r).filter((k) => even(k) && free(k)
+    cells.push(...around(storage, r).filter((k) => even(k) && free(k) && !labPath.includes(k)
       && !room.lookForAt(LOOK_STRUCTURES, Math.floor(k / 50), k % 50).length));
   }
   plan[STRUCTURE_SPAWN] = room.find(FIND_MY_SPAWNS).map((s) => s.pos.x * 50 + s.pos.y);
