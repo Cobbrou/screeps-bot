@@ -5,6 +5,9 @@ const defense = require('./defense');
 
 // Attente maximale (en ticks) de la régénération d'une source avant d'aller récolter ailleurs.
 const AWAY_MIN_WAIT = 100;
+// Énergie dans un conteneur de source au-delà de laquelle le transport ne suit plus (haulers à renforcer, lien débordé).
+// ponytail: stock instantané, un hauler de plus par spawn tant que ça dure ; peut en créer un ou deux de trop.
+const HAUL_BACKLOG = CONTAINER_CAPACITY / 2;
 // Nombre maximal de créeps partis récolter dans une même salle voisine, par source de cette salle.
 const AWAY_PER_SOURCE = 2;
 // Ticks consécutifs sans case libre autour de la source avant d'aller récolter ailleurs.
@@ -164,6 +167,12 @@ function sourceLink(source) {
   return box && box.pos.findInRange(FIND_MY_STRUCTURES, 1, {
     filter: (s) => s.structureType === STRUCTURE_LINK && s !== hub,
   })[0];
+}
+
+// Vrai si le lien de la source (et celui du hub) absorbe sa récolte : aucun hauler à y envoyer ni à prévoir.
+// Faux dès que son conteneur s'engorge (mineur sans CARRY, lien du hub jamais vidé).
+function linked(source) {
+  return !!sourceLink(source) && !!hubLink(source.room) && container(source).store[RESOURCE_ENERGY] <= HAUL_BACKLOG;
 }
 
 // Énergie posée au sol sur la case du dépôt, ou undefined.
@@ -360,4 +369,4 @@ function pickFrom(pile, box, free) {
   return inBox ? box : undefined;
 }
 
-module.exports = { list, spots, container, waitSpot, depot, depotPile, mainSpawn, hubLink, sourceLink, harvest, harvestSource, collect, goBack, stepAway, forget, pickFrom };
+module.exports = { list, spots, container, waitSpot, depot, depotPile, mainSpawn, hubLink, sourceLink, linked, HAUL_BACKLOG, harvest, harvestSource, collect, goBack, stepAway, forget, pickFrom };

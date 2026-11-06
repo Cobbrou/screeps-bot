@@ -34,7 +34,8 @@ function mineRate(source) {
 
 // Source à vider pour ce trajet. Énergie prévue à l'arrivée : stock, plus la production pendant le trajet,
 // moins la place libre des haulers déjà en route vers elle. La plus proche qui remplira le hauler, sinon celle
-// qui promet le plus (il attend sur place que les mineurs produisent).
+// qui promet le plus (il attend sur place que les mineurs produisent). Les sources liées sont écartées, leur conteneur
+// reste vide, sauf si toutes le sont.
 // ponytail: trajet estimé à la distance en ligne droite ; passer au chemin réel si les haulers se trompent de source.
 function dispatch(creep) {
   const reserved = {};
@@ -49,7 +50,9 @@ function dispatch(creep) {
   let fullRange = Infinity;
   let best;
   let bestExpected = -Infinity;
-  for (const source of sources.list(creep.room)) {
+  const list = sources.list(creep.room);
+  const unlinked = list.filter((s) => !sources.linked(s));
+  for (const source of unlinked.length ? unlinked : list) {
     const range = creep.pos.getRangeTo(source);
     const expected = stock(source) + mineRate(source) * range - (reserved[source.id] || 0);
     if (expected >= need && range < fullRange) {
@@ -93,7 +96,7 @@ function pickupTarget(creep) {
   }
 
   let source = Game.getObjectById(creep.memory.haul);
-  if (!source) {
+  if (!source || sources.linked(source)) {
     source = dispatch(creep);
     if (!source) return undefined;
     creep.memory.haul = source.id;

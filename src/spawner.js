@@ -33,9 +33,7 @@ const SCOUT_REFRESH = 5000;
 // levée au-dessus de DOWNGRADE_HIGH (hystérésis : chaque amélioration ne rend que 100 ticks).
 const DOWNGRADE_LOW = 0.1;
 const DOWNGRADE_HIGH = 0.2;
-// Énergie dans un conteneur de source au-delà de laquelle on ajoute un hauler : l'estimation de haulCapacity ne suit pas.
-// ponytail: stock instantané, un hauler de plus par spawn tant que ça dure ; peut en créer un ou deux de trop.
-const HAUL_BACKLOG = CONTAINER_CAPACITY / 2;
+const { HAUL_BACKLOG } = sources;
 // Plafond de ce renfort : capacité des haulers au plus HAUL_BACKLOG_RATIO fois le besoin estimé. Sans lui, quand
 // spawn et extensions sont pleins, les haulers restent pleins, les conteneurs s'engorgent et les renforts s'enchaînent.
 const HAUL_BACKLOG_RATIO = 3;
@@ -95,18 +93,18 @@ function needsMiner(source, miners) {
 // (2 énergie/tick par WORK, 10 au plus) sur l'aller-retour spawn ↔ source : aller à vide à une case par tick,
 // retour chargé selon le terrain et le profil des haulers (haulerRatio). Comparée à la capacité des haulers
 // vivants, et non à leur nombre : ceux nés avant les extensions portent moins qu'un corps neuf.
-// ponytail: chemin de la route du planner, alors que les haulers livrent aussi aux tours et au contrôleur.
+// Avec un stockage, le surplus y part une fois spawn et extensions pleins : si le stockage est plus loin que le spawn,
+// l'écart compte à l'aller et au retour (une case par tick, sur route).
+// ponytail: écart en ligne droite, sous le trajet réel (21 cases pour environ 28 ticks) ; HAUL_SHARE_MARGIN le couvre.
 function haulCapacity(room, source, work) {
   if (!work) return 0;
-  // Source liée (son lien et celui du hub construits) : l'énergie part au hub par le lien, sans hauler.
-  // Sauf si son conteneur s'engorge : le lien n'absorbe plus la récolte (mineur sans CARRY, lien du hub jamais vidé).
-  const box = sources.container(source);
-  if (sources.sourceLink(source) && sources.hubLink(room) && (!box || box.store[RESOURCE_ENERGY] <= HAUL_BACKLOG)) return 0;
+  if (sources.linked(source)) return 0;
   const rate = Math.min(work, MAX_MINER_WORK) * HARVEST_POWER;
   const scan = routeTerrain(room, source.id);
   // Sans route connue : la capacité d'un hauler neuf.
   if (!scan) return buildBody('hauler', room.energyCapacityAvailable, room).filter((p) => p === CARRY).length * CARRY_CAPACITY;
-  return (scan.factors.length + travelTime(scan.factors, haulerRatio(room), 1)) * rate;
+  const far = room.storage ? Math.max(0, source.pos.getRangeTo(room.storage) - scan.factors.length) : 0;
+  return (scan.factors.length + travelTime(scan.factors, haulerRatio(room), 1) + 2 * far) * rate;
 }
 
 // Revenu net soutenable de la salle (énergie/tick) : production des mineurs locaux (2 par WORK, 10 au plus par source)
