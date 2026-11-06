@@ -132,11 +132,12 @@ Priorité immédiate, d'après l'[analyse de E25S3](docs/e25s3-analysis.md) : l'
 - [x] `filler` dédié au spawn, aux extensions et aux tours depuis le stockage, quand les sources sont toutes liées (plus de hauler voulu) : sinon le dernier hauler mort déclenchait l'urgence `harvester`
 - [x] Nombre d'`upgrader` et taille des corps selon l'énergie stockée : stock compté dans le revenu net, corps limité au manque de `WORK` (4 au moins)
 - [x] Extracteur et mineur de minerai (RCL 6) : `mineralMiner` sur le conteneur du minerai, `mineralHauler` vers le stockage (100 000 au plus)
-- [ ] Terminal (RCL 6) : équilibrage de l'énergie entre nos salles
+- [x] Terminal (RCL 6) : posé dès que du minerai attend au stockage, rempli par le `mineralHauler` (minerai, 5 000 d'énergie)
+- [ ] Terminal : équilibrage de l'énergie entre nos salles
 
 ## Phase 8 : économie et marché (RCL 6+)
 
-- [ ] Vente des surplus de minerai sur le marché
+- [x] Vente du minerai sur le marché (`market`) : meilleur ordre d'achat net du transport, au moins 80 % du prix moyen sur 14 jours
 - [ ] Achat d'énergie ou de minerais manquants quand les crédits le permettent
 - [ ] Laboratoires : réactions de base
 

@@ -5,6 +5,7 @@ const spawner = require('./spawner');
 const planner = require('./planner');
 const defense = require('./defense');
 const expansion = require('./expansion');
+const market = require('./market');
 const stats = require('./stats');
 const move = require('./move');
 const roles = {
@@ -45,10 +46,11 @@ module.exports.loop = function () {
     // Pas notés par les rôles, exécutés ensemble pour pousser les créeps qui barrent la route.
     move.run();
   });
-  // Planification et expansion sautées quand le bucket est bas : non essentielles.
+  // Planification, expansion et ventes sautées quand le bucket est bas : non essentielles.
   if (!stats.lowBucket()) {
     stats.measure('planner', planner.run);
     stats.measure('expansion', expansion.run);
+    stats.measure('market', market.run);
   }
   stats.run();
 };

@@ -58,6 +58,7 @@ function run() {
     if (!room || !room.controller || !room.controller.my) delete Memory.stats.rooms[name];
   }
   Memory.stats.time = Game.time;
+  Memory.stats.credits = Game.market.credits;
   Memory.stats.cpu = { used: Game.cpu.getUsed(), limit: Game.cpu.limit, bucket: Game.cpu.bucket, modules };
   modules = {};
 

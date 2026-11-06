@@ -1,7 +1,7 @@
 const move = require('../move');
 const sources = require('../sources');
 
-// Au-delà de ce stock dans le stockage, plus de nouveau mineur : le minerai n'a pas encore de débouché.
+// Au-delà de ce stock (stockage et terminal), plus de nouveau mineur : les ventes ne suivent pas.
 const MINERAL_STOCK = 100000;
 
 const extractor = (mineral) => mineral.pos.lookFor(LOOK_STRUCTURES).find((s) => s.structureType === STRUCTURE_EXTRACTOR);
@@ -11,7 +11,8 @@ function wanted(room) {
   const mineral = room.find(FIND_MINERALS)[0];
   return !!mineral && mineral.mineralAmount > 0 && !!room.storage && !room.memory.storageLow
     && !!extractor(mineral) && !!sources.container(mineral)
-    && (room.storage.store[mineral.mineralType] || 0) < MINERAL_STOCK;
+    && (room.storage.store[mineral.mineralType] || 0)
+      + ((room.terminal && room.terminal.store[mineral.mineralType]) || 0) < MINERAL_STOCK;
 }
 
 // Se poste sur le conteneur du minerai et récolte à chaque fin de recharge de l'extracteur.

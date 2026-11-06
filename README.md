@@ -57,6 +57,7 @@ screeps-bot/
 │   ├── defense.js           # tours, mode sans échec, détection des hostiles
 │   ├── expansion.js         # choix de la salle à revendiquer, pose de son premier spawn
 │   ├── intel.js             # renseignements sur les salles explorées (Memory.rooms[*].intel)
+│   ├── market.js            # vente du minerai du terminal au meilleur ordre d'achat
 │   ├── memory.js            # nettoyage de Memory (créeps morts)
 │   ├── move.js              # déplacements : moveTo avec contournement des créeps en cas de blocage
 │   ├── remoteMining.js      # récolte distante : salles et sources exploitées, besoins en mineurs, transporteurs et reservers
@@ -73,7 +74,7 @@ screeps-bot/
 │       ├── hauler.js        # transporte l'énergie des conteneurs vers spawn, extensions, tours, dépôt du contrôleur
 │       ├── miner.js         # récolte statique sur une source (conteneur, ou au sol)
 │       ├── pioneer.js       # amorce la nouvelle salle (construit son spawn)
-│       ├── mineralHauler.js # vide le conteneur du minerai dans le stockage
+│       ├── mineralHauler.js # vide le conteneur du minerai, alimente le terminal en minerai et en énergie
 │       ├── mineralMiner.js  # récolte le minerai depuis son conteneur (extracteur, RCL 6)
 │       ├── remoteBuilder.js # construit et entretient les routes des salles distantes
 │       ├── remoteHauler.js  # ramasse l'énergie d'une source distante (sol, conteneur) et la rapporte
