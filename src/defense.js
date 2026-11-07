@@ -157,23 +157,23 @@ function defenders(room) {
 }
 
 // Tours : tirent sur la cible commune, sinon soignent, sinon réparent tant qu'elles gardent la moitié de leur énergie.
+// Une seule tour répare, la plus proche : une réparation coûte le même prix à toute portée et rend 4 fois moins de loin.
 function runTowers(room) {
   const towers = room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER });
   if (!towers.length) return;
   const enemy = target(room);
   const wounded = room.find(FIND_MY_CREEPS, { filter: (c) => c.hits < c.hitsMax });
-  let damaged;
-  for (const tower of towers) {
-    if (enemy) {
-      tower.attack(enemy);
-    } else if (wounded.length) {
-      tower.heal(tower.pos.findClosestByRange(wounded));
-    } else if (tower.store[RESOURCE_ENERGY] > tower.store.getCapacity(RESOURCE_ENERGY) / 2) {
-      // Cherchée une fois pour toutes les tours.
-      if (damaged === undefined) damaged = damagedStructure(room);
-      if (damaged) tower.repair(damaged);
-    }
+  if (enemy) {
+    for (const tower of towers) tower.attack(enemy);
+    return;
   }
+  if (wounded.length) {
+    for (const tower of towers) tower.heal(tower.pos.findClosestByRange(wounded));
+    return;
+  }
+  const ready = towers.filter((t) => t.store[RESOURCE_ENERGY] > t.store.getCapacity(RESOURCE_ENERGY) / 2);
+  const damaged = ready.length && damagedStructure(room);
+  if (damaged) damaged.pos.findClosestByRange(ready).repair(damaged);
 }
 
 // Mode sans échec en dernier recours : un spawn ou une tour est tombé sous la moitié de ses points de vie,
