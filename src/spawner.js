@@ -197,12 +197,13 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     // sur une source sans lien), et c'est le mineur qui doit passer, pas 81 ticks de spawn de filler.
     filler: room.storage && sources.hubLink(room) && !need && list.every((s) => sources.sourceLink(s)) ? 1 : 0,
     // Un hauler de plus tant que la capacité des haulers vivants reste sous le besoin, ou qu'un conteneur
-    // de source s'engorge (trajets plus lents ou plus longs que prévu : fatigue hors route, livraisons au contrôleur),
-    // dans la limite de HAUL_BACKLOG_RATIO fois le besoin.
+    // de source sans lien s'engorge (trajets plus lents ou plus longs que prévu : fatigue hors route, livraisons au contrôleur),
+    // dans la limite de HAUL_BACKLOG_RATIO fois le besoin. Source liée exclue : un hauler de plus coûterait plus que ce stock,
+    // ramassé en passant par ceux qui existent.
     hauler: (roomCounts.hauler || 0)
       + (need > (carry || 0)
         || ((carry || 0) < need * HAUL_BACKLOG_RATIO
-          && list.some((s) => { const box = sources.container(s); return box && box.store[RESOURCE_ENERGY] > HAUL_BACKLOG; }))
+          && list.some((s) => { const box = sources.container(s); return box && !sources.sourceLink(s) && box.store[RESOURCE_ENERGY] > HAUL_BACKLOG; }))
         ? 1 : 0),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
     // Après la récolte locale : il rend ses sources à la salle distante envahie.
