@@ -25,6 +25,10 @@ const ENCLOSED_STORED_PER_ENERGY = STORED_PER_ENERGY / 2;
 // les temps morts (EFFECTIVE_BUILD_POWER de harabibot), corps polyvalent WORK/CARRY/MOVE.
 const UPGRADE_SPEND = UPGRADE_CONTROLLER_POWER + (BODYPART_COST[WORK] + BODYPART_COST[MOVE] / 2) / CREEP_LIFE_TIME;
 const BUILD_SPEND = 4 + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPART_COST[MOVE]) / CREEP_LIFE_TIME;
+// Réparation seule (murs et remparts, sans chantier) : 1 énergie/tick par WORK (REPAIR_POWER × REPAIR_COST), 4 fois
+// moins qu'en construction. Compté avec BUILD_SPEND, le revenu ne financerait qu'un builder et les murs monteraient
+// 4 fois trop lentement pendant que le stockage se remplit.
+const REPAIR_SPEND = REPAIR_POWER * REPAIR_COST + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPART_COST[MOVE]) / CREEP_LIFE_TIME;
 // Rôles dont l'entretien est déduit du revenu : ceux qui récoltent et transportent.
 const ECONOMY_ROLES = ['miner', 'hauler', 'filler', 'remoteMiner', 'remoteHauler', 'reserver', 'mineralMiner', 'mineralHauler'];
 // Renseignements sur une salle voisine jugés périmés après ce nombre de ticks : un éclaireur va les rafraîchir.
@@ -186,7 +190,8 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   const need = list.reduce((sum, s) => sum + haulCapacity(room, s, (miners[s.id] || {}).work), 0);
   const bd = roomCounts.builder || 0;
   // Au moins un builder par chantier en cours, même à revenu nul ; murs et remparts seuls ou réparation : un seul.
-  const builder = building ? bd + (!bd || (work.builder || 0) < net / BUILD_SPEND ? 1 : 0)
+  const spend = sites.length ? BUILD_SPEND : REPAIR_SPEND;
+  const builder = building ? bd + (!bd || (work.builder || 0) < net / spend ? 1 : 0)
     : (sites.length || room.memory.swapBarrier || needsRepair(room) ? 1 : 0);
   return {
     // Selon la menace que les tours ne couvrent pas (voir defense.defenders).
