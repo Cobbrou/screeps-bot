@@ -25,6 +25,28 @@ function boxJob(room, alive) {
   return undefined;
 }
 
+// Minerai au sol, dans une pierre tombale ou une ruine (créep mort chargé) : les haulers ne ramassent que l'énergie.
+// Le plus proche joignable, ou undefined ; undefined aussi sans stockage ni terminal (où décharger).
+// Pas compté dans ready : les haulers inoccupés suffisent, pas de transporteur créé pour un tas.
+function leftover(creep) {
+  const room = creep.room;
+  if (!room.storage && !room.terminal) return undefined;
+  const mineral = (o) => Object.keys(o.store).find((r) => r !== RESOURCE_ENERGY && o.store[r] > 0);
+  const found = [
+    ...room.find(FIND_DROPPED_RESOURCES, { filter: (r) => r.resourceType !== RESOURCE_ENERGY }),
+    ...room.find(FIND_TOMBSTONES, { filter: mineral }),
+    ...room.find(FIND_RUINS, { filter: mineral }),
+  ].filter((o) => move.reachable(creep, o));
+  const from = creep.pos.findClosestByRange(found);
+  return from ? { from, resource: from.store ? mineral(from) : from.resourceType } : undefined;
+}
+
+// Prend le chargement `next` (job, boxJob ou leftover) : withdraw d'un Store, pickup d'un tas au sol.
+function take(creep, next) {
+  const result = next.from.store ? creep.withdraw(next.from, next.resource) : creep.pickup(next.from);
+  if (result === ERR_NOT_IN_RANGE) move.to(creep, next.from);
+}
+
 // Prochain chargement de la salle, ou undefined : conteneur du minerai, puis énergie reçue en trop au terminal,
 // puis minerai du stockage vers le terminal, puis énergie du terminal. `alive` : le transporteur existe déjà, il finit aussi les restes et les petits appoints.
 function job(room, alive) {
@@ -53,17 +75,18 @@ function unload(creep, held) {
 
 // Livre au terminal ce qu'il porte, puis prend le chargement suivant. Au stockage sans terminal, et pour l'énergie
 // dont le terminal n'a plus besoin (envoi reçu d'une autre salle).
+// Sans chargement, ramasse le minerai abandonné (leftover).
 // Rien à prendre : attend le prochain voyage tant qu'un mineur est voulu, sinon se suicide.
 function run(creep) {
   const room = creep.room;
   const held = carried(creep);
   if (held) return unload(creep, held);
-  const next = job(room, true);
+  const next = job(room, true) || leftover(creep);
   if (next) {
-    if (creep.withdraw(next.from, next.resource) === ERR_NOT_IN_RANGE) move.to(creep, next.from);
+    take(creep, next);
   } else if (!mineralMiner.wanted(room)) {
     creep.suicide();
   }
 }
 
-module.exports = { run, ready, boxJob, unload, LOAD };
+module.exports = { run, ready, boxJob, leftover, take, unload, LOAD };
