@@ -1,6 +1,7 @@
 const move = require('../move');
 const sources = require('../sources');
 const defense = require('../defense');
+const mineralHauler = require('./mineralHauler');
 
 // Énergie au sol au-delà de laquelle le dépôt sans conteneur n'est plus alimenté : le tas perd 1 par tranche
 // de 1 000 à chaque tick, inutile de l'entasser plus que ne le ferait un conteneur.
@@ -171,9 +172,14 @@ function collect(creep) {
   const t = pickupTarget(creep);
   if (!t) return;
   if (t.wait) {
+    // Vide et sans source à vider : va chercher le minerai de l'extracteur (LOAD au moins), déchargé par run.
+    const mineral = !creep.store.getUsedCapacity() && mineralHauler.boxJob(creep.room, false);
     if (creep.store[RESOURCE_ENERGY] >= creep.store.getCapacity() / 2) {
       startDelivery(creep);
       deliver(creep);
+    } else if (mineral) {
+      delete creep.memory.haul;
+      if (creep.withdraw(mineral.from, mineral.resource) === ERR_NOT_IN_RANGE) move.to(creep, mineral.from);
     } else if (!creep.pos.inRangeTo(t.wait, t.range)) {
       fillNearby(creep);
       move.to(creep, t.wait, { range: t.range });
@@ -299,6 +305,9 @@ function emptied(creep) {
 }
 
 module.exports.run = function (creep) {
+  // Minerai pris à l'extracteur : déposé au terminal (ou au stockage) avant toute autre tâche.
+  const mineral = Object.keys(creep.store).find((r) => r !== RESOURCE_ENERGY && creep.store[r] > 0);
+  if (mineral) return mineralHauler.unload(creep, mineral);
   if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) creep.memory.working = false;
   if (!creep.memory.working && creep.store.getFreeCapacity() === 0) startDelivery(creep);
 

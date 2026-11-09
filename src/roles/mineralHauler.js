@@ -15,14 +15,23 @@ const box = (room) => {
 // Première ressource présente : un Store peut garder des clés à 0.
 const carried = (object) => Object.keys(object.store).find((r) => object.store[r] > 0);
 
+// Voyage au conteneur du minerai : LOAD au moins, ou le reste si `alive` et que plus aucun mineur n'est voulu.
+// Sert aussi aux haulers inoccupés. Undefined sans stockage (où décharger).
+function boxJob(room, alive) {
+  if (!room.storage) return undefined;
+  const source = box(room);
+  const stock = source ? source.store.getUsedCapacity() : 0;
+  if (stock >= LOAD || (alive && stock && !mineralMiner.wanted(room))) return { from: source, resource: carried(source) };
+  return undefined;
+}
+
 // Prochain chargement de la salle, ou undefined : conteneur du minerai, puis énergie reçue en trop au terminal,
 // puis minerai du stockage vers le terminal, puis énergie du terminal. `alive` : le transporteur existe déjà, il finit aussi les restes et les petits appoints.
 function job(room, alive) {
   const { storage, terminal } = room;
   if (!storage) return undefined;
-  const source = box(room);
-  const stock = source ? source.store.getUsedCapacity() : 0;
-  if (stock >= LOAD || (alive && stock && !mineralMiner.wanted(room))) return { from: source, resource: carried(source) };
+  const fromBox = boxJob(room, alive);
+  if (fromBox) return fromBox;
   if (!terminal) return undefined;
   if (terminal.store[RESOURCE_ENERGY] >= TERMINAL_ENERGY + LOAD) return { from: terminal, resource: RESOURCE_ENERGY };
   const mineral = Object.keys(storage.store).find((r) => r !== RESOURCE_ENERGY && storage.store[r] > 0);
@@ -35,18 +44,20 @@ function job(room, alive) {
 // Vrai si la salle a besoin d'un transporteur.
 const ready = (room) => !!job(room, false);
 
+// Dépose `held` au terminal : au stockage sans terminal, et pour l'énergie dont le terminal n'a plus besoin.
+function unload(creep, held) {
+  const { storage, terminal } = creep.room;
+  const dest = !terminal || (held === RESOURCE_ENERGY && terminal.store[RESOURCE_ENERGY] >= TERMINAL_ENERGY) ? storage : terminal;
+  if (dest && creep.transfer(dest, held) === ERR_NOT_IN_RANGE) move.to(creep, dest);
+}
+
 // Livre au terminal ce qu'il porte, puis prend le chargement suivant. Au stockage sans terminal, et pour l'énergie
 // dont le terminal n'a plus besoin (envoi reçu d'une autre salle).
 // Rien à prendre : attend le prochain voyage tant qu'un mineur est voulu, sinon se suicide.
 function run(creep) {
   const room = creep.room;
   const held = carried(creep);
-  if (held) {
-    const { storage, terminal } = room;
-    const dest = !terminal || (held === RESOURCE_ENERGY && terminal.store[RESOURCE_ENERGY] >= TERMINAL_ENERGY) ? storage : terminal;
-    if (dest && creep.transfer(dest, held) === ERR_NOT_IN_RANGE) move.to(creep, dest);
-    return;
-  }
+  if (held) return unload(creep, held);
   const next = job(room, true);
   if (next) {
     if (creep.withdraw(next.from, next.resource) === ERR_NOT_IN_RANGE) move.to(creep, next.from);
@@ -55,4 +66,4 @@ function run(creep) {
   }
 }
 
-module.exports = { run, ready, LOAD };
+module.exports = { run, ready, boxJob, unload, LOAD };
