@@ -480,7 +480,7 @@ function planContainer(room, target, range, end, wanted) {
   if (wanted && !built && !sites.length) place(room, end, STRUCTURE_CONTAINER);
 }
 
-// Chemin du spawn jusqu'à la cible (bout compris), ou undefined ; ses cases passent à 1 dans `costs`.
+// Chemin du spawn (ou d'une autre origine) jusqu'à la cible (bout compris), ou undefined ; ses cases passent à 1 dans `costs`.
 // Le chemin est gardé en mémoire (cases codées x * 50 + y) : le recalculer à chaque passage le ferait dévier
 // au gré des nouvelles structures et laisserait des tronçons orphelins. Il n'est recalculé que s'il est bloqué.
 // Il est calculé même sans conteneur ni route : le spawner s'en sert pour dimensionner les haulers.
@@ -488,8 +488,10 @@ function routePath(room, spawn, target, range, costs) {
   if (!room.memory.routes) room.memory.routes = {};
   const saved = room.memory.routes[target.id];
   let path = saved && saved.map((k) => new RoomPosition(Math.floor(k / 50), k % 50, room.name));
-  // Recalculé aussi si son bout n'est plus à portée de la cible (cible déplacée : hub du contrôleur).
-  if (!path || path.some((pos) => costs.get(pos.x, pos.y) === 255) || !path[path.length - 1].inRangeTo(target.pos, range)) {
+  // Recalculé aussi si son bout n'est plus à portée de la cible (cible déplacée : hub du contrôleur),
+  // ou son début plus à côté de l'origine (origine changée : minerai relié au stockage).
+  if (!path || path.some((pos) => costs.get(pos.x, pos.y) === 255) || !path[path.length - 1].inRangeTo(target.pos, range)
+    || !path[0].inRangeTo(spawn.pos, 1)) {
     const result = PathFinder.search(spawn.pos, { pos: target.pos, range }, {
       plainCost: 2,
       swampCost: 10,
@@ -703,7 +705,6 @@ module.exports.run = function () {
     if (plan.link) buildPlan(room, plan, STRUCTURE_LINK);
     // Labs : cases réservées au plan, mais rien n'est posé tant qu'aucun code ne les utilise.
     // ponytail: à réactiver avec buildPlan quand leur code existe.
-    // ponytail: pas de route jusqu'au minerai (mineur peu fréquent) ; à poser si son transport coûte trop.
     planExtras(room, plan, costs);
     planLate(room, plan, costs);
     planHubTowers(room, plan, costs);
@@ -712,7 +713,11 @@ module.exports.run = function () {
     const mineral = room.find(FIND_MINERALS)[0];
     // Terminal seulement avec du minerai à vendre : 100 000 d'énergie, et son chantier bloque les nouveaux upgraders.
     if (mineral && room.storage && room.storage.store[mineral.mineralType]) buildPlan(room, plan, STRUCTURE_TERMINAL);
-    if (mineral) planRoute(room, spawn, mineral, 1, costs, CONTROLLER_STRUCTURES[STRUCTURE_EXTRACTOR][room.controller.level] > 0);
+    // Chemin du minerai depuis le stockage (le terminal est à côté), sinon le spawn ; route une fois l'extracteur construit,
+    // pour les allers-retours du mineralHauler.
+    const minePath = mineral && planRoute(room, room.storage || spawn, mineral, 1, costs,
+      CONTROLLER_STRUCTURES[STRUCTURE_EXTRACTOR][room.controller.level] > 0);
+    if (minePath && mineral.pos.lookFor(LOOK_STRUCTURES).some((s) => s.structureType === STRUCTURE_EXTRACTOR)) paths.push(minePath);
     // Routes après tous les conteneurs : elles passent en dernier dans les places libres.
     for (const path of paths) if (path) planRoad(room, path, roads);
     // Routes de service des extensions et tours, après les routes principales.

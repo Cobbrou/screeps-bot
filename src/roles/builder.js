@@ -2,6 +2,7 @@ const move = require('../move');
 const planner = require('../planner');
 const sources = require('../sources');
 const upgraders = require('./upgrader');
+const defense = require('../defense');
 
 // Chantier prioritaire de la salle : ordre de construction du planner (planner.priority), puis le moins
 // de travail restant. Tous les builders y vont ensemble : chaque structure est finie au plus vite.
@@ -36,6 +37,17 @@ function repair(creep, ratio) {
   if (!damaged) return false;
   const result = creep.repair(damaged);
   if (result === ERR_NOT_IN_RANGE) move.to(creep, damaged);
+  else if (result === OK) sources.stepAway(creep);
+  return true;
+}
+
+// Répare la structure que les tours entretiennent (defense.damagedStructure : murs et remparts de la coupe compris) :
+// la défense passe avant l'amélioration. Vrai si le créep a de quoi réparer.
+function fortify(creep) {
+  const damaged = defense.damagedStructure(creep.room);
+  if (!damaged) return false;
+  const result = creep.repair(damaged);
+  if (result === ERR_NOT_IN_RANGE) move.to(creep, damaged, { range: 3 });
   else if (result === OK) sources.stepAway(creep);
   return true;
 }
@@ -104,7 +116,7 @@ function wait(creep) {
 }
 
 // Répare les structures très abîmées ; sinon construit les chantiers ; sinon remplace la barrière signalée ;
-// sinon répare ce qui est sous REPAIR_RATIO ;
+// sinon renforce murs et remparts avec les tours (fortify) ; sinon répare ce qui est sous REPAIR_RATIO ;
 // sinon améliore le contrôleur.
 // Sans stockage, les haulers apportent l'énergie (hauler.deliveryTarget) : le builder travaille dès qu'il en porte
 // et attend sur place sinon, au lieu de marcher jusqu'aux sources. Avec stockage ou sans hauler, il se recharge seul.
@@ -129,6 +141,7 @@ module.exports.run = function (creep) {
     if (repair(creep, URGENT_RATIO)) return;
     if (build(creep)) return;
     if (swapBarrier(creep)) return;
+    if (fortify(creep)) return;
     if (repair(creep, REPAIR_RATIO)) return;
     // Plus rien à construire ni à réparer : le builder devient upgrader s'il reste une place au dépôt
     // (le spawner ne crée pas d'upgrader pendant les chantiers, ceux-ci prennent le relais).

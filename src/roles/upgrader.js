@@ -17,12 +17,13 @@ function storageLow(room) {
   return !!room.memory.storageLow;
 }
 
-// Vrai si l'amélioration doit attendre : stockage bas, ou hostiles dangereux hors mode sans échec.
+// Vrai si l'amélioration doit attendre : stockage bas, ou salle pas encore sûre et réparée (hostiles hors mode
+// sans échec, chantiers, murs ou structures à réparer : voir defense.secure).
 // Jamais en cas de rétrogradation proche (drapeau room.memory.downgrade posé par le spawner).
 function paused(room) {
   if (room.memory.downgrade) return false;
   if (storageLow(room)) return true;
-  return !room.controller.safeMode && defense.threats(room).length > 0;
+  return !defense.secure(room);
 }
 
 // Sans dépôt (route du planner pas encore tracée) : alterne collecte et amélioration.

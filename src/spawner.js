@@ -169,7 +169,9 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   // downgrading avant paused : il pose le drapeau qui lève la pause.
   const urgent = downgrading(room);
   const sites = room.find(FIND_MY_CONSTRUCTION_SITES);
-  const building = sites.some((s) => s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART);
+  // Tout chantier, murs et remparts compris, et toute réparation des tours (defense.damagedStructure) : les builders
+  // prennent le revenu, l'amélioration attend que la salle soit sûre et réparée (voir upgrader.paused).
+  const building = sites.length > 0 || !!defense.damagedStructure(room);
   const up = roomCounts.upgrader || 0;
   // Plus petit corps d'upgrader possible ici : avant les extensions, la capacité ne permet pas MIN_UPGRADER_WORK.
   const step = Math.min(MIN_UPGRADER_WORK, buildBody('upgrader', room.energyCapacityAvailable, room).filter((p) => p === WORK).length);

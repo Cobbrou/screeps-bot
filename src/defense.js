@@ -78,6 +78,14 @@ function damagedStructure(room) {
   return damaged;
 }
 
+// Vrai si la salle est sûre et réparée : aucun hostile dangereux (hors mode sans échec), aucun chantier,
+// rien à réparer (damagedStructure). Sinon l'amélioration attend (voir upgrader.paused) : l'énergie va d'abord
+// aux builders et aux tours.
+function secure(room) {
+  if (!room.controller.safeMode && threats(room).length) return false;
+  return !room.find(FIND_MY_CONSTRUCTION_SITES).length && !damagedStructure(room);
+}
+
 // Dégâts d'une tour à `range` : TOWER_POWER_ATTACK jusqu'à TOWER_OPTIMAL_RANGE, puis baisse linéaire
 // jusqu'à TOWER_FALLOFF (75 %) de perte à TOWER_FALLOFF_RANGE et au-delà.
 function towerDamage(range) {
@@ -216,3 +224,5 @@ module.exports.FRIENDS = FRIENDS;
 module.exports.INVADER = INVADER;
 module.exports.target = target;
 module.exports.defenders = defenders;
+module.exports.damagedStructure = damagedStructure;
+module.exports.secure = secure;
