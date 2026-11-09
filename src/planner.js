@@ -705,19 +705,18 @@ function buildCut(room, plan, costs) {
 }
 
 // Retire les chantiers restés à 0 de progression plus de SITE_TTL ticks, sur tout le compte.
-// Memory.sites garde le tick où chaque chantier a été vu sans progression pour la première fois.
+// Memory.sites garde le tick où chaque chantier a été vu pour la première fois : âge pour ce retrait,
+// et ordre de construction des builders (les plus anciens d'abord).
 function removeStaleSites() {
   const seen = Memory.sites = Memory.sites || {};
   for (const id in seen) {
-    const site = Game.constructionSites[id];
-    if (!site || site.progress) delete seen[id];
+    if (!Game.constructionSites[id]) delete seen[id];
   }
   for (const id in Game.constructionSites) {
     const site = Game.constructionSites[id];
-    if (site.progress) continue;
     if (!seen[id]) {
       seen[id] = Game.time;
-    } else if (Game.time - seen[id] > SITE_TTL && site.remove() === OK) {
+    } else if (!site.progress && Game.time - seen[id] > SITE_TTL && site.remove() === OK) {
       delete seen[id];
     }
   }
