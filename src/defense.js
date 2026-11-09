@@ -20,6 +20,9 @@ const REPAIR_SCAN_INTERVAL = 10;
 // n'a que 1 PV) pendant que la tour fait la tournée des murs au même ratio.
 const RAMPART_DYING = 2 * RAMPART_DECAY_AMOUNT;
 
+// Structures dont la perte déclenche le mode sans échec (lastResort).
+const VITAL = [STRUCTURE_SPAWN, STRUCTURE_TOWER, STRUCTURE_STORAGE, STRUCTURE_TERMINAL];
+
 // Structures qui ne justifient pas un rempart sur leur case.
 const UNCOVERED = [STRUCTURE_WALL, STRUCTURE_RAMPART, STRUCTURE_ROAD, STRUCTURE_CONTAINER];
 
@@ -129,8 +132,19 @@ function hostileHeal(target, hostiles) {
   return heal;
 }
 
+// Vrai si les tours (et `extra` dégâts/tick sans coût d'énergie, ceux des défenseurs) tuent `h` avant de se vider :
+// dégâts moins soin hostile, multipliés par le nombre de salves que l'énergie moyenne des tours permet, au moins ses PV.
+// Dépasser le soin ne suffit pas : une paire d'Invaders au bord de la salle, à portée 30 des tours, prend 12 PV
+// nets par tick et vide les tours avant d'arriver au contact, où elles l'auraient tuée.
+function killable(h, hostiles, towers, extra) {
+  const net = salvo(towers, h) + extra - hostileHeal(h, hostiles);
+  const energy = towers.reduce((sum, t) => sum + t.store[RESOURCE_ENERGY], 0);
+  const shots = towers.length ? energy / (TOWER_ENERGY_COST * towers.length) : Infinity;
+  return net > 0 && net * shots >= h.hits;
+}
+
 // Hostile visé par les tours (et en priorité par les défenseurs), ou null.
-// Seuls comptent ceux dont les dégâts estimés des tours et des défenseurs à portée dépassent le soin hostile : sinon les tours se vident pour rien.
+// Seuls comptent ceux que tours et défenseurs à portée peuvent tuer (killable) : sinon les tours se vident pour rien.
 // Priorité : soigneur, puis claimer (attackController bloque l'amélioration), puis cible tuée par cette salve,
 // puis celle qui prend le plus de dégâts (la plus proche des tours).
 function target(room) {
@@ -142,7 +156,7 @@ function target(room) {
   let bestKey = Infinity;
   for (const h of hostiles) {
     const damage = salvo(towers, h) + defenderDamage(h);
-    if (damage <= hostileHeal(h, hostiles)) continue;
+    if (!killable(h, hostiles, towers, defenderDamage(h))) continue;
     const rank = h.getActiveBodyparts(HEAL) ? 0 : h.getActiveBodyparts(CLAIM) ? 1 : h.hits <= damage ? 2 : 3;
     const key = rank * 1e6 - damage;
     if (key < bestKey) {
@@ -154,7 +168,7 @@ function target(room) {
   return best;
 }
 
-// Défenseurs voulus : aucun si les tours peuvent entamer chaque hostile, sinon assez de RANGED_ATTACK
+// Défenseurs voulus : aucun si les tours peuvent tuer chaque hostile (killable), sinon assez de RANGED_ATTACK
 // pour égaler les parties ATTACK, RANGED_ATTACK et HEAL hostiles (au moins 1, au plus MAX_DEFENDERS).
 // Aucun en mode sans échec : les hostiles ne peuvent rien contre la salle.
 // Aucun non plus si un défenseur et les tours ne dépassent le soin d'aucun hostile : arrivés un à un, ils meurent
@@ -165,7 +179,7 @@ function defenders(room) {
   const hostiles = threats(room);
   if (!hostiles.length) return 0;
   const towers = loadedTowers(room);
-  if (towers.length && hostiles.every((h) => salvo(towers, h) > hostileHeal(h, hostiles))) return 0;
+  if (towers.length && hostiles.every((h) => killable(h, hostiles, towers, 0))) return 0;
   const parts = hostiles.reduce((sum, h) => sum + h.getActiveBodyparts(ATTACK)
     + h.getActiveBodyparts(RANGED_ATTACK) + h.getActiveBodyparts(HEAL), 0);
   // RANGED_ATTACK d'un défenseur à la capacité de la salle (corps [RANGED_ATTACK, MOVE] répété, voir spawner).
@@ -196,7 +210,8 @@ function runTowers(room) {
   if (damaged) damaged.pos.findClosestByRange(ready).repair(damaged);
 }
 
-// Mode sans échec en dernier recours : un spawn ou une tour est tombé sous la moitié de ses points de vie,
+// Mode sans échec en dernier recours : un spawn, une tour, le stockage ou le terminal est tombé sous la moitié
+// de ses points de vie (le rempart qui le couvrait est tombé),
 // ou un claimer hostile approche du contrôleur. Activé avant son premier attackController : un contrôleur
 // `upgradeBlocked` peut refuser le mode sans échec (la doc le confirme pour les nukes) ; l'appel est tenté quand même.
 function lastResort(room, hostiles) {
@@ -204,8 +219,7 @@ function lastResort(room, hostiles) {
   if (c.safeMode || c.safeModeCooldown || !c.safeModeAvailable) return;
   const claimer = hostiles.some((h) => h.getActiveBodyparts(CLAIM) && h.pos.inRangeTo(c, CLAIMER_ALERT_RANGE));
   if (claimer || room.find(FIND_MY_STRUCTURES, {
-    filter: (s) => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_TOWER)
-      && s.hits < s.hitsMax / 2,
+    filter: (s) => VITAL.includes(s.structureType) && s.hits < s.hitsMax / 2,
   }).length) c.activateSafeMode();
 }
 
@@ -223,6 +237,7 @@ module.exports.threats = threats;
 module.exports.FRIENDS = FRIENDS;
 module.exports.INVADER = INVADER;
 module.exports.target = target;
+module.exports.towerDamage = towerDamage;
 module.exports.defenders = defenders;
 module.exports.damagedStructure = damagedStructure;
 module.exports.secure = secure;

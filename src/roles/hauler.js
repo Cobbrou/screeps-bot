@@ -70,9 +70,18 @@ function dispatch(creep) {
   return full || best;
 }
 
+// Vrai si une tour attend sa livraison (TOWER_REFILL manquant, ou le moindre manque face aux hostiles).
+function hungryTower(room, threatened) {
+  return room.find(FIND_MY_STRUCTURES, {
+    filter: (s) => s.structureType === STRUCTURE_TOWER
+      && s.store.getFreeCapacity(RESOURCE_ENERGY) >= (threatened ? 1 : TOWER_REFILL),
+  }).length > 0;
+}
+
 // Où prendre l'énergie : tas hors des sources, pierre tombale ou ruine (en début de trajet), sinon la source
 // attribuée pour le trajet (`creep.memory.haul`, choisie par dispatch) : son tas ou son conteneur (sources.pickFrom).
-// Le stockage remplace une source trop maigre quand spawn ou extensions attendent.
+// Le stockage remplace une source trop maigre quand spawn, extensions ou une tour attendent : sans ça, une tour
+// loin des sources reste vide pendant une attaque, stockage plein.
 // Retourne l'objet où puiser, ou { wait, range } : où attendre que la source produise.
 // L'énergie posée près du contrôleur (par les remoteHauler) est laissée aux upgraders et aux builders.
 // Tas, pierres tombales et ruines près d'un hostile (DANGER_RANGE) sont laissés.
@@ -110,7 +119,7 @@ function pickupTarget(creep) {
   const free = creep.store.getFreeCapacity(RESOURCE_ENERGY);
   const storage = room.storage;
   if (stock(source) < free && storage && storage.store[RESOURCE_ENERGY] >= free
-    && room.energyAvailable < room.energyCapacityAvailable) {
+    && (room.energyAvailable < room.energyCapacityAvailable || hungryTower(room, hostiles.length > 0))) {
     delete creep.memory.haul;
     creep.memory.pickupId = storage.id;
     return storage;

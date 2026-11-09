@@ -1,6 +1,7 @@
 const sources = require('./sources');
 const remoteMining = require('./remoteMining');
 const minCut = require('./minCut');
+const defense = require('./defense');
 
 // Le plan est recalculé tous les INTERVAL ticks : les chantiers manquants sont recréés.
 const INTERVAL = 100;
@@ -428,7 +429,8 @@ function planLate(room, plan, costs) {
 }
 
 // Tours des RCL 7 et 8 : déplacées une fois au plan (plan.hubTowers) sur les cases de lateCells. Les 2 premières
-// restent au spawn ; les suivantes couvrent le hub, stockage et contrôleur, à l'écart du damier.
+// restent au spawn ; les suivantes couvrent le hub, stockage et contrôleur, à l'écart du damier. L'ordre de
+// construction de toutes ces cases est ensuite fixé par orderTowers.
 // Une tour déjà construite ou en chantier garde sa case.
 function planHubTowers(room, plan, costs) {
   if (plan.hubTowers) return;
@@ -444,6 +446,64 @@ function planHubTowers(room, plan, costs) {
     towers[i] = k;
     costs.set(Math.floor(k / 50), k % 50, 255);
   }
+}
+
+// Couverture d'un jeu de tours : dégâts cumulés sur la case la moins bien couverte de `cells`.
+function coverage(towers, cells) {
+  let worst = Infinity;
+  for (const c of cells) worst = Math.min(worst, towers.reduce((sum, t) => sum + defense.towerDamage(range(t, c)), 0));
+  return worst;
+}
+
+// Ordre de construction des tours, fixé une fois (plan.towerOrder), après planHubTowers : la meilleure paire
+// d'abord (RCL 5 et 6), puis à chaque rang la case qui complète le mieux les précédentes. Meilleure = la plus
+// forte couverture du cœur (spawns, stockage, terminal), puis de toute la base (extensions et liens compris) :
+// une base étalée entre le spawn et le hub n'a plus ses 2 premières tours collées au spawn.
+// Les cases ne changent pas, seul leur ordre : la base complète du RCL 8 reste la même.
+function orderTowers(plan) {
+  if (plan.towerOrder) return;
+  plan.towerOrder = true;
+  const core = [STRUCTURE_SPAWN, STRUCTURE_STORAGE, STRUCTURE_TERMINAL].flatMap((t) => plan[t] || []);
+  const all = [...core, ...[STRUCTURE_EXTENSION, STRUCTURE_LINK].flatMap((t) => plan[t] || [])];
+  if (!core.length) return;
+  const better = (a, b) => !b || a[0] > b[0] || (a[0] === b[0] && a[1] > b[1]);
+  const score = (towers) => [coverage(towers, core), coverage(towers, all)];
+  const rest = plan[STRUCTURE_TOWER].slice();
+  const order = [];
+  let best;
+  for (let i = 0; i < rest.length; i++) {
+    for (let j = i + 1; j < rest.length; j++) {
+      const s = score([rest[i], rest[j]]);
+      if (better(s, best && best.s)) best = { s, pair: [rest[i], rest[j]] };
+    }
+  }
+  if (best) for (const k of best.pair) order.push(...rest.splice(rest.indexOf(k), 1));
+  while (rest.length) {
+    let pick = 0;
+    let top;
+    rest.forEach((k, i) => {
+      const s = score([...order, k]);
+      if (better(s, top)) {
+        top = s;
+        pick = i;
+      }
+    });
+    order.push(...rest.splice(pick, 1));
+  }
+  plan[STRUCTURE_TOWER] = order;
+}
+
+// Tour construite hors des cases que le RCL autorise (ordre changé par orderTowers) alors que toutes les tours
+// permises existent : détruite, la case attendue la remplace au passage suivant. Seulement sans danger (aucun
+// hostile, ou mode sans échec) et avec de quoi la reconstruire au stockage : la salle reste un temps à une tour de moins.
+function moveTowers(room, plan) {
+  const allowed = new Set(plan[STRUCTURE_TOWER].slice(0, CONTROLLER_STRUCTURES[STRUCTURE_TOWER][room.controller.level]));
+  const towers = room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER });
+  if (towers.length < allowed.size) return;
+  const stray = towers.find((t) => !allowed.has(t.pos.x * 50 + t.pos.y));
+  if (!stray || !room.storage || room.storage.store[RESOURCE_ENERGY] < CONSTRUCTION_COST[STRUCTURE_TOWER]) return;
+  if (!room.controller.safeMode && defense.threats(room).length) return;
+  stray.destroy();
 }
 
 // Pose les structures du plan de ce type que le RCL autorise et qui manquent (ni la structure ni un chantier
@@ -708,6 +768,8 @@ module.exports.run = function () {
     planExtras(room, plan, costs);
     planLate(room, plan, costs);
     planHubTowers(room, plan, costs);
+    orderTowers(plan);
+    moveTowers(room, plan);
     buildPlan(room, plan, STRUCTURE_SPAWN);
     buildPlan(room, plan, STRUCTURE_EXTRACTOR);
     const mineral = room.find(FIND_MINERALS)[0];
@@ -750,3 +812,4 @@ module.exports.run = function () {
 };
 
 module.exports.priority = priority;
+module.exports.orderTowers = orderTowers;
