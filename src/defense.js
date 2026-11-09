@@ -34,6 +34,11 @@ const VITAL = [STRUCTURE_SPAWN, STRUCTURE_TOWER, STRUCTURE_STORAGE, STRUCTURE_TE
 // Structures qui ne justifient pas un rempart sur leur case.
 const UNCOVERED = [STRUCTURE_WALL, STRUCTURE_RAMPART, STRUCTURE_ROAD, STRUCTURE_CONTAINER];
 
+// Portée de RANGED_ATTACK : un défenseur posté sur un rempart tire sur un hostile à cette portée.
+const DEFENDER_RANGE = 3;
+
+// Intérieur de la coupe par salle ({ cut, cells }), gardé jusqu'au reset du global, recalculé si plan.cut change.
+const insideCache = {};
 // Structure à réparer par salle et tick de la dernière recherche, gardés jusqu'au reset du global.
 const repairCache = {};
 // Cible commune des tours et des défenseurs, par salle, recalculée à chaque tick.
@@ -182,8 +187,63 @@ function target(room) {
   return best;
 }
 
+// Cases (x * 50 + y) à l'intérieur de la coupe (plan.cut) : atteintes depuis un spawn sans traverser la coupe,
+// cases de la coupe exclues. null sans coupe ou sans spawn : toute la salle compte comme l'intérieur.
+function insideCells(room) {
+  const cut = room.memory.plan && room.memory.plan.cut;
+  const spawn = room.find(FIND_MY_SPAWNS)[0];
+  if (!cut || !spawn) return null;
+  const id = cut.join();
+  const cached = insideCache[room.name];
+  if (cached && cached.cut === id) return cached.cells;
+  const terrain = room.getTerrain();
+  const closed = new Set(cut);
+  const start = spawn.pos.x * 50 + spawn.pos.y;
+  const cells = new Set([start]);
+  const queue = [start];
+  for (let i = 0; i < queue.length; i++) {
+    const x = Math.floor(queue[i] / 50);
+    const y = queue[i] % 50;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const k = (x + dx) * 50 + y + dy;
+        if (x + dx < 0 || x + dx > 49 || y + dy < 0 || y + dy > 49 || cells.has(k) || closed.has(k)) continue;
+        if (terrain.get(x + dx, y + dy) === TERRAIN_MASK_WALL) continue;
+        cells.add(k);
+        queue.push(k);
+      }
+    }
+  }
+  insideCache[room.name] = { cut: id, cells };
+  return cells;
+}
+
+// Vrai si `pos` est à l'intérieur des murs (voir insideCells).
+function inBase(room, pos) {
+  const cells = insideCells(room);
+  return !cells || cells.has(pos.x * 50 + pos.y);
+}
+
+// Rempart où un créep peut se tenir (aucune structure bloquante dessous) : un défenseur dessus ne prend aucun coup
+// tant que le rempart tient.
+function standable(rampart) {
+  return rampart.pos.lookFor(LOOK_STRUCTURES).every((s) => !OBSTACLE_OBJECT_TYPES.includes(s.structureType));
+}
+
+// Vrai si un défenseur peut tirer sur `h` sans sortir des murs : hostile à l'intérieur, ou à portée d'un rempart
+// où se tenir.
+function engageable(room, h) {
+  if (inBase(room, h.pos)) return true;
+  return h.pos.findInRange(FIND_MY_STRUCTURES, DEFENDER_RANGE, {
+    filter: (s) => s.structureType === STRUCTURE_RAMPART && standable(s),
+  }).length > 0;
+}
+
 // Défenseurs voulus : aucun si les tours peuvent tuer chaque hostile (killable), sinon assez de RANGED_ATTACK
-// pour égaler les parties ATTACK, RANGED_ATTACK et HEAL hostiles (au moins 1, au plus MAX_DEFENDERS).
+// pour égaler les parties ATTACK, RANGED_ATTACK et HEAL des hostiles que les défenseurs peuvent atteindre sans sortir
+// des murs (engageable ; au moins 1, au plus MAX_DEFENDERS). Hostiles tous dehors, loin des remparts : aucun. Ils
+// cassent les murs à portée des tours, qui les achèvent en approchant ; envoyés au-devant d'eux, hors de portée utile
+// des tours, les défenseurs mouraient un à un (3 morts pour une mise à mort le 9 novembre).
 // Aucun en mode sans échec : les hostiles ne peuvent rien contre la salle.
 // Aucun non plus si un défenseur et les tours ne dépassent le soin d'aucun hostile : arrivés un à un, ils meurent
 // sans rien tuer et vident la salle de son énergie. Les tours attendent que les hostiles approchent, le mode sans
@@ -194,12 +254,14 @@ function defenders(room) {
   if (!hostiles.length) return 0;
   const towers = loadedTowers(room);
   if (towers.length && hostiles.every((h) => killable(h, hostiles, towers, 0))) return 0;
-  const parts = hostiles.reduce((sum, h) => sum + h.getActiveBodyparts(ATTACK)
+  const reachable = hostiles.filter((h) => engageable(room, h));
+  if (!reachable.length) return 0;
+  const parts = reachable.reduce((sum, h) => sum + h.getActiveBodyparts(ATTACK)
     + h.getActiveBodyparts(RANGED_ATTACK) + h.getActiveBodyparts(HEAL), 0);
   // RANGED_ATTACK d'un défenseur à la capacité de la salle (corps [RANGED_ATTACK, MOVE] répété, voir spawner).
   const unit = BODYPART_COST[RANGED_ATTACK] + BODYPART_COST[MOVE];
   const perDefender = Math.max(1, Math.min(Math.floor(room.energyCapacityAvailable / unit), MAX_CREEP_SIZE / 2));
-  const hopeless = hostiles.every((h) => salvo(towers, h) + perDefender * RANGED_ATTACK_POWER <= hostileHeal(h, hostiles));
+  const hopeless = reachable.every((h) => salvo(towers, h) + perDefender * RANGED_ATTACK_POWER <= hostileHeal(h, hostiles));
   if (hopeless) return 0;
   return Math.min(MAX_DEFENDERS, Math.max(1, Math.ceil(parts / perDefender)));
 }
@@ -278,3 +340,5 @@ module.exports.towerDamage = towerDamage;
 module.exports.defenders = defenders;
 module.exports.damagedStructure = damagedStructure;
 module.exports.secure = secure;
+module.exports.inBase = inBase;
+module.exports.standable = standable;
