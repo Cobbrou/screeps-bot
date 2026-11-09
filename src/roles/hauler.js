@@ -8,6 +8,9 @@ const DEPOT_MAX = CONTAINER_CAPACITY;
 // Tour visée seulement s'il lui manque au moins cette énergie, sauf hostiles présents : pas de détour pour quelques points.
 // Le remplissage en passant (fillNearby) la complète sans condition.
 const TOWER_REFILL = 200;
+// Énergie au sol, pierre tombale ou ruine à cette portée d'un hostile dangereux : laissée, le hauler s'y ferait tuer
+// (portée 3 de RANGED_ATTACK, plus de quoi s'approcher).
+const DANGER_RANGE = 5;
 
 // Tas d'énergie le plus gros au pied de la source (posé par un mineur sans conteneur, ou débordement du conteneur).
 function pileAt(source) {
@@ -72,22 +75,25 @@ function dispatch(creep) {
 // Le stockage remplace une source trop maigre quand spawn ou extensions attendent.
 // Retourne l'objet où puiser, ou { wait, range } : où attendre que la source produise.
 // L'énergie posée près du contrôleur (par les remoteHauler) est laissée aux upgraders et aux builders.
+// Tas, pierres tombales et ruines près d'un hostile (DANGER_RANGE) sont laissés.
 function pickupTarget(creep) {
   const room = creep.room;
+  const hostiles = defense.threats(room);
+  const safe = (o) => !hostiles.some((h) => h.pos.inRangeTo(o, DANGER_RANGE));
   const controller = room.controller;
   const roomSources = sources.list(room);
   const dropped = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
     filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50
       && !(controller && r.pos.inRangeTo(controller, 3)) && !roomSources.some((s) => r.pos.inRangeTo(s, 1))
-      && move.reachable(creep, r),
+      && safe(r) && move.reachable(creep, r),
   });
   if (dropped) return dropped;
 
   let target = Game.getObjectById(creep.memory.pickupId);
-  if (target && target.store[RESOURCE_ENERGY]) return target;
+  if (target && target.store[RESOURCE_ENERGY] && safe(target)) return target;
   delete creep.memory.pickupId;
   if (!creep.memory.haul) {
-    const remains = [...room.find(FIND_TOMBSTONES), ...room.find(FIND_RUINS)].filter((o) => o.store[RESOURCE_ENERGY] > 0 && move.reachable(creep, o));
+    const remains = [...room.find(FIND_TOMBSTONES), ...room.find(FIND_RUINS)].filter((o) => o.store[RESOURCE_ENERGY] > 0 && safe(o) && move.reachable(creep, o));
     target = creep.pos.findClosestByRange(remains);
     if (target) {
       creep.memory.pickupId = target.id;

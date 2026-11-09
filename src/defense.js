@@ -97,6 +97,13 @@ function salvo(towers, creep) {
   return towers.reduce((sum, t) => sum + towerDamage(t.pos.getRangeTo(creep)), 0);
 }
 
+// Dégâts à distance des défenseurs à portée de `creep` : comptés avec la salve, sinon les tours restent muettes
+// face à un soigneur que tours et défenseurs ensemble pourraient battre.
+function defenderDamage(creep) {
+  return creep.pos.findInRange(FIND_MY_CREEPS, 3, { filter: (c) => c.memory.role === 'defender' })
+    .reduce((sum, c) => sum + c.getActiveBodyparts(RANGED_ATTACK) * RANGED_ATTACK_POWER, 0);
+}
+
 // Soin par tick que les hostiles peuvent rendre à `target` : HEAL_POWER au contact (lui-même compris),
 // RANGED_HEAL_POWER à portée 3, boosts compris.
 // ponytail: les TOUGH boostés de la cible (dégâts réduits) sont ignorés ; les compter si les tours se vident quand même.
@@ -115,7 +122,7 @@ function hostileHeal(target, hostiles) {
 }
 
 // Hostile visé par les tours (et en priorité par les défenseurs), ou null.
-// Seuls comptent ceux dont les dégâts estimés des tours dépassent le soin hostile : sinon les tours se vident pour rien.
+// Seuls comptent ceux dont les dégâts estimés des tours et des défenseurs à portée dépassent le soin hostile : sinon les tours se vident pour rien.
 // Priorité : soigneur, puis claimer (attackController bloque l'amélioration), puis cible tuée par cette salve,
 // puis celle qui prend le plus de dégâts (la plus proche des tours).
 function target(room) {
@@ -126,7 +133,7 @@ function target(room) {
   let best = null;
   let bestKey = Infinity;
   for (const h of hostiles) {
-    const damage = salvo(towers, h);
+    const damage = salvo(towers, h) + defenderDamage(h);
     if (damage <= hostileHeal(h, hostiles)) continue;
     const rank = h.getActiveBodyparts(HEAL) ? 0 : h.getActiveBodyparts(CLAIM) ? 1 : h.hits <= damage ? 2 : 3;
     const key = rank * 1e6 - damage;
@@ -142,6 +149,9 @@ function target(room) {
 // Défenseurs voulus : aucun si les tours peuvent entamer chaque hostile, sinon assez de RANGED_ATTACK
 // pour égaler les parties ATTACK, RANGED_ATTACK et HEAL hostiles (au moins 1, au plus MAX_DEFENDERS).
 // Aucun en mode sans échec : les hostiles ne peuvent rien contre la salle.
+// Aucun non plus si un défenseur et les tours ne dépassent le soin d'aucun hostile : arrivés un à un, ils meurent
+// sans rien tuer et vident la salle de son énergie. Les tours attendent que les hostiles approchent, le mode sans
+// échec reste le dernier recours.
 function defenders(room) {
   if (room.controller.safeMode) return 0;
   const hostiles = threats(room);
@@ -153,6 +163,8 @@ function defenders(room) {
   // RANGED_ATTACK d'un défenseur à la capacité de la salle (corps [RANGED_ATTACK, MOVE] répété, voir spawner).
   const unit = BODYPART_COST[RANGED_ATTACK] + BODYPART_COST[MOVE];
   const perDefender = Math.max(1, Math.min(Math.floor(room.energyCapacityAvailable / unit), MAX_CREEP_SIZE / 2));
+  const hopeless = hostiles.every((h) => salvo(towers, h) + perDefender * RANGED_ATTACK_POWER <= hostileHeal(h, hostiles));
+  if (hopeless) return 0;
   return Math.min(MAX_DEFENDERS, Math.max(1, Math.ceil(parts / perDefender)));
 }
 
