@@ -7,7 +7,12 @@ const INVADER = 'Invader';
 // Joueurs amis : nos créeps n'entrent pas dans leurs salles (voir intel). Leurs créeps armés restent des menaces chez nous.
 const FRIENDS = ['vKDeath'];
 // ponytail: plafond fixe des murs et remparts, à ajuster selon le budget énergie de la salle.
-const WALL_HITS_PER_RCL = 10000;
+// 300 000 au RCL 6 : un casseur Invader (4 WORK, 2 ATTACK, ~260 PV/tick) hors de portée utile des tours
+// ne perce pas un mur en une vie (1 500 ticks) ; à 60 000, il en perçait un en 280 ticks.
+const WALL_HITS_PER_RCL = 50000;
+// Sous cette énergie au stockage, murs et remparts attendent (sauf rempart mourant) : de quoi remplir les tours
+// plusieurs fois pendant une attaque. La sécurité passe avant l'amélioration : au-dessus, ils sont réparés.
+const DEFENSE_RESERVE = 5000;
 // Les tours ne réparent qu'en dessous de cette fraction de la cible : pas d'énergie gaspillée pour quelques points.
 const REPAIR_RATIO = 0.8;
 // Défenseurs au plus par salle : au-delà, le mode sans échec prend le relais.
@@ -47,8 +52,7 @@ function repairTarget(s) {
 // Structure la plus abîmée par rapport à sa cible (sous REPAIR_RATIO), ou null ; un rempart sous RAMPART_DYING d'abord.
 // Murs hors de la coupe (room.memory.plan.cut) ignorés : ils ne s'usent pas, l'ancienne ceinture reste telle quelle.
 // Remparts hors de la coupe ignorés aussi, s'ils ne couvrent pas une structure : ils disparaissent avec le decay.
-// Stockage bas (drapeau room.memory.storageLow, voir upgrader) : murs et remparts attendent, sauf rempart mourant,
-// pour que l'énergie aille d'abord à l'amélioration.
+// Stockage sous DEFENSE_RESERVE : murs et remparts attendent, sauf rempart mourant, pour garder l'énergie des tours.
 // La cible est reprise jusqu'à la prochaine recherche, qui a lieu tous les REPAIR_SCAN_INTERVAL ticks et prend
 // la pire structure : un mur s'arrête donc vers REPAIR_RATIO de sa cible, dès qu'un autre est plus abîmé.
 function damagedStructure(room) {
@@ -60,7 +64,7 @@ function damagedStructure(room) {
   }
   let damaged = null;
   let worst = REPAIR_RATIO;
-  const saving = room.memory.storageLow;
+  const saving = room.storage && room.storage.store[RESOURCE_ENERGY] < DEFENSE_RESERVE;
   const planned = room.memory.plan && room.memory.plan.cut;
   const cut = new Set(planned);
   const structures = room.find(FIND_STRUCTURES);
@@ -192,6 +196,8 @@ function defenders(room) {
 
 // Tours : tirent sur la cible commune, sinon soignent, sinon réparent tant qu'elles gardent la moitié de leur énergie.
 // Une seule tour répare, la plus proche : une réparation coûte le même prix à toute portée et rend 4 fois moins de loin.
+// Murs et remparts seulement à TOWER_OPTIMAL_RANGE, ou rempart mourant : plus loin, un builder rend 5 fois plus
+// par énergie (100 PV contre 20 à portée 20) ; les tours gardent la leur pour tirer.
 function runTowers(room) {
   const towers = room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER });
   if (!towers.length) return;
@@ -207,7 +213,10 @@ function runTowers(room) {
   }
   const ready = towers.filter((t) => t.store[RESOURCE_ENERGY] > t.store.getCapacity(RESOURCE_ENERGY) / 2);
   const damaged = ready.length && damagedStructure(room);
-  if (damaged) damaged.pos.findClosestByRange(ready).repair(damaged);
+  const tower = damaged && damaged.pos.findClosestByRange(ready);
+  if (!tower) return;
+  const barrier = damaged.structureType === STRUCTURE_WALL || damaged.structureType === STRUCTURE_RAMPART;
+  if (!barrier || damaged.hits <= RAMPART_DYING || tower.pos.inRangeTo(damaged, TOWER_OPTIMAL_RANGE)) tower.repair(damaged);
 }
 
 // Mode sans échec en dernier recours : un spawn, une tour, le stockage ou le terminal est tombé sous la moitié
