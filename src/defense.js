@@ -60,8 +60,10 @@ function repairTarget(s) {
 }
 
 // Structure la plus abîmée par rapport à sa cible (sous REPAIR_RATIO), ou null ; un rempart sous RAMPART_DYING d'abord,
-// puis tout sauf les murs (remparts et structures : ils s'usent), puis les murs, qui ne s'usent pas.
-// Un mur n'est donc renvoyé que si rien d'autre n'est à réparer (voir secure).
+// puis les autres structures, puis les remparts, puis les murs, qui ne s'usent pas.
+// Remparts après les structures : loin de leur plafond (300 000 PV au RCL 6), ils ont toujours le pire ratio, et les tours
+// ne les réparent qu'à TOWER_OPTIMAL_RANGE : un rempart lointain bloquait toute réparation des routes, que les builders
+// devaient alors rattraper au lieu de construire. Un mur n'est renvoyé que si rien d'autre n'est à réparer (voir secure).
 // Murs hors de la coupe (room.memory.plan.cut) ignorés : ils ne s'usent pas, l'ancienne ceinture reste telle quelle.
 // Remparts hors de la coupe ignorés aussi, s'ils ne couvrent pas une structure : ils disparaissent avec le decay.
 // Stockage sous DEFENSE_RESERVE : murs et remparts attendent, sauf rempart mourant, pour garder l'énergie des tours.
@@ -75,7 +77,11 @@ function damagedStructure(room) {
     if (target && target.hits < repairTarget(target)) return target;
   }
   // Pire structure hors murs, et pire mur : chacun sous REPAIR_RATIO de sa cible.
-  const worst = { other: { ratio: REPAIR_RATIO, s: null }, wall: { ratio: REPAIR_RATIO, s: null } };
+  const worst = {
+    other: { ratio: REPAIR_RATIO, s: null },
+    rampart: { ratio: REPAIR_RATIO, s: null },
+    wall: { ratio: REPAIR_RATIO, s: null },
+  };
   const saving = room.storage && room.storage.store[RESOURCE_ENERGY] < DEFENSE_RESERVE;
   const planned = room.memory.plan && room.memory.plan.cut;
   const cut = new Set(planned);
@@ -88,13 +94,15 @@ function damagedStructure(room) {
     const dying = s.structureType === STRUCTURE_RAMPART && s.hits <= RAMPART_DYING;
     if (saving && !dying && (s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART)) continue;
     const ratio = dying ? -1 : s.hits / repairTarget(s);
-    const slot = s.structureType === STRUCTURE_WALL ? worst.wall : worst.other;
+    let slot = worst.other;
+    if (s.structureType === STRUCTURE_WALL) slot = worst.wall;
+    else if (s.structureType === STRUCTURE_RAMPART && !dying) slot = worst.rampart;
     if (s.hitsMax && ratio < slot.ratio) {
       slot.ratio = ratio;
       slot.s = s;
     }
   }
-  const damaged = worst.other.s || worst.wall.s;
+  const damaged = worst.other.s || worst.rampart.s || worst.wall.s;
   repairCache[room.name] = { id: damaged && damaged.id, time: Game.time };
   return damaged;
 }
