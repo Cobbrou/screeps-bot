@@ -14,6 +14,11 @@ const DETOUR_TICKS = 3;
 // (case visée hors route, route coupée). Recherche plus large : l'écart route/plaine élargit l'exploration.
 const ROAD_ROLES = new Set(['miner', 'hauler', 'remoteMiner', 'remoteHauler']);
 const ROAD_COSTS = { plainCost: 10, swampCost: 50, maxOps: 6000 };
+// Coûts du tracé des routes (planner, remoteMining) : une fois la route posée, chaque case coûte 1 tick quel que soit
+// le terrain, donc le chemin le plus court en cases est le plus rapide. Écarts faibles : route existante (ROAD) puis
+// plaine puis marais ne départagent que des chemins de longueur voisine (un détour d'une case pour réutiliser
+// une route ne vaut que s'il évite 4 cases neuves).
+const PLAN_COSTS = { road: 4, plainCost: 5, swampCost: 6 };
 
 // Dernière position connue de chaque créep, par nom, gardée hors de `Memory` : écrite à chaque déplacement,
 // elle alourdirait la sérialisation. Perdue au reset du global, ce qui remet juste le compteur à zéro.
@@ -212,4 +217,4 @@ function forget(name) {
   delete hops[name];
 }
 
-module.exports = { to, step, travel, reachable, run, forget };
+module.exports = { to, step, travel, reachable, run, forget, PLAN_COSTS };

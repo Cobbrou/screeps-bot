@@ -163,7 +163,7 @@ const ROAD_REPAIR_RATIO = 0.5;
 function remoteCosts(room) {
   const costs = new PathFinder.CostMatrix();
   for (const o of [...room.find(FIND_STRUCTURES), ...room.find(FIND_MY_CONSTRUCTION_SITES)]) {
-    if (o.structureType === STRUCTURE_ROAD) costs.set(o.pos.x, o.pos.y, 1);
+    if (o.structureType === STRUCTURE_ROAD) costs.set(o.pos.x, o.pos.y, move.PLAN_COSTS.road);
     else if (OBSTACLE_OBJECT_TYPES.includes(o.structureType)) costs.set(o.pos.x, o.pos.y, 255);
   }
   return costs;
@@ -189,7 +189,8 @@ function roadPath(room, source, homeCosts) {
   const spawn = sources.mainSpawn(room);
   if (!spawn) return undefined;
   const result = PathFinder.search(spawn.pos, { pos: new RoomPosition(source.x, source.y, source.room), range: 1 }, {
-    plainCost: 2, swampCost: 10, maxRooms: 2, maxOps: 6000, roomCallback: callback,
+    plainCost: move.PLAN_COSTS.plainCost, swampCost: move.PLAN_COSTS.swampCost, maxRooms: 2, maxOps: 6000,
+    roomCallback: callback,
   });
   if (result.incomplete || result.path.length < 2) return undefined;
   const path = {};

@@ -24,6 +24,9 @@ const REPAIR_SCAN_INTERVAL = 10;
 // Rempart à ce nombre de PV ou moins : réparé avant tout le reste, sinon le decay le détruit (un rempart neuf
 // n'a que 1 PV) pendant que la tour fait la tournée des murs au même ratio.
 const RAMPART_DYING = 2 * RAMPART_DECAY_AMOUNT;
+// Rempart d'une structure vitale sous ce plancher : réparé par les tours à toute portée, avant le reste.
+// Un attaquant qui passe la coupe ne le perce pas d'emblée (~550 ticks pour un Invader hybride à ~90 dégâts/tick).
+const VITAL_RAMPART_FLOOR = 50000;
 
 // Structures dont la perte déclenche le mode sans échec (lastResort).
 const VITAL = [STRUCTURE_SPAWN, STRUCTURE_TOWER, STRUCTURE_STORAGE, STRUCTURE_TERMINAL];
@@ -49,7 +52,9 @@ function repairTarget(s) {
   return Math.min(s.hitsMax, WALL_HITS_PER_RCL * s.room.controller.level);
 }
 
-// Structure la plus abîmée par rapport à sa cible (sous REPAIR_RATIO), ou null ; un rempart sous RAMPART_DYING d'abord.
+// Structure la plus abîmée par rapport à sa cible (sous REPAIR_RATIO), ou null ; un rempart sous RAMPART_DYING d'abord,
+// puis tout sauf les murs (remparts et structures : ils s'usent), puis les murs, qui ne s'usent pas.
+// Un mur n'est donc renvoyé que si rien d'autre n'est à réparer (voir secure).
 // Murs hors de la coupe (room.memory.plan.cut) ignorés : ils ne s'usent pas, l'ancienne ceinture reste telle quelle.
 // Remparts hors de la coupe ignorés aussi, s'ils ne couvrent pas une structure : ils disparaissent avec le decay.
 // Stockage sous DEFENSE_RESERVE : murs et remparts attendent, sauf rempart mourant, pour garder l'énergie des tours.
@@ -62,8 +67,8 @@ function damagedStructure(room) {
     const target = Game.getObjectById(cached.id);
     if (target && target.hits < repairTarget(target)) return target;
   }
-  let damaged = null;
-  let worst = REPAIR_RATIO;
+  // Pire structure hors murs, et pire mur : chacun sous REPAIR_RATIO de sa cible.
+  const worst = { other: { ratio: REPAIR_RATIO, s: null }, wall: { ratio: REPAIR_RATIO, s: null } };
   const saving = room.storage && room.storage.store[RESOURCE_ENERGY] < DEFENSE_RESERVE;
   const planned = room.memory.plan && room.memory.plan.cut;
   const cut = new Set(planned);
@@ -76,21 +81,26 @@ function damagedStructure(room) {
     const dying = s.structureType === STRUCTURE_RAMPART && s.hits <= RAMPART_DYING;
     if (saving && !dying && (s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART)) continue;
     const ratio = dying ? -1 : s.hits / repairTarget(s);
-    if (s.hitsMax && ratio < worst) {
-      worst = ratio;
-      damaged = s;
+    const slot = s.structureType === STRUCTURE_WALL ? worst.wall : worst.other;
+    if (s.hitsMax && ratio < slot.ratio) {
+      slot.ratio = ratio;
+      slot.s = s;
     }
   }
+  const damaged = worst.other.s || worst.wall.s;
   repairCache[room.name] = { id: damaged && damaged.id, time: Game.time };
   return damaged;
 }
 
 // Vrai si la salle est sûre et réparée : aucun hostile dangereux (hors mode sans échec), aucun chantier,
-// rien à réparer (damagedStructure). Sinon l'amélioration attend (voir upgrader.paused) : l'énergie va d'abord
-// aux builders et aux tours.
+// rien à réparer hors murs (damagedStructure ne renvoie un mur qu'en dernier). Sinon l'amélioration attend
+// (voir upgrader.paused) : l'énergie va d'abord aux builders et aux tours. Les murs ne s'usent pas : les monter
+// à leur plafond (des millions de PV) ne bloque pas l'amélioration, les builders s'en chargent en parallèle.
 function secure(room) {
   if (!room.controller.safeMode && threats(room).length) return false;
-  return !room.find(FIND_MY_CONSTRUCTION_SITES).length && !damagedStructure(room);
+  if (room.find(FIND_MY_CONSTRUCTION_SITES).length) return false;
+  const damaged = damagedStructure(room);
+  return !damaged || damaged.structureType === STRUCTURE_WALL;
 }
 
 // Dégâts d'une tour à `range` : TOWER_POWER_ATTACK jusqu'à TOWER_OPTIMAL_RANGE, puis baisse linéaire
@@ -194,7 +204,19 @@ function defenders(room) {
   return Math.min(MAX_DEFENDERS, Math.max(1, Math.ceil(parts / perDefender)));
 }
 
-// Tours : tirent sur la cible commune, sinon soignent, sinon réparent tant qu'elles gardent la moitié de leur énergie.
+// Rempart le plus bas posé sur une structure vitale (VITAL) sous VITAL_RAMPART_FLOOR, ou undefined.
+function weakVitalRampart(room) {
+  const mine = room.find(FIND_MY_STRUCTURES);
+  const key = (s) => s.pos.x * 50 + s.pos.y;
+  const vital = new Set(mine.filter((s) => VITAL.includes(s.structureType)).map(key));
+  return mine.filter((s) => s.structureType === STRUCTURE_RAMPART && s.hits < VITAL_RAMPART_FLOOR && vital.has(key(s)))
+    .sort((a, b) => a.hits - b.hits)[0];
+}
+
+// Tours : tirent sur la cible commune, sinon soignent (seulement sans hostile dangereux : soigner un défenseur
+// face à un ennemi que les tours ne peuvent pas tuer les vide pour rien, elles gardent leur énergie pour tirer),
+// sinon réparent tant qu'elles gardent la moitié de leur énergie : d'abord le rempart d'une structure vitale
+// sous VITAL_RAMPART_FLOOR, à toute portée, puis la structure de damagedStructure.
 // Une seule tour répare, la plus proche : une réparation coûte le même prix à toute portée et rend 4 fois moins de loin.
 // Murs et remparts seulement à TOWER_OPTIMAL_RANGE, ou rempart mourant : plus loin, un builder rend 5 fois plus
 // par énergie (100 PV contre 20 à portée 20) ; les tours gardent la leur pour tirer.
@@ -207,12 +229,18 @@ function runTowers(room) {
     for (const tower of towers) tower.attack(enemy);
     return;
   }
-  if (wounded.length) {
+  if (wounded.length && !threats(room).length) {
     for (const tower of towers) tower.heal(tower.pos.findClosestByRange(wounded));
     return;
   }
   const ready = towers.filter((t) => t.store[RESOURCE_ENERGY] > t.store.getCapacity(RESOURCE_ENERGY) / 2);
-  const damaged = ready.length && damagedStructure(room);
+  if (!ready.length) return;
+  const weak = weakVitalRampart(room);
+  if (weak) {
+    weak.pos.findClosestByRange(ready).repair(weak);
+    return;
+  }
+  const damaged = damagedStructure(room);
   const tower = damaged && damaged.pos.findClosestByRange(ready);
   if (!tower) return;
   const barrier = damaged.structureType === STRUCTURE_WALL || damaged.structureType === STRUCTURE_RAMPART;

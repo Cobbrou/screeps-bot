@@ -2,6 +2,7 @@ const sources = require('./sources');
 const remoteMining = require('./remoteMining');
 const minCut = require('./minCut');
 const defense = require('./defense');
+const { PLAN_COSTS } = require('./move');
 
 // Le plan est recalculé tous les INTERVAL ticks : les chantiers manquants sont recréés.
 const INTERVAL = 100;
@@ -27,8 +28,11 @@ const ROAD_MIN_RCL = 3;
 const CONTAINER_MIN_RCL = 2;
 // Marge gardée autour de la base par la coupe : un RANGED_ATTACK resté dehors n'atteint aucune structure.
 const CUT_MARGIN = 3;
-// Coût d'une barrière neuve dans la coupe, contre 1 pour une case déjà barrée : les murs existants sont repris.
-const CUT_NEW_COST = 2;
+// Coût d'une barrière de la coupe : (dégâts max des 2 premières tours / leurs dégâts sur la case) ^ CUT_TOWER_EXPONENT,
+// de 1 au pied des tours à 4^3 = 64 au-delà de TOWER_FALLOFF_RANGE. Un goulot de 2 cases au bord de la salle coûte
+// plus qu'une ligne de 8 cases sous le feu des tours : la coupe se resserre autour de la base.
+// ponytail: exposant réglé à la main sur E25S3 (2 garde le goulot du bord) ; à revoir si une salle fait une coupe trop longue.
+const CUT_TOWER_EXPONENT = 3;
 
 // Chantier non entamé depuis ce nombre de ticks retiré (inaccessible, salle perdue, plan obsolète) :
 // il libère une place sur MAX_CONSTRUCTION_SITES. Rien n'est perdu ; le planner le repose s'il est toujours voulu.
@@ -99,10 +103,10 @@ function place(room, ...args) {
 function costMatrix(room) {
   const costs = new PathFinder.CostMatrix();
   for (const id in room.memory.routes) {
-    for (const k of room.memory.routes[id]) costs.set(Math.floor(k / 50), k % 50, 1);
+    for (const k of room.memory.routes[id]) costs.set(Math.floor(k / 50), k % 50, PLAN_COSTS.road);
   }
   for (const id in room.memory.remoteRoads) {
-    for (const k of room.memory.remoteRoads[id].path[room.name] || []) costs.set(Math.floor(k / 50), k % 50, 1);
+    for (const k of room.memory.remoteRoads[id].path[room.name] || []) costs.set(Math.floor(k / 50), k % 50, PLAN_COSTS.road);
   }
   for (const type of [...PLANNED, ...EXTRA]) {
     for (const k of (room.memory.plan && room.memory.plan[type]) || []) costs.set(Math.floor(k / 50), k % 50, 255);
@@ -110,7 +114,7 @@ function costMatrix(room) {
   const objects = [...room.find(FIND_STRUCTURES), ...room.find(FIND_MY_CONSTRUCTION_SITES)];
   for (const o of objects) {
     if (o.structureType === STRUCTURE_ROAD) {
-      costs.set(o.pos.x, o.pos.y, 1);
+      costs.set(o.pos.x, o.pos.y, PLAN_COSTS.road);
     } else if (o.structureType !== STRUCTURE_CONTAINER && o.structureType !== STRUCTURE_RAMPART) {
       costs.set(o.pos.x, o.pos.y, 255);
     }
@@ -540,7 +544,8 @@ function planContainer(room, target, range, end, wanted) {
   if (wanted && !built && !sites.length) place(room, end, STRUCTURE_CONTAINER);
 }
 
-// Chemin du spawn (ou d'une autre origine) jusqu'à la cible (bout compris), ou undefined ; ses cases passent à 1 dans `costs`.
+// Chemin du spawn (ou d'une autre origine) jusqu'à la cible (bout compris), ou undefined ; ses cases passent au coût
+// d'une route dans `costs`. Tracé au plus court en cases (PLAN_COSTS) : sur route, chaque case prend 1 tick.
 // Le chemin est gardé en mémoire (cases codées x * 50 + y) : le recalculer à chaque passage le ferait dévier
 // au gré des nouvelles structures et laisserait des tronçons orphelins. Il n'est recalculé que s'il est bloqué.
 // Il est calculé même sans conteneur ni route : le spawner s'en sert pour dimensionner les haulers.
@@ -553,8 +558,8 @@ function routePath(room, spawn, target, range, costs) {
   if (!path || path.some((pos) => costs.get(pos.x, pos.y) === 255) || !path[path.length - 1].inRangeTo(target.pos, range)
     || !path[0].inRangeTo(spawn.pos, 1)) {
     const result = PathFinder.search(spawn.pos, { pos: target.pos, range }, {
-      plainCost: 2,
-      swampCost: 10,
+      plainCost: PLAN_COSTS.plainCost,
+      swampCost: PLAN_COSTS.swampCost,
       maxRooms: 1,
       roomCallback: () => costs,
     });
@@ -563,7 +568,7 @@ function routePath(room, spawn, target, range, costs) {
     room.memory.routes[target.id] = path.map((pos) => pos.x * 50 + pos.y);
   }
   // Les routes suivantes réutilisent celle-ci.
-  for (const pos of path) costs.set(pos.x, pos.y, 1);
+  for (const pos of path) costs.set(pos.x, pos.y, PLAN_COSTS.road);
   return path;
 }
 
@@ -627,8 +632,11 @@ function planRemoteRoad(name, cells, posted) {
   }
 }
 
-// Coupe minimale entre la base et les sorties, calculée une fois (plan.cut) quand le plan est complet : base, sources,
-// contrôleur et minerai, à CUT_MARGIN cases près. Les barrières déjà posées (ancienne ceinture) coûtent moins cher.
+// Coupe minimale entre la base et les sorties, calculée une fois (plan.cut) quand le plan est complet : toutes les cases
+// du plan à CUT_MARGIN cases près, sources et contrôleur à 1 case (mineurs et upgraders). Le minerai reste dehors :
+// souvent loin de la base, il tirait la coupe jusqu'au bord de la salle, hors de portée utile des tours.
+// Coût d'une case selon les dégâts des 2 premières tours du plan (CUT_TOWER_EXPONENT) : murs au plus près des tours.
+// L'ancienne ceinture n'est pas reprise : ses murs restent en place sans être réparés, ses remparts disparaissent.
 // Portes (plan.doors) : un rempart s'use et coûte en réparation, un mur non. Seulement ce qu'il faut pour relier la base
 // à chaque côté de la salle (minCut.gates), d'abord par les cases forcément en rempart (routes), puis les remparts
 // construits, puis les cases sans mur.
@@ -638,19 +646,25 @@ function planCut(room, plan, costs) {
   const key = (s) => s.pos.x * 50 + s.pos.y;
   const barriers = room.find(FIND_STRUCTURES, { filter: (s) => isBarrier(s.structureType) });
   if (!plan.cut) {
-    const cells = [].concat(...Object.values(plan).filter(Array.isArray));
+    const skip = [STRUCTURE_EXTRACTOR, 'cut', 'doors'];
+    const cells = Object.entries(plan).filter(([type, v]) => Array.isArray(v) && !skip.includes(type)).flatMap(([, v]) => v);
     if (plan.hub) cells.push(plan.hub.container);
-    for (const o of [...sources.list(room), room.controller, ...room.find(FIND_MINERALS)]) cells.push(key(o));
     const base = new Set();
-    for (const k of cells) {
-      for (let x = Math.floor(k / 50) - CUT_MARGIN; x <= Math.floor(k / 50) + CUT_MARGIN; x++) {
-        for (let y = k % 50 - CUT_MARGIN; y <= k % 50 + CUT_MARGIN; y++) {
+    const guard = (k, margin) => {
+      for (let x = Math.floor(k / 50) - margin; x <= Math.floor(k / 50) + margin; x++) {
+        for (let y = k % 50 - margin; y <= k % 50 + margin; y++) {
           if (x >= 0 && x < 50 && y >= 0 && y < 50 && walkable(x, y)) base.add(x * 50 + y);
         }
       }
-    }
-    const barred = new Set(barriers.map(key));
-    plan.cut = minCut(walkable, base, (x, y) => (barred.has(x * 50 + y) ? 1 : CUT_NEW_COST));
+    };
+    for (const k of cells) guard(k, CUT_MARGIN);
+    for (const o of [...sources.list(room), room.controller]) guard(key(o), 1);
+    const towers = plan[STRUCTURE_TOWER].slice(0, CONTROLLER_STRUCTURES[STRUCTURE_TOWER][6]);
+    const best = towers.length * TOWER_POWER_ATTACK;
+    plan.cut = minCut(walkable, base, (x, y) => {
+      const damage = towers.reduce((sum, t) => sum + defense.towerDamage(range(t, x * 50 + y)), 0);
+      return damage ? Math.max(1, Math.round(Math.pow(best / damage, CUT_TOWER_EXPONENT))) : 1;
+    });
   }
   if (plan.doors) return;
   // Plan d'avant plan.doors : ses portes (une par tronçon) sont oubliées, buildCut remet des murs à la place des inutiles.
