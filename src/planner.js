@@ -494,15 +494,15 @@ function orderTowers(plan) {
 }
 
 // Tour construite hors des cases que le RCL autorise (ordre changé par orderTowers) alors que toutes les tours
-// permises existent : détruite, la case attendue la remplace au passage suivant. Seulement sans danger (aucun
-// hostile, ou mode sans échec) et avec de quoi la reconstruire au stockage : la salle reste un temps à une tour de moins.
+// permises existent : détruite, la case attendue la remplace au passage suivant. Seulement avec de quoi la
+// reconstruire au stockage : la salle reste un temps à une tour de moins. destroy() refuse (ERR_BUSY) tant qu'un
+// créep hostile est dans la salle : jamais en pleine attaque.
 function moveTowers(room, plan) {
   const allowed = new Set(plan[STRUCTURE_TOWER].slice(0, CONTROLLER_STRUCTURES[STRUCTURE_TOWER][room.controller.level]));
   const towers = room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER });
   if (towers.length < allowed.size) return;
   const stray = towers.find((t) => !allowed.has(t.pos.x * 50 + t.pos.y));
   if (!stray || !room.storage || room.storage.store[RESOURCE_ENERGY] < CONSTRUCTION_COST[STRUCTURE_TOWER]) return;
-  if (!room.controller.safeMode && defense.threats(room).length) return;
   stray.destroy();
 }
 
