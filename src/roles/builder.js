@@ -4,14 +4,17 @@ const sources = require('../sources');
 const upgraders = require('./upgrader');
 const defense = require('../defense');
 
-// Chantier prioritaire de la salle : le plus ancien (premier passage du planner qui l'a vu, Memory.sites ;
-// pas encore vu = le plus récent), puis l'ordre de construction du planner (planner.priority), puis le moins
-// de travail restant. Un vieux chantier peu prioritaire (mur) n'attend plus derrière les nouveaux.
-// Tous les builders y vont ensemble : chaque structure est finie au plus vite.
+// Chantier prioritaire de la salle : spawn et tour d'abord (vitaux), puis le plus ancien (premier passage
+// du planner qui l'a vu, Memory.sites ; pas encore vu = le plus récent), puis l'ordre de construction du planner
+// (planner.priority), puis le moins de travail restant. Un vieux chantier peu prioritaire (mur) n'attend plus
+// derrière les nouveaux. Tous les builders y vont ensemble : chaque structure est finie au plus vite.
+const VITAL = [STRUCTURE_SPAWN, STRUCTURE_TOWER];
+
 function target(room, sites) {
   const seen = Memory.sites || {};
-  const key = (s) => [seen[s.id] || Game.time, planner.priority(room, s.structureType), s.progressTotal - s.progress];
-  const before = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+  const key = (s) => [VITAL.includes(s.structureType) ? 0 : 1, seen[s.id] || Game.time,
+    planner.priority(room, s.structureType), s.progressTotal - s.progress];
+  const before = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3];
   return sites.reduce((best, s) => (!best || before(key(s), key(best)) < 0 ? s : best), undefined);
 }
 
