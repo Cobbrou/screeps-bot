@@ -193,7 +193,7 @@ function pickupNearby(creep) {
   if (pile) creep.pickup(pile);
 }
 
-// Livre au spawn, aux extensions et aux tours (s'il leur manque TOWER_REFILL, sauf hostiles), puis aux builders (sans stockage), puis au dépôt des upgraders
+// Livre au spawn, aux extensions et aux tours (s'il leur manque TOWER_REFILL, sauf hostiles : tours d'abord), puis aux builders (sans stockage), puis au dépôt des upgraders
 // (sources.depot), puis au stockage.
 // Sans conteneur, le dépôt est une case (RoomPosition) où l'énergie est posée au sol, jusqu'à DEPOT_MAX.
 // Structures et builders sont réservés (`creep.memory.deliverId`) : la place libre de chacun est comptée une fois
@@ -217,10 +217,12 @@ function deliveryTarget(creep, skip) {
     }
   }
   const free = (o) => o.store.getFreeCapacity(RESOURCE_ENERGY) - (incoming[o.id] || 0);
-  const structure = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
-    filter: (s) => s !== skip && needsEnergy(s) && free(s) > 0
-      && (s.structureType !== STRUCTURE_TOWER || threatened || free(s) >= TOWER_REFILL),
-  });
+  const wanted = (s) => s !== skip && needsEnergy(s) && free(s) > 0
+    && (s.structureType !== STRUCTURE_TOWER || threatened || free(s) >= TOWER_REFILL);
+  // Face aux hostiles, les tours d'abord : ce sont elles qui tirent, spawn et extensions attendent.
+  const structure = (threatened && creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
+    filter: (s) => s.structureType === STRUCTURE_TOWER && wanted(s),
+  })) || creep.pos.findClosestByRange(FIND_MY_STRUCTURES, { filter: wanted });
   if (structure) {
     creep.memory.deliverId = structure.id;
     return structure;
