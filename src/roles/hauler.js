@@ -11,6 +11,8 @@ const TOWER_REFILL = 200;
 // Énergie au sol, pierre tombale ou ruine à cette portée d'un hostile dangereux : laissée, le hauler s'y ferait tuer
 // (portée 3 de RANGED_ATTACK, plus de quoi s'approcher).
 const DANGER_RANGE = 5;
+// Hauler à moitié plein : reprise minimale au pied de sa source pour compléter, sinon il part livrer.
+const MIN_TOPUP = 100;
 
 // Tas d'énergie le plus gros au pied de la source (posé par un mineur sans conteneur, ou débordement du conteneur).
 function pileAt(source) {
@@ -39,8 +41,9 @@ function mineRate(source) {
 // moins la place libre des haulers déjà en route vers elle. La plus proche qui remplira le hauler, sinon celle
 // qui promet le plus (il attend sur place que les mineurs produisent). Les sources liées sont écartées, leur conteneur
 // reste vide, sauf si toutes le sont.
+// `fullOnly` : seulement une source qui remplira le hauler, undefined sinon.
 // ponytail: trajet estimé à la distance en ligne droite ; passer au chemin réel si les haulers se trompent de source.
-function dispatch(creep) {
+function dispatch(creep, fullOnly) {
   const reserved = {};
   for (const name in Game.creeps) {
     const other = Game.creeps[name];
@@ -67,7 +70,7 @@ function dispatch(creep) {
       bestExpected = expected;
     }
   }
-  return full || best;
+  return full || (fullOnly ? undefined : best);
 }
 
 // Vrai si une tour attend sa livraison (TOWER_REFILL manquant, ou le moindre manque face aux hostiles).
@@ -117,6 +120,20 @@ function pickupTarget(creep) {
     creep.memory.haul = source.id;
   }
   const free = creep.store.getFreeCapacity(RESOURCE_ENERGY);
+  if (stock(source) < free) {
+    // Déjà à moitié plein et presque rien ici : on livre. Sans ça, il reprend tick après tick les 10 que le mineur
+    // pose dans le conteneur et ne part jamais.
+    if (creep.store[RESOURCE_ENERGY] >= creep.store.getCapacity() / 2 && stock(source) < Math.min(free, MIN_TOPUP)) {
+      return { wait: source, range: Infinity };
+    }
+    // Source trop maigre pour le plein : on passe à une autre qui le promet (une source liée dont le lien déborde
+    // redevient disponible après la répartition). Sinon on reste, pas de va-et-vient entre sources vides.
+    const other = dispatch(creep, true);
+    if (other) {
+      source = other;
+      creep.memory.haul = other.id;
+    }
+  }
   const storage = room.storage;
   if (stock(source) < free && storage && storage.store[RESOURCE_ENERGY] >= free
     && (room.energyAvailable < room.energyCapacityAvailable || hungryTower(room, hostiles.length > 0))) {
