@@ -24,7 +24,9 @@ const REPAIR_SCAN_INTERVAL = 10;
 // Rempart à ce nombre de PV ou moins : réparé avant tout le reste, sinon le decay le détruit (un rempart neuf
 // n'a que 1 PV) pendant que la tour fait la tournée des murs au même ratio.
 const RAMPART_DYING = 2 * RAMPART_DECAY_AMOUNT;
-// Rempart d'une structure vitale sous ce plancher : réparé par les tours à toute portée, avant le reste.
+// Rempart d'une structure vitale ou de la coupe sous ce plancher : réparé par les tours à toute portée, avant le reste
+// (sinon un rempart de la coupe hors de TOWER_OPTIMAL_RANGE reste vers RAMPART_DYING, au gré du decay).
+// Le decay retire autant de PV à tout niveau : tenir ce plancher ne coûte que sa montée initiale.
 // Un attaquant qui passe la coupe ne le perce pas d'emblée (~550 ticks pour un Invader hybride à ~90 dégâts/tick).
 const VITAL_RAMPART_FLOOR = 50000;
 
@@ -266,11 +268,13 @@ function defenders(room) {
   return Math.min(MAX_DEFENDERS, Math.max(1, Math.ceil(parts / perDefender)));
 }
 
-// Rempart le plus bas posé sur une structure vitale (VITAL) sous VITAL_RAMPART_FLOOR, ou undefined.
-function weakVitalRampart(room) {
+// Rempart le plus bas posé sur une structure vitale (VITAL) ou sur la coupe (plan.cut) sous VITAL_RAMPART_FLOOR,
+// ou undefined.
+function weakRampart(room) {
   const mine = room.find(FIND_MY_STRUCTURES);
   const key = (s) => s.pos.x * 50 + s.pos.y;
   const vital = new Set(mine.filter((s) => VITAL.includes(s.structureType)).map(key));
+  for (const k of (room.memory.plan && room.memory.plan.cut) || []) vital.add(k);
   return mine.filter((s) => s.structureType === STRUCTURE_RAMPART && s.hits < VITAL_RAMPART_FLOOR && vital.has(key(s)))
     .sort((a, b) => a.hits - b.hits)[0];
 }
@@ -278,7 +282,7 @@ function weakVitalRampart(room) {
 // Tours : tirent sur la cible commune, sinon soignent (seulement sans hostile dangereux : soigner un défenseur
 // face à un ennemi que les tours ne peuvent pas tuer les vide pour rien, elles gardent leur énergie pour tirer),
 // sinon réparent tant qu'elles gardent la moitié de leur énergie : d'abord le rempart d'une structure vitale
-// sous VITAL_RAMPART_FLOOR, à toute portée, puis la structure de damagedStructure.
+// ou de la coupe sous VITAL_RAMPART_FLOOR, à toute portée, puis la structure de damagedStructure.
 // Une seule tour répare, la plus proche : une réparation coûte le même prix à toute portée et rend 4 fois moins de loin.
 // Murs et remparts seulement à TOWER_OPTIMAL_RANGE, ou rempart mourant : plus loin, un builder rend 5 fois plus
 // par énergie (100 PV contre 20 à portée 20) ; les tours gardent la leur pour tirer.
@@ -297,7 +301,7 @@ function runTowers(room) {
   }
   const ready = towers.filter((t) => t.store[RESOURCE_ENERGY] > t.store.getCapacity(RESOURCE_ENERGY) / 2);
   if (!ready.length) return;
-  const weak = weakVitalRampart(room);
+  const weak = weakRampart(room);
   if (weak) {
     weak.pos.findClosestByRange(ready).repair(weak);
     return;
