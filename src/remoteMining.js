@@ -104,8 +104,8 @@ function needsReserve(name) {
 // `remote` : WORK et capacité CARRY vivants par source ; `reservers` : reservers vivants par salle visée.
 function missing(room, remote, reservers) {
   const result = {};
-  const sources = sourceList(room);
-  for (const source of sources) {
+  const list = sourceList(room);
+  for (const source of list) {
     const r = remote[source.id] || { work: 0, carry: 0 };
     if (!result.miner && !r.work) result.miner = source;
     const flow = Math.min(r.work * HARVEST_POWER, rate(source.room));
@@ -116,7 +116,7 @@ function missing(room, remote, reservers) {
     }
   }
   for (const name of rooms(room)) {
-    const roomSources = sources.filter((s) => s.room === name);
+    const roomSources = list.filter((s) => s.room === name);
     if (!roomSources.length || reservers[name] || !needsReserve(name)) continue;
     if (worthReserving(room, name, roomSources)) {
       result.reserver = name;
