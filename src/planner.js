@@ -734,13 +734,13 @@ module.exports.run = function () {
   if (!rooms.length) return;
   // Game.constructionSites ne compte pas les chantiers posés pendant le tick : décompte local.
   budget = MAX_CONSTRUCTION_SITES - SITE_MARGIN - Object.keys(Game.constructionSites).length;
-  for (const room of rooms) {
+  const planRoom = (room) => {
     plannedLevel[room.name] = room.controller.level;
     slots = MAX_ACTIVE_SITES - activeSites(room);
     blocked = false;
     waiting[room.name] = false;
     const spawn = sources.mainSpawn(room);
-    if (!spawn) continue;
+    if (!spawn) return;
 
     // Plan d'avant le hub : refait (les structures construites sont reprises), avant costMatrix qui en bloquerait les cases.
     if (room.memory.plan && !('hub' in room.memory.plan)) delete room.memory.plan;
@@ -821,6 +821,14 @@ module.exports.run = function () {
       }
     }
     waiting[room.name] = blocked;
+  };
+  // Une salle en erreur ne doit pas empêcher de planifier les autres.
+  for (const room of rooms) {
+    try {
+      planRoom(room);
+    } catch (e) {
+      console.log(`[planner] ${room.name} : ${e.stack || e}`);
+    }
   }
 };
 
