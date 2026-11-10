@@ -29,7 +29,8 @@ const roles = {
 };
 
 module.exports.loop = function () {
-  memory.cleanup();
+  // Tout passe par stats.measure : une erreur dans un module ne fait pas perdre le tick aux autres.
+  stats.measure('memory', memory.cleanup);
   stats.measure('defense', defense.run);
   stats.measure('spawner', spawner.run);
   stats.measure('creeps', () => {
@@ -53,5 +54,9 @@ module.exports.loop = function () {
     stats.measure('expansion', expansion.run);
     stats.measure('market', market.run);
   }
-  stats.run();
+  try {
+    stats.run();
+  } catch (e) {
+    console.log(`[stats] ${e.stack || e}`);
+  }
 };
