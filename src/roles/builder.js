@@ -148,7 +148,10 @@ module.exports.run = function (creep) {
     // Plus rien à construire ni à réparer : le builder devient upgrader s'il reste une place au dépôt
     // (le spawner ne crée pas d'upgrader pendant les chantiers, ceux-ci prennent le relais).
     const room = creep.room;
-    if (room.controller && room.controller.my && !room.find(FIND_MY_CONSTRUCTION_SITES).length) {
+    // Seulement dans sa salle d'origine : un pioneer converti ailleurs resterait compté dans les upgraders
+    // de sa salle d'origine (creep.memory.room), qui en créerait moins pour elle.
+    if (room.controller && room.controller.my && creep.memory.room === room.name
+      && !room.find(FIND_MY_CONSTRUCTION_SITES).length) {
       const placed = Object.values(Game.creeps)
         .filter((c) => c.memory.role === 'upgrader' && c.memory.room === room.name).length;
       if (placed < upgraders.spots(room)) {
