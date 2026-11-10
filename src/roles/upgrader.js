@@ -17,8 +17,8 @@ function storageLow(room) {
   return !!room.memory.storageLow;
 }
 
-// Vrai si l'amélioration doit attendre : stockage bas, ou salle pas encore sûre et réparée (hostiles hors mode
-// sans échec, chantiers, murs ou structures à réparer : voir defense.secure).
+// Vrai si l'amélioration doit attendre : stockage bas, hostiles hors mode sans échec ou chantiers en cours
+// (voir defense.secure). Les réparations ne la bloquent pas.
 // Jamais en cas de rétrogradation proche (drapeau room.memory.downgrade posé par le spawner).
 function paused(room) {
   if (room.memory.downgrade) return false;

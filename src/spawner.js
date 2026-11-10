@@ -25,10 +25,6 @@ const ENCLOSED_STORED_PER_ENERGY = STORED_PER_ENERGY / 2;
 // les temps morts (EFFECTIVE_BUILD_POWER de harabibot), corps polyvalent WORK/CARRY/MOVE.
 const UPGRADE_SPEND = UPGRADE_CONTROLLER_POWER + (BODYPART_COST[WORK] + BODYPART_COST[MOVE] / 2) / CREEP_LIFE_TIME;
 const BUILD_SPEND = 4 + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPART_COST[MOVE]) / CREEP_LIFE_TIME;
-// Réparation seule (murs et remparts, sans chantier) : 1 énergie/tick par WORK (REPAIR_POWER × REPAIR_COST), 4 fois
-// moins qu'en construction. Compté avec BUILD_SPEND, le revenu ne financerait qu'un builder et les murs monteraient
-// 4 fois trop lentement pendant que le stockage se remplit.
-const REPAIR_SPEND = REPAIR_POWER * REPAIR_COST + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPART_COST[MOVE]) / CREEP_LIFE_TIME;
 // Rôles dont l'entretien est déduit du revenu : ceux qui récoltent et transportent.
 const ECONOMY_ROLES = ['miner', 'hauler', 'filler', 'remoteMiner', 'remoteHauler', 'reserver', 'mineralMiner', 'mineralHauler'];
 // Renseignements sur une salle voisine jugés périmés après ce nombre de ticks : un éclaireur va les rafraîchir.
@@ -162,8 +158,7 @@ function downgrading(room) {
 // au lieu de payer tous les mineurs avant de pouvoir transporter.
 // `remoteNeed` : sources distantes à qui il manque un mineur ou du transport (remoteMining.missing).
 // `net` : revenu net (netIncome) ; `work` : WORK vivants des upgraders et des builders.
-// Upgraders et builders se partagent le revenu sans se le disputer : pendant les chantiers (hors murs et remparts,
-// trop longs), tout va aux builders et aucun upgrader n'est créé ; ensuite les builders deviennent upgraders.
+// Upgraders et builders se partagent le revenu sans se le disputer : pendant les chantiers, tout va aux builders et aucun upgrader n'est créé ; ensuite les builders deviennent upgraders.
 // Un upgrader de plus seulement si son corps entre dans le revenu (revenu / consommation par WORK) : sans ça,
 // un dernier corps de MIN_UPGRADER_WORK fait dépasser le revenu et vide le stockage jusqu'à la pause.
 // Builders : un créep de plus tant que les WORK vivants restent sous revenu / consommation par WORK.
@@ -173,9 +168,9 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   // downgrading avant paused : il pose le drapeau qui lève la pause.
   const urgent = downgrading(room);
   const sites = room.find(FIND_MY_CONSTRUCTION_SITES);
-  // Tout chantier, murs et remparts compris, et toute réparation des tours (defense.damagedStructure) : les builders
-  // prennent le revenu, l'amélioration attend que la salle soit sûre et réparée (voir upgrader.paused).
-  const building = sites.length > 0 || !!defense.damagedStructure(room);
+  // Tout chantier, murs et remparts compris : les builders prennent le revenu, l'amélioration attend la fin
+  // des chantiers (voir upgrader.paused). Les réparations ne comptent pas : ensuite, l'amélioration reprend à fond.
+  const building = sites.length > 0;
   const up = roomCounts.upgrader || 0;
   // Plus petit corps d'upgrader possible ici : avant les extensions, la capacité ne permet pas MIN_UPGRADER_WORK.
   const step = Math.min(MIN_UPGRADER_WORK, buildBody('upgrader', room.energyCapacityAvailable, room).filter((p) => p === WORK).length);
@@ -189,10 +184,10 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   if (!building) room.memory.upgraders = upgrader;
   const need = list.reduce((sum, s) => sum + haulCapacity(room, s, (miners[s.id] || {}).work), 0);
   const bd = roomCounts.builder || 0;
-  // Au moins un builder par chantier en cours, même à revenu nul ; murs et remparts seuls ou réparation : un seul.
-  const spend = sites.length ? BUILD_SPEND : REPAIR_SPEND;
-  const builder = building ? bd + (!bd || (work.builder || 0) < net / spend ? 1 : 0)
-    : (sites.length || room.memory.swapBarrier || needsRepair(room) ? 1 : 0);
+  // Au moins un builder pendant les chantiers, même à revenu nul. Sans chantier, un seul s'il reste à réparer
+  // (murs et remparts montés en parallèle de l'amélioration) ou une barrière à remplacer.
+  const builder = building ? bd + (!bd || (work.builder || 0) < net / BUILD_SPEND ? 1 : 0)
+    : (defense.damagedStructure(room) || room.memory.swapBarrier || needsRepair(room) ? 1 : 0);
   return {
     // Selon la menace que les tours ne couvrent pas (voir defense.defenders).
     defender: defense.defenders(room),

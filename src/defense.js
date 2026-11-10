@@ -107,15 +107,13 @@ function damagedStructure(room) {
   return damaged;
 }
 
-// Vrai si la salle est sûre et réparée : aucun hostile dangereux (hors mode sans échec), aucun chantier,
-// rien à réparer hors murs (damagedStructure ne renvoie un mur qu'en dernier). Sinon l'amélioration attend
-// (voir upgrader.paused) : l'énergie va d'abord aux builders et aux tours. Les murs ne s'usent pas : les monter
-// à leur plafond (des millions de PV) ne bloque pas l'amélioration, les builders s'en chargent en parallèle.
+// Vrai si la salle est sûre et ses chantiers finis : aucun hostile dangereux (hors mode sans échec), aucun chantier.
+// Sinon l'amélioration attend (voir upgrader.paused) : l'énergie va d'abord aux builders et aux tours.
+// Les réparations ne la bloquent pas : murs et remparts restent presque toujours sous leur cible, la salle ne serait
+// jamais prête ; les tours et un builder les montent en parallèle de l'amélioration.
 function secure(room) {
   if (!room.controller.safeMode && threats(room).length) return false;
-  if (room.find(FIND_MY_CONSTRUCTION_SITES).length) return false;
-  const damaged = damagedStructure(room);
-  return !damaged || damaged.structureType === STRUCTURE_WALL;
+  return !room.find(FIND_MY_CONSTRUCTION_SITES).length;
 }
 
 // Dégâts d'une tour à `range` : TOWER_POWER_ATTACK jusqu'à TOWER_OPTIMAL_RANGE, puis baisse linéaire
