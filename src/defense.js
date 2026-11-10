@@ -7,9 +7,10 @@ const INVADER = 'Invader';
 // Joueurs amis : nos créeps n'entrent pas dans leurs salles (voir intel). Leurs créeps armés restent des menaces chez nous.
 const FRIENDS = ['vKDeath'];
 // ponytail: plafond fixe des murs et remparts, à ajuster selon le budget énergie de la salle.
-// 300 000 au RCL 6 : un casseur Invader (4 WORK, 2 ATTACK, ~260 PV/tick) hors de portée utile des tours
-// ne perce pas un mur en une vie (1 500 ticks) ; à 60 000, il en perçait un en 280 ticks.
+// 50 000 par RCL, plafonné à 150 000 dès le RCL 3 : un casseur Invader (4 WORK, 2 ATTACK, ~260 PV/tick) hors de portée
+// utile des tours met ~580 ticks à percer un mur (280 à 60 000) ; 300 000 coûtaient ~64 k d'énergie de plus au RCL 6.
 const WALL_HITS_PER_RCL = 50000;
+const WALL_HITS_MAX = 150000;
 // Sous cette énergie au stockage, murs et remparts attendent (sauf rempart mourant) : de quoi remplir les tours
 // plusieurs fois pendant une attaque. La sécurité passe avant l'amélioration : au-dessus, ils sont réparés.
 const DEFENSE_RESERVE = 5000;
@@ -53,15 +54,15 @@ function threats(room) {
   });
 }
 
-// Points de vie visés à la réparation : les murs et remparts sont plafonnés selon le RCL.
+// Points de vie visés à la réparation : les murs et remparts sont plafonnés selon le RCL, puis à WALL_HITS_MAX.
 function repairTarget(s) {
   if (s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART) return s.hitsMax;
-  return Math.min(s.hitsMax, WALL_HITS_PER_RCL * s.room.controller.level);
+  return Math.min(s.hitsMax, WALL_HITS_PER_RCL * s.room.controller.level, WALL_HITS_MAX);
 }
 
 // Structure la plus abîmée par rapport à sa cible (sous REPAIR_RATIO), ou null ; un rempart sous RAMPART_DYING d'abord,
 // puis les autres structures, puis les remparts, puis les murs, qui ne s'usent pas.
-// Remparts après les structures : loin de leur plafond (300 000 PV au RCL 6), ils ont toujours le pire ratio, et les tours
+// Remparts après les structures : loin de leur plafond (150 000 PV dès le RCL 3), ils ont toujours le pire ratio, et les tours
 // ne les réparent qu'à TOWER_OPTIMAL_RANGE : un rempart lointain bloquait toute réparation des routes, que les builders
 // devaient alors rattraper au lieu de construire. Un mur n'est renvoyé que si rien d'autre n'est à réparer (voir secure).
 // Murs hors de la coupe (room.memory.plan.cut) ignorés : ils ne s'usent pas, l'ancienne ceinture reste telle quelle.
