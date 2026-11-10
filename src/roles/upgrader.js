@@ -106,6 +106,13 @@ function drainLink(creep, link) {
 // Sans poste libre (plus d'upgraders que de postes), il se contente de rester à portée du contrôleur.
 function run(creep) {
   const room = creep.room;
+  // Ancien builder (converti faute de chantier, voir builder.run) : il reprend son rôle dès qu'un chantier revient.
+  // Sans ça, le spawner ne voit aucun builder et en crée un neuf à chaque lot de chantiers du planner.
+  if (creep.name.startsWith('builder-') && creep.memory.room === room.name
+    && room.find(FIND_MY_CONSTRUCTION_SITES).length) {
+    creep.memory.role = 'builder';
+    return;
+  }
   // Temps de trajet depuis le spawn, noté à la première arrivée au contrôleur : le spawner lance le successeur
   // assez tôt pour qu'il arrive quand cet upgrader meurt.
   if (creep.memory.travel === undefined && creep.pos.inRangeTo(room.controller, 3)) {
