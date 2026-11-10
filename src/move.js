@@ -58,11 +58,12 @@ function blockExits(costs) {
 // Remplace `creep.moveTo` : même signature et même code de retour.
 // Le chemin est calculé par `moveTo`, mais le pas est seulement noté : `run` l'exécute en fin de tick,
 // en poussant les créeps immobiles qui barrent la route.
-// Par défaut, `moveTo` ignore les autres créeps ; un créep bloqué malgré tout (créep qui ne peut pas céder sa case)
-// piétine : on détecte ce blocage et on force un nouveau chemin qui les contourne.
+// Le chemin ignore les autres créeps (`ignoreCreeps`, faux par défaut dans `moveTo`) : `run` les pousse. Un créep bloqué
+// malgré tout (créep qui ne peut pas céder sa case) piétine : on détecte ce blocage et on force un nouveau chemin
+// qui les contourne.
 function to(creep, target, opts = {}) {
   // Plaine à 2 et marais à 10 (1 et 5 par défaut) : la route (1) devient moins chère que la plaine, les créeps la suivent.
-  opts = Object.assign({ reusePath: REUSE_PATH, plainCost: 2, swampCost: 10 },
+  opts = Object.assign({ reusePath: REUSE_PATH, plainCost: 2, swampCost: 10, ignoreCreeps: true },
     ROAD_ROLES.has(creep.memory.role) ? ROAD_COSTS : null, opts);
   const here = `${creep.pos.roomName}:${creep.pos.x}:${creep.pos.y}`;
   const last = lastSeen[creep.name];
