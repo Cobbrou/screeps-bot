@@ -5,8 +5,7 @@ const defense = require('./defense');
 
 // Attente maximale (en ticks) de la régénération d'une source avant d'aller récolter ailleurs.
 const AWAY_MIN_WAIT = 100;
-// Énergie dans un conteneur de source au-delà de laquelle le transport ne suit plus (haulers à renforcer, lien débordé).
-// ponytail: stock instantané, un hauler de plus par spawn tant que ça dure ; peut en créer un ou deux de trop.
+// Énergie dans le conteneur d'une source liée au-delà de laquelle son lien ne suit plus : les haulers y reviennent.
 const HAUL_BACKLOG = CONTAINER_CAPACITY / 2;
 // Nombre maximal de créeps partis récolter dans une même salle voisine, par source de cette salle.
 const AWAY_PER_SOURCE = 2;

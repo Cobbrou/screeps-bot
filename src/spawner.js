@@ -25,6 +25,10 @@ const ENCLOSED_STORED_PER_ENERGY = STORED_PER_ENERGY / 2;
 // les temps morts (EFFECTIVE_BUILD_POWER de harabibot), corps polyvalent WORK/CARRY/MOVE.
 const UPGRADE_SPEND = UPGRADE_CONTROLLER_POWER + (BODYPART_COST[WORK] + BODYPART_COST[MOVE] / 2) / CREEP_LIFE_TIME;
 const BUILD_SPEND = 4 + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPART_COST[MOVE]) / CREEP_LIFE_TIME;
+// Builder hors chantier (murs, remparts, réparations) : 1 énergie par WORK et par tick de réparation, mais il marche
+// d'un mur à l'autre et se recharge la plupart du temps.
+// ponytail: 0,4 mesuré le 2026-11-10 sur E25S3 (5 énergie/tick pour 12 WORK) ; à recaler si le stockage dérive.
+const REPAIR_SPEND = 0.4 + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPART_COST[MOVE]) / CREEP_LIFE_TIME;
 // Rôles dont l'entretien est déduit du revenu : ceux qui récoltent et transportent.
 const ECONOMY_ROLES = ['miner', 'hauler', 'filler', 'remoteMiner', 'remoteHauler', 'reserver', 'mineralMiner', 'mineralHauler'];
 // Renseignements sur une salle voisine jugés périmés après ce nombre de ticks : un éclaireur va les rafraîchir.
@@ -33,8 +37,7 @@ const SCOUT_REFRESH = 5000;
 // levée au-dessus de DOWNGRADE_HIGH (hystérésis : chaque amélioration ne rend que 100 ticks).
 const DOWNGRADE_LOW = 0.1;
 const DOWNGRADE_HIGH = 0.2;
-const { HAUL_BACKLOG } = sources;
-// Plafond de ce renfort : capacité des haulers au plus HAUL_BACKLOG_RATIO fois le besoin estimé. Sans lui, quand
+// Plafond du renfort de haulers (conteneur de source plein, voir targets) : capacité des haulers au plus HAUL_BACKLOG_RATIO fois le besoin estimé. Sans lui, quand
 // spawn et extensions sont pleins, les haulers restent pleins, les conteneurs s'engorgent et les renforts s'enchaînent.
 const HAUL_BACKLOG_RATIO = 3;
 // Marge sur le besoin d'une source pour la taille d'un hauler : haulCapacity ne compte que le chemin du planner,
@@ -76,6 +79,20 @@ function travelTime(factors, heavy, moves) {
 function haulerRatio(room) {
   const scans = sources.list(room).map((s) => routeTerrain(room, s.id));
   return scans.length && scans.every((s) => s && s.roads) ? 2 : 1;
+}
+
+// WORK par MOVE de l'upgrader posté : 4 quand la route du contrôleur est entièrement construite (un seul trajet
+// dans sa vie, 2 ticks par case sur route), 2 avant (plaine et marais coûteraient 4 et 20 ticks par case).
+function upgraderRatio(room) {
+  const scan = routeTerrain(room, room.controller.id);
+  return scan && scan.roads ? 4 : 2;
+}
+
+// Revenu laissé aux upgraders : hors chantier, la dépense du builder vivant (murs, réparations) est retirée du revenu.
+// Sans ça, l'upgrader est taillé sur tout le revenu, le stockage se vide et il attend en pause la moitié du temps.
+function upgradeBudget(room, net, work) {
+  if (room.find(FIND_MY_CONSTRUCTION_SITES).length) return net;
+  return net - (work.builder || 0) * REPAIR_SPEND;
 }
 
 // Récolte statique dès le RCL 1 : même un mineur à 2 WORK posé sur la source (4 énergie/tick en continu)
@@ -174,7 +191,8 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   const up = roomCounts.upgrader || 0;
   // Plus petit corps d'upgrader possible ici : avant les extensions, la capacité ne permet pas MIN_UPGRADER_WORK.
   const step = Math.min(MIN_UPGRADER_WORK, buildBody('upgrader', room.energyCapacityAvailable, room).filter((p) => p === WORK).length);
-  const funded = up ? (work.upgrader || 0) + step <= net / UPGRADE_SPEND : net > 0;
+  const upNet = upgradeBudget(room, net, work);
+  const funded = up ? (work.upgrader || 0) + step <= upNet / UPGRADE_SPEND : upNet > 0;
   // Rétrogradation proche : au moins un upgrader, même pendant les chantiers.
   // Pendant les chantiers, l'effectif voulu avant eux (room.memory.upgraders) est maintenu : les upgraders
   // en fin de vie sont remplacés, seule l'augmentation attend la fin des chantiers.
@@ -199,13 +217,13 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     // sur une source sans lien), et c'est le mineur qui doit passer, pas 81 ticks de spawn de filler.
     filler: room.storage && sources.hubLink(room) && !need && list.every((s) => sources.sourceLink(s)) ? 1 : 0,
     // Un hauler de plus tant que la capacité des haulers vivants reste sous le besoin, ou qu'un conteneur
-    // de source sans lien s'engorge (trajets plus lents ou plus longs que prévu : fatigue hors route, livraisons au contrôleur),
+    // de source sans lien est plein (à moitié plein, le seuil créait un hauler de trop ; trajets plus lents ou plus longs que prévu : fatigue hors route, livraisons au contrôleur),
     // dans la limite de HAUL_BACKLOG_RATIO fois le besoin. Source liée exclue : un hauler de plus coûterait plus que ce stock,
     // ramassé en passant par ceux qui existent.
     hauler: (roomCounts.hauler || 0)
       + (need > (carry || 0)
         || ((carry || 0) < need * HAUL_BACKLOG_RATIO
-          && list.some((s) => { const box = sources.container(s); return box && !sources.sourceLink(s) && box.store[RESOURCE_ENERGY] > HAUL_BACKLOG; }))
+          && list.some((s) => { const box = sources.container(s); return box && !sources.sourceLink(s) && box.store.getFreeCapacity(RESOURCE_ENERGY) === 0; }))
         ? 1 : 0),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
     // Après la récolte locale : il rend ses sources à la salle distante envahie.
@@ -301,9 +319,15 @@ function buildBody(role, energy, room, sourceId, target) {
   if (role === 'scout') return [MOVE];
   if (role === 'claimer') return energy >= BODYPART_COST[CLAIM] + BODYPART_COST[MOVE] ? [CLAIM, MOVE] : [];
   // Upgrader nourri au dépôt du contrôleur (tas puis conteneur) : il ne bouge plus une fois posté,
-  // donc surtout des WORK, un seul CARRY et un MOVE pour deux WORK (300 → 2 WORK, 550 → 4 WORK, 800 → 6 WORK).
+  // donc surtout des WORK, un seul CARRY et un MOVE pour upgraderRatio WORK (à 2 : 300 → 2 WORK, 550 → 4 WORK,
+  // 800 → 6 WORK ; à 4 : 2 300 → 20 WORK).
   if (role === 'upgrader' && room && sources.depot(room) && energy >= BODYPART_COST[CARRY] + 250) {
-    return [CARRY, ...repeat([WORK, WORK, MOVE], energy - BODYPART_COST[CARRY], [[WORK, MOVE]])].slice(0, MAX_CREEP_SIZE);
+    const per = upgraderRatio(room);
+    const budget = energy - BODYPART_COST[CARRY];
+    const moves = (w) => Math.ceil(w / per);
+    let work = MAX_CREEP_SIZE - 1;
+    while (work * BODYPART_COST[WORK] + moves(work) * BODYPART_COST[MOVE] > budget || 1 + work + moves(work) > MAX_CREEP_SIZE) work--;
+    return [CARRY, ...Array(work).fill(WORK), ...Array(moves(work)).fill(MOVE)];
   }
   // Polyvalent : le reste devient un WORK de plus (300 → 2 WORK, 550 → 3 WORK).
   return repeat([WORK, CARRY, MOVE], energy, [[WORK, MOVE], [WORK]]);
@@ -412,7 +436,7 @@ module.exports.run = function () {
         : room.energyCapacityAvailable;
     // Hauler plafonné au besoin de la source la plus exigeante, avec la marge HAUL_SHARE_MARGIN : à la capacité
     // pleine de la salle, il porte plusieurs fois la production et paie son entretien pour rien. Le renfort
-    // HAUL_BACKLOG couvre les écarts. Les sources liées (besoin nul) ne comptent pas.
+    // (conteneur plein) couvre les écarts. Les sources liées (besoin nul) ne comptent pas.
     if (role === 'hauler' && !emergency) {
       const share = HAUL_SHARE_MARGIN
         * Math.max(0, ...sources.list(room).map((s) => haulCapacity(room, s, (miners[s.id] || {}).work)));
@@ -429,9 +453,10 @@ module.exports.run = function () {
     // Upgrader : corps au manque de WORK, pas à la capacité de la salle (deux corps pleins de 14 WORK dépensaient 28/tick
     // pour ~20 de revenu, jusqu'à la pause du stockage bas).
     if (role === 'upgrader' && !emergency) {
-      const lack = Math.floor(net / UPGRADE_SPEND - ((work[room.name] || {}).upgrader || 0));
+      const roomWork = work[room.name] || {};
+      const lack = Math.floor(upgradeBudget(room, net, roomWork) / UPGRADE_SPEND - (roomWork.upgrader || 0));
       const parts = Math.max(lack, MIN_UPGRADER_WORK);
-      energy = Math.min(energy, BODYPART_COST[CARRY] + parts * BODYPART_COST[WORK] + Math.ceil(parts / 2) * BODYPART_COST[MOVE]);
+      energy = Math.min(energy, BODYPART_COST[CARRY] + parts * BODYPART_COST[WORK] + Math.ceil(parts / upgraderRatio(room)) * BODYPART_COST[MOVE]);
     }
     const body = buildBody(role, energy, room, memory.sourceId, memory.target);
     if (!body.length) continue;

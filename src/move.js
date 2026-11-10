@@ -14,6 +14,10 @@ const DETOUR_TICKS = 3;
 // (case visée hors route, route coupée). Recherche plus large : l'écart route/plaine élargit l'exploration.
 const ROAD_ROLES = new Set(['miner', 'hauler', 'remoteMiner', 'remoteHauler']);
 const ROAD_COSTS = { plainCost: 10, swampCost: 50, maxOps: 6000 };
+// Transporteur à vide (que des MOVE et des CARRY vides) : aucune fatigue, une case par tick sur tout terrain.
+// Il coupe au plus court et laisse la route aux créeps chargés.
+const FREE_COSTS = { plainCost: 1, swampCost: 1 };
+const unladen = (creep) => !creep.store.getUsedCapacity() && creep.body.every((p) => p.type === MOVE || p.type === CARRY);
 // Coûts du tracé des routes (planner, remoteMining) : une fois la route posée, chaque case coûte 1 tick quel que soit
 // le terrain, donc le chemin le plus court en cases est le plus rapide. Écarts faibles : route existante (ROAD) puis
 // plaine puis marais ne départagent que des chemins de longueur voisine (un détour d'une case pour réutiliser
@@ -42,7 +46,8 @@ function intend(creep, dir) {
 const onRoad = (room, x, y) => room.lookForAt(LOOK_STRUCTURES, x, y).some((s) => s.structureType === STRUCTURE_ROAD);
 
 // Vrai si le créep doit rester sur la route où il se trouve. Sans route sous lui (salle pas encore équipée), il circule librement.
-const roadBound = (creep) => ROAD_ROLES.has(creep.memory.role) && onRoad(creep.room, creep.pos.x, creep.pos.y);
+// À vide, un transporteur n'y est pas tenu (voir FREE_COSTS).
+const roadBound = (creep) => ROAD_ROLES.has(creep.memory.role) && !unladen(creep) && onRoad(creep.room, creep.pos.x, creep.pos.y);
 
 // Rend infranchissables les cases du bord (sorties) dans la matrice de coûts.
 function blockExits(costs) {
@@ -64,7 +69,7 @@ function blockExits(costs) {
 function to(creep, target, opts = {}) {
   // Plaine à 2 et marais à 10 (1 et 5 par défaut) : la route (1) devient moins chère que la plaine, les créeps la suivent.
   opts = Object.assign({ reusePath: REUSE_PATH, plainCost: 2, swampCost: 10, ignoreCreeps: true },
-    ROAD_ROLES.has(creep.memory.role) ? ROAD_COSTS : null, opts);
+    unladen(creep) ? FREE_COSTS : ROAD_ROLES.has(creep.memory.role) ? ROAD_COSTS : null, opts);
   const here = `${creep.pos.roomName}:${creep.pos.x}:${creep.pos.y}`;
   const last = lastSeen[creep.name];
   // Ne compte que les appels de ticks consécutifs : un créep qui travaille sur place n'est pas bloqué.
