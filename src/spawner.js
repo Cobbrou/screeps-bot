@@ -192,6 +192,10 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   // Plus petit corps d'upgrader possible ici : avant les extensions, la capacité ne permet pas MIN_UPGRADER_WORK.
   const step = Math.min(MIN_UPGRADER_WORK, buildBody('upgrader', room.energyCapacityAvailable, room).filter((p) => p === WORK).length);
   const upNet = upgradeBudget(room, net, work);
+  // WORK d'upgraders que le revenu finance, lu par builder.run avant de reconvertir un builder sans chantier.
+  // Revenu brut : le builder qui se reconvertit cesse ses réparations, leur dépense (REPAIR_SPEND) disparaît avec.
+  // ponytail: les réparations des autres builders sont ignorées (un seul hors chantier, voir builder plus bas).
+  room.memory.upgradeWork = Math.floor(net / UPGRADE_SPEND);
   const funded = up ? (work.upgrader || 0) + step <= upNet / UPGRADE_SPEND : upNet > 0;
   // Rétrogradation proche : au moins un upgrader, même pendant les chantiers.
   // Pendant les chantiers, l'effectif voulu avant eux (room.memory.upgraders) est maintenu : les upgraders
