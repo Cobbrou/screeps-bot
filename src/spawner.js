@@ -381,18 +381,20 @@ module.exports.run = function () {
     const remoteRole = creep.memory.role === 'remoteMiner' || creep.memory.role === 'remoteHauler';
     const lead = ['hauler', 'remoteHauler', 'filler'].includes(creep.memory.role) ? 0 : creep.memory.travel;
     const dying = lead !== undefined && creep.ticksToLive <= lead + creep.body.length * CREEP_SPAWN_TIME;
+    // Ancien builder devenu upgrader, chantier revenu : compté builder dès ce tick. Il ne reprend son rôle
+    // qu'après le spawner (upgrader.run, même condition) : sans ça, un builder neuf au premier tick de chaque lot.
+    const role = creep.memory.role === 'upgrader' && creep.name.startsWith('builder-') && creep.room.name === room
+      && creep.room.find(FIND_MY_CONSTRUCTION_SITES).length ? 'builder' : creep.memory.role;
     // Upgrader et filler en fin de vie ne comptent plus : leur successeur prend la relève sans trou.
-    if (!(dying && (creep.memory.role === 'upgrader' || creep.memory.role === 'filler'))) {
-      counts[room][creep.memory.role] = (counts[room][creep.memory.role] || 0) + 1;
+    if (!(dying && (role === 'upgrader' || role === 'filler'))) {
+      counts[room][role] = (counts[room][role] || 0) + 1;
     }
     if (creep.memory.role === 'miner') addMiner(creep.memory.sourceId, creep.body, dying);
     if (creep.memory.role === 'hauler' && !dying) addCarry(room, creep.body);
     if (remoteRole && !dying) addRemote(creep.memory.role, creep.memory.sourceId, creep.body);
     if (creep.memory.role === 'reserver' && !dying) reservers[creep.memory.target] = (reservers[creep.memory.target] || 0) + 1;
     if (ECONOMY_ROLES.includes(creep.memory.role)) addUpkeep(room, creep.body);
-    if (creep.memory.role === 'builder' || (creep.memory.role === 'upgrader' && !dying)) {
-      addWork(room, creep.memory.role, creep.body);
-    }
+    if (role === 'builder' || (role === 'upgrader' && !dying)) addWork(room, role, creep.body);
   }
 
   for (const name in Game.spawns) {
