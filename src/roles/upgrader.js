@@ -26,6 +26,14 @@ function paused(room) {
   return !defense.secure(room);
 }
 
+// Vrai si la salle a du travail de builder : chantier, structure que les tours entretiennent (murs et remparts
+// de la coupe compris) ou barrière à remplacer. Un ancien builder devenu upgrader reprend alors son rôle :
+// sans ça, le spawner ne voit aucun builder et en crée un neuf (2 300 d'énergie) à chaque rempart à remonter.
+function builderWork(room) {
+  return room.find(FIND_MY_CONSTRUCTION_SITES).length > 0 || !!defense.damagedStructure(room)
+    || !!room.memory.swapBarrier;
+}
+
 // Sans dépôt (route du planner pas encore tracée) : alterne collecte et amélioration.
 function roam(creep) {
   if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) creep.memory.working = false;
@@ -106,10 +114,9 @@ function drainLink(creep, link) {
 // Sans poste libre (plus d'upgraders que de postes), il se contente de rester à portée du contrôleur.
 function run(creep) {
   const room = creep.room;
-  // Ancien builder (converti faute de chantier, voir builder.run) : il reprend son rôle dès qu'un chantier revient.
-  // Sans ça, le spawner ne voit aucun builder et en crée un neuf à chaque lot de chantiers du planner.
-  if (creep.name.startsWith('builder-') && creep.memory.room === room.name
-    && room.find(FIND_MY_CONSTRUCTION_SITES).length) {
+  // Ancien builder (converti faute de travail, voir builder.run) : il reprend son rôle dès que du travail revient
+  // (builderWork). Sans ça, le spawner ne voit aucun builder et en crée un neuf.
+  if (creep.name.startsWith('builder-') && creep.memory.room === room.name && builderWork(room)) {
     creep.memory.role = 'builder';
     return;
   }
@@ -152,4 +159,4 @@ function spots(room) {
   return Math.max(1, posts(room, d).length);
 }
 
-module.exports = { run, paused, spots, STORAGE_HIGH };
+module.exports = { run, paused, spots, builderWork, STORAGE_HIGH };
