@@ -1,6 +1,5 @@
 const intel = require('./intel');
 const move = require('./move');
-const defense = require('./defense');
 const sources = require('./sources');
 
 // Débit d'une source de salle non réservée (1 500 énergie par régénération) : 5 énergie/tick ; réservée : 10.
@@ -137,9 +136,10 @@ function income(room, remote) {
   }, 0);
 }
 
-// Vrai si la salle visée par le créep est sûre ; sur place, il signale lui-même les hostiles.
+// Vrai si la salle visée par le créep est sûre ; sur place, il signale lui-même les hostiles
+// et tout changement de propriétaire ou de réservation (intel.watch).
 function safe(creep) {
-  if (creep.room.name === creep.memory.target && defense.threats(creep.room).length) intel.record(creep.room);
+  if (creep.room.name === creep.memory.target) intel.watch(creep.room);
   return intel.safe(creep.memory.target);
 }
 

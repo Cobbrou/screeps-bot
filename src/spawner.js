@@ -326,7 +326,13 @@ function buildBody(role, energy, room, sourceId, target) {
   if (role === 'remoteBuilder') return repeat([WORK, CARRY, MOVE], Math.min(energy, 4 * cost([WORK, CARRY, MOVE])));
   if (role === 'defender' || role === 'remoteDefender') return repeat([RANGED_ATTACK, MOVE], energy);
   if (role === 'scout') return [MOVE];
-  if (role === 'claimer') return energy >= BODYPART_COST[CLAIM] + BODYPART_COST[MOVE] ? [CLAIM, MOVE] : [];
+  // Claimer : 5 MOVE si l'énergie le permet (850), de quoi annuler la fatigue du CLAIM en marais (10) : une case
+  // par tick sur tout terrain. Avec un seul MOVE (5 ticks par case de marais), il mourait avant d'arriver
+  // (CREEP_CLAIM_LIFE_TIME 600) sur un trajet de 10 salles (expansion.ENCLOSED_DISTANCE).
+  if (role === 'claimer') {
+    const moves = Math.min(5, Math.floor((energy - BODYPART_COST[CLAIM]) / BODYPART_COST[MOVE]));
+    return moves > 0 ? [CLAIM, ...Array(moves).fill(MOVE)] : [];
+  }
   // Upgrader nourri au dépôt du contrôleur (tas puis conteneur) : il ne bouge plus une fois posté,
   // donc surtout des WORK, un seul CARRY et un MOVE pour upgraderRatio WORK (à 2 : 300 → 2 WORK, 550 → 4 WORK,
   // 800 → 6 WORK ; à 4 : 2 300 → 20 WORK).

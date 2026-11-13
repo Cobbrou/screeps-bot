@@ -1,7 +1,6 @@
 const move = require('./move');
 const stats = require('./stats');
 const intel = require('./intel');
-const defense = require('./defense');
 
 // Attente maximale (en ticks) de la régénération d'une source avant d'aller récolter ailleurs.
 const AWAY_MIN_WAIT = 100;
@@ -222,8 +221,8 @@ function unavailable(creep, source) {
 // Récolte dans la salle voisine notée dans `creep.memory.away` ; l'oublie si elle devient dangereuse.
 function harvestAway(creep) {
   const away = creep.memory.away;
-  // Sur place, le créep signale lui-même les hostiles : intel.safe le fera repartir.
-  if (creep.room.name === away.to && defense.threats(creep.room).length) intel.record(creep.room);
+  // Sur place, le créep signale lui-même les hostiles et la salle prise ou réservée : intel.safe le fera repartir.
+  if (creep.room.name === away.to) intel.watch(creep.room);
   if (!intel.safe(away.to)) {
     delete creep.memory.away;
     return;

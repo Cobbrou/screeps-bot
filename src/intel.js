@@ -28,6 +28,18 @@ function record(room) {
   };
 }
 
+// Réenregistre la salle où se trouve un de nos créeps si elle a des hostiles dangereux, ou si son propriétaire
+// ou sa réservation n'est plus celui noté : salle distante prise ou réservée par un joueur, cœur d'Invader.
+// Sans ça, l'intel ne changeait qu'au passage de l'éclaireur (SCOUT_REFRESH) et les créeps distants, recréés
+// à chaque mort, continuaient d'y aller sous les tours ou sans pouvoir récolter.
+function watch(room) {
+  const c = room.controller;
+  const i = room.memory.intel;
+  const owner = c && c.owner ? c.owner.username : null;
+  const reserved = c && c.reservation ? c.reservation.username : null;
+  if (!i || i.owner !== owner || i.reserved !== reserved || defense.threats(room).length) record(room);
+}
+
 // Salle injoignable : notée comme explorée, sans contrôleur, pour ne plus y être envoyé.
 function skip(name) {
   if (!Memory.rooms) Memory.rooms = {};
@@ -109,4 +121,4 @@ function clear(name) {
   if (i) Object.assign(i, { hostile: 0, invader: false });
 }
 
-module.exports = { get, record, skip, safe, invaded, clear, me, reservedByMe, keeperRoom, friendly, route };
+module.exports = { get, record, watch, skip, safe, invaded, clear, me, reservedByMe, keeperRoom, friendly, route };
