@@ -29,6 +29,11 @@ const BUILD_SPEND = 4 + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPART_C
 // d'un mur à l'autre et se recharge la plupart du temps.
 // ponytail: 0,4 mesuré le 2026-11-10 sur E25S3 (5 énergie/tick pour 12 WORK) ; à recaler si le stockage dérive.
 const REPAIR_SPEND = 0.4 + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPART_COST[MOVE]) / CREEP_LIFE_TIME;
+// Builder créé sans chantier (entretien des murs et remparts de la coupe) : motifs WORK/CARRY/MOVE au plus.
+// Le decay des remparts lointains ne demande que ~0,1 énergie/tick : un corps de 2 300 (12 WORK) était recréé
+// à chaque vie pour ça, ~35 k d'énergie par jour sur E25S3 (relevé du 2026-11-13).
+// ponytail: plafond fixe, lent après une attaque (~3 énergie/tick de réparation) ; le tailler sur le déficit des murs si besoin.
+const REPAIR_BUILDER_UNITS = 3;
 // Rôles dont l'entretien est déduit du revenu : ceux qui récoltent et transportent.
 const ECONOMY_ROLES = ['miner', 'hauler', 'filler', 'remoteMiner', 'remoteHauler', 'reserver', 'mineralMiner', 'mineralHauler'];
 // Renseignements sur une salle voisine jugés périmés après ce nombre de ticks : un éclaireur va les rafraîchir.
@@ -332,6 +337,9 @@ function buildBody(role, energy, room, sourceId, target) {
     let work = MAX_CREEP_SIZE - 1;
     while (work * BODYPART_COST[WORK] + moves(work) * BODYPART_COST[MOVE] > budget || 1 + work + moves(work) > MAX_CREEP_SIZE) work--;
     return [CARRY, ...Array(work).fill(WORK), ...Array(moves(work)).fill(MOVE)];
+  }
+  if (role === 'builder' && room && !room.find(FIND_MY_CONSTRUCTION_SITES).length) {
+    energy = Math.min(energy, REPAIR_BUILDER_UNITS * cost([WORK, CARRY, MOVE]));
   }
   // Polyvalent : le reste devient un WORK de plus (300 → 2 WORK, 550 → 3 WORK).
   return repeat([WORK, CARRY, MOVE], energy, [[WORK, MOVE], [WORK]]);
