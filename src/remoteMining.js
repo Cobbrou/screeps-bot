@@ -150,10 +150,11 @@ function invaded(room) {
 }
 
 // Ramène le créep dans sa salle, où il attend que la salle visée redevienne sûre.
+// Jusqu'à portée 20 du centre, pas seulement jusqu'à l'entrée : resté sur la case de sortie, il serait renvoyé
+// par le moteur dans la salle dangereuse au tick suivant, et ainsi de suite.
 function retreat(creep) {
-  if (creep.room.name !== creep.memory.room) {
-    move.to(creep, new RoomPosition(25, 25, creep.memory.room), { range: 20 });
-  }
+  const center = new RoomPosition(25, 25, creep.memory.room);
+  if (creep.room.name !== center.roomName || !creep.pos.inRangeTo(center, 20)) move.to(creep, center, { range: 20 });
 }
 
 // Sous cette part de ses points de vie, une route distante est réparée par le remoteBuilder (pas de tour hors de nos salles).

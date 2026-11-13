@@ -14,6 +14,23 @@ const ENCLOSED_AFTER = 20000;
 const ENCLOSED_DISTANCE = 10;
 // Abandon de la cible si elle n'est pas revendiquée, ou si son spawn n'est pas construit, dans ce délai.
 const GIVE_UP = 5000;
+// Cible abandonnée (délai dépassé) écartée pendant ce nombre de ticks : sans ça, choose() la reprenait aussitôt
+// (même score) et claimers et pioneers s'enchaînaient sans fin vers un contrôleur inaccessible ou un spawn imposable.
+// Délai et non exclusion définitive : l'échec peut venir d'un spawn d'origine trop occupé pour créer le claimer.
+const RETRY_AFTER = 50000;
+
+// Note l'abandon de la cible, hors de son intel (réécrit à chaque passage de l'éclaireur).
+function fail(name) {
+  if (!Memory.rooms) Memory.rooms = {};
+  if (!Memory.rooms[name]) Memory.rooms[name] = {};
+  Memory.rooms[name].expansionFailed = Game.time;
+}
+
+// Vrai si la salle a été abandonnée comme cible depuis moins de RETRY_AFTER ticks.
+function failed(name) {
+  const at = Memory.rooms[name].expansionFailed;
+  return at !== undefined && Game.time - at < RETRY_AFTER;
+}
 
 function ownedRooms() {
   return Object.values(Game.rooms).filter((r) => r.controller && r.controller.my);
@@ -34,7 +51,7 @@ function choose() {
   let best = null;
   let bestScore = -Infinity;
   for (const name in Memory.rooms) {
-    if (!intel.safe(name) || !intel.get(name).sources) continue;
+    if (!intel.safe(name) || !intel.get(name).sources || failed(name)) continue;
     for (const home of homes) {
       // Vol d'oiseau d'abord : findRoute seulement pour les salles assez proches, et seulement si le score
       // optimiste (trajet aussi court que le vol d'oiseau) peut battre le meilleur.
@@ -113,6 +130,7 @@ module.exports.run = function () {
     // Spawn jamais construit (pioneers tués) : la salle est rendue pour ne pas produire des pioneers sans fin.
     if (Game.time - exp.claimedAt > GIVE_UP) {
       room.controller.unclaim();
+      fail(exp.target);
       delete Memory.expansion;
       return;
     }
@@ -123,8 +141,11 @@ module.exports.run = function () {
   const c = room && room.controller;
   const taken = c && (c.owner || (c.reservation && c.reservation.username !== intel.me()));
   const unreachable = Game.time % INTERVAL === 0 && !intel.route(exp.from, exp.target);
-  if (taken || unreachable || Game.time - exp.since > GIVE_UP) {
+  const late = Game.time - exp.since > GIVE_UP;
+  if (taken || unreachable || late) {
     if (room) intel.record(room);
+    // Prise ou sans trajet : l'intel et intel.route l'écartent déjà. Délai dépassé : rien d'autre ne le retient.
+    if (late) fail(exp.target);
     delete Memory.expansion;
     // Nouvelle cible dès ce tick : sans elle, le claimer en route se suiciderait en attendant le prochain INTERVAL.
     choose();

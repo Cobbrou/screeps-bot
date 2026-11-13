@@ -234,6 +234,8 @@ function harvestAway(creep) {
   }
   const source = creep.pos.findClosestByRange(FIND_SOURCES_ACTIVE);
   if (source) harvestSource(creep, source);
+  // Aucune source active : il quitte quand même la case de sortie, où le moteur le renverrait d'où il vient à chaque tick.
+  else if (!creep.pos.inRangeTo(25, 25, 22)) move.to(creep, new RoomPosition(25, 25, away.to), { range: 22 });
 }
 
 // Salle voisine sûre qui a encore de la place pour un créep de plus, ou undefined.
