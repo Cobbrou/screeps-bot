@@ -153,6 +153,8 @@ En attente du marché : relevé du 2026-11-06 sur shard0, ordres réels (les pri
 - [ ] Boosts des défenseurs depuis les laboratoires
 - [ ] Escouades d'attaque (soin + attaque) contre les salles hostiles voisines
 
+En attente, d'après un relevé du 2026-11-17 sur shard0. Boosts : aucun lab construit, minerai H vendu au fur et à mesure, et KO à ~580 crédits l'unité. Un défenseur à 10 `RANGED_ATTACK` boostés coûterait ~174 000 crédits, pour ~55 000 en caisse. Escouades : voisins hostiles E27S4 (Franz, RCL 7, 14 créeps) et E27S5 (explicit, RCL 6, 35 remparts), en zone normale et séparés de notre zone de respawn jusqu'au 2026-12-01. En face, une seule salle RCL 6 avec 14 500 d'énergie stockée. À revoir après l'expansion (GCL 4 pour une seule salle possédée) ou si les prix baissent.
+
 ## Phase 10 : fin de partie (RCL 8)
 
 - [ ] Power spawn et traitement de la puissance
