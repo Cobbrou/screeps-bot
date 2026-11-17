@@ -5,16 +5,30 @@ const boost = require('../boost');
 
 // Sous ce stock d'énergie dans le stockage, l'amélioration s'arrête : l'énergie va au spawn et aux tours.
 // Elle ne reprend qu'au-dessus de STORAGE_HIGH (hystérésis : sans elle, upgraders créés puis mis en pause
-// en boucle autour du seuil).
+// en boucle autour du seuil). Dès le RCL 7, seuils relevés (RESERVE_*) : une réserve reste au stockage en cas de besoin.
 const STORAGE_LOW = 10000;
 const STORAGE_HIGH = 15000;
+const RESERVE_RCL = 7;
+const RESERVE_LOW = 50000;
+const RESERVE_HIGH = 55000;
+
+// Seuils du stockage bas de la salle : [bas, reprise].
+function thresholds(room) {
+  return room.controller && room.controller.level >= RESERVE_RCL ? [RESERVE_LOW, RESERVE_HIGH] : [STORAGE_LOW, STORAGE_HIGH];
+}
+
+// Seuil de reprise de l'amélioration de la salle (le spawner ne compte comme revenu que le stock au-dessus).
+function storageHigh(room) {
+  return thresholds(room)[1];
+}
 
 // Vrai si le stockage est bas (drapeau room.memory.storageLow, avec hystérésis). Sans stockage : faux.
 function storageLow(room) {
   if (!room.storage) return false;
   const energy = room.storage.store[RESOURCE_ENERGY];
-  if (energy < STORAGE_LOW) room.memory.storageLow = true;
-  else if (energy > STORAGE_HIGH) delete room.memory.storageLow;
+  const [low, high] = thresholds(room);
+  if (energy < low) room.memory.storageLow = true;
+  else if (energy > high) delete room.memory.storageLow;
   return !!room.memory.storageLow;
 }
 
@@ -163,4 +177,4 @@ function spots(room) {
   return Math.max(1, posts(room, d).length);
 }
 
-module.exports = { run, paused, spots, builderWork, STORAGE_HIGH };
+module.exports = { run, paused, spots, builderWork, storageHigh };
