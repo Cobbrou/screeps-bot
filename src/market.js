@@ -1,3 +1,5 @@
+const boost = require('./boost');
+
 // Ticks entre deux ventes d'une salle : le double de TERMINAL_COOLDOWN laisse le terminal disponible à chaque passage.
 const INTERVAL = 20;
 // Stock de minerai au terminal sous lequel on ne vend pas.
@@ -37,7 +39,9 @@ function bestOrder(resource, roomName) {
 function sell(room) {
   const terminal = room.terminal;
   if (terminal.cooldown) return;
-  const resource = Object.keys(terminal.store).find((r) => r !== RESOURCE_ENERGY && terminal.store[r] >= MIN_SALE);
+  // Composés de boost achetés pour les upgraders : jamais revendus.
+  const resource = Object.keys(terminal.store).find((r) => r !== RESOURCE_ENERGY && !boost.COMPOUNDS.includes(r)
+    && terminal.store[r] >= MIN_SALE);
   if (!resource) return;
   const best = bestOrder(resource, room.name);
   if (!best) return;
@@ -45,6 +49,21 @@ function sell(room) {
   if (amount <= 0) return;
   const result = Game.market.deal(best.order.id, amount, room.name);
   console.log(`[market] ${room.name} : ${amount} ${resource} à ${best.order.price} vers ${best.order.roomName} (${result})`);
+}
+
+// Achète le composé de boost des upgraders qui manque (boost.purchase), transport payé par le terminal.
+// Vrai si un achat est parti : le terminal est pris pour ce tick.
+function buy(room) {
+  const terminal = room.terminal;
+  if (terminal.cooldown) return false;
+  const want = boost.purchase(room);
+  if (!want) return false;
+  const unit = Game.market.calcTransactionCost(1000, room.name, want.order.roomName) / 1000;
+  const amount = Math.min(want.amount, Math.floor(terminal.store[RESOURCE_ENERGY] / unit));
+  if (amount <= 0) return false;
+  const result = Game.market.deal(want.order.id, amount, room.name);
+  console.log(`[market] ${room.name} : achat de ${amount} ${want.order.resourceType} à ${want.order.price} depuis ${want.order.roomName} (${result})`);
+  return result === OK;
 }
 
 // Énergie de la salle, terminal compris : un envoi pas encore rangé au stockage compte déjà.
@@ -71,6 +90,6 @@ module.exports.run = function () {
   const rooms = Object.values(Game.rooms).filter((room) => room.terminal && room.terminal.my);
   const sender = balance(rooms);
   for (const room of rooms) {
-    if (room !== sender) sell(room);
+    if (room !== sender && !buy(room)) sell(room);
   }
 };

@@ -1,6 +1,7 @@
 const move = require('../move');
 const sources = require('../sources');
 const mineralMiner = require('./mineralMiner');
+const boost = require('../boost');
 
 // Charge d'un voyage (corps du spawner) et stock du conteneur qui justifie un voyage.
 const LOAD = 500;
@@ -42,12 +43,15 @@ function leftover(creep) {
 }
 
 // Prend le chargement `next` (job, boxJob ou leftover) : withdraw d'un Store, pickup d'un tas au sol.
+// Destination imposée (`next.to`, lab de boost) gardée dans creep.memory.to pour unload.
 function take(creep, next) {
+  if (next.to) creep.memory.to = next.to.id;
+  else delete creep.memory.to;
   const result = next.from.store ? creep.withdraw(next.from, next.resource) : creep.pickup(next.from);
   if (result === ERR_NOT_IN_RANGE) move.to(creep, next.from);
 }
 
-// Prochain chargement de la salle, ou undefined : conteneur du minerai, puis énergie reçue en trop au terminal,
+// Prochain chargement de la salle, ou undefined : conteneur du minerai, puis lab de boost (boost.labJob), puis énergie reçue en trop au terminal,
 // puis minerai du stockage vers le terminal, puis énergie du terminal. `alive` : le transporteur existe déjà, il finit aussi les restes et les petits appoints.
 function job(room, alive) {
   const { storage, terminal } = room;
@@ -55,6 +59,8 @@ function job(room, alive) {
   const fromBox = boxJob(room, alive);
   if (fromBox) return fromBox;
   if (!terminal) return undefined;
+  const toLab = boost.labJob(room);
+  if (toLab) return toLab;
   if (terminal.store[RESOURCE_ENERGY] >= TERMINAL_ENERGY + LOAD) return { from: terminal, resource: RESOURCE_ENERGY };
   const mineral = Object.keys(storage.store).find((r) => r !== RESOURCE_ENERGY && storage.store[r] > 0);
   if (mineral) return { from: storage, resource: mineral };
@@ -67,7 +73,15 @@ function job(room, alive) {
 const ready = (room) => !!job(room, false);
 
 // Dépose `held` au terminal : au stockage sans terminal, et pour l'énergie dont le terminal n'a plus besoin.
+// Destination imposée au chargement (creep.memory.to) d'abord ; pleine ou disparue, retour au cas général.
 function unload(creep, held) {
+  const to = creep.memory.to && Game.getObjectById(creep.memory.to);
+  if (to) {
+    const result = creep.transfer(to, held);
+    if (result === ERR_NOT_IN_RANGE) move.to(creep, to);
+    if (result === ERR_NOT_IN_RANGE || result === OK) return;
+  }
+  delete creep.memory.to;
   const { storage, terminal } = creep.room;
   const dest = !terminal || (held === RESOURCE_ENERGY && terminal.store[RESOURCE_ENERGY] >= TERMINAL_ENERGY) ? storage : terminal;
   if (dest && creep.transfer(dest, held) === ERR_NOT_IN_RANGE) move.to(creep, dest);

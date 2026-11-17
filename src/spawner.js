@@ -7,6 +7,7 @@ const mineralMiner = require('./roles/mineralMiner');
 const mineralHauler = require('./roles/mineralHauler');
 const scout = require('./roles/scout');
 const remoteMining = require('./remoteMining');
+const boost = require('./boost');
 
 const MAX_MINER_WORK = 5;
 // Plus petit upgrader créé : au-dessous, il occupe un poste et du temps de spawn pour presque rien.
@@ -482,6 +483,8 @@ module.exports.run = function () {
     }
     const body = buildBody(role, energy, room, memory.sourceId, memory.target);
     if (!body.length) continue;
+    // Upgrader boosté au lab s'il a de quoi (composé et énergie) : il y passe avant son poste.
+    if (role === 'upgrader' && boost.parts(room, body.filter((p) => p === WORK).length)) memory.boost = true;
     if (spawn.spawnCreep(body, `${role}-${spawn.name}-${Game.time}`, { memory }) === OK) {
       roomCounts[role] = (roomCounts[role] || 0) + 1;
       if (role === 'miner') addMiner(memory.sourceId, body);

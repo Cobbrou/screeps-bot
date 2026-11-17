@@ -1,6 +1,7 @@
 const move = require('../move');
 const sources = require('../sources');
 const defense = require('../defense');
+const boost = require('../boost');
 
 // Sous ce stock d'énergie dans le stockage, l'amélioration s'arrête : l'énergie va au spawn et aux tours.
 // Elle ne reprend qu'au-dessus de STORAGE_HIGH (hystérésis : sans elle, upgraders créés puis mis en pause
@@ -122,10 +123,13 @@ function run(creep) {
   }
   // Temps de trajet depuis le spawn, noté à la première arrivée au contrôleur : le spawner lance le successeur
   // assez tôt pour qu'il arrive quand cet upgrader meurt.
-  if (creep.memory.travel === undefined && creep.pos.inRangeTo(room.controller, 3)) {
+  // Pas pendant le détour par le lab de boost : il fausserait le trajet.
+  if (creep.memory.travel === undefined && !creep.memory.boost && creep.pos.inRangeTo(room.controller, 3)) {
     creep.memory.travel = CREEP_LIFE_TIME - creep.ticksToLive;
   }
   if (sources.goBack(creep)) return;
+  // Upgrader neuf marqué par le spawner : passe au lab de boost avant son poste.
+  if (creep.memory.boost && boost.apply(creep)) return;
   const depot = room.controller && room.controller.my && sources.depot(room);
   if (!depot) {
     roam(creep);

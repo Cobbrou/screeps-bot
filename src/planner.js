@@ -2,6 +2,7 @@ const sources = require('./sources');
 const remoteMining = require('./remoteMining');
 const minCut = require('./minCut');
 const defense = require('./defense');
+const boost = require('./boost');
 const { PLAN_COSTS } = require('./move');
 
 // Le plan est recalculé tous les INTERVAL ticks : les chantiers manquants sont recréés.
@@ -776,9 +777,13 @@ module.exports.run = function () {
     // Liens (RCL 5), une fois les routes connues : ils passent avant les routes dans les places libres.
     planLinks(room, plan, costs);
     if (plan.link) buildPlan(room, plan, STRUCTURE_LINK);
-    // Labs : cases réservées au plan, mais rien n'est posé tant qu'aucun code ne les utilise.
-    // ponytail: à réactiver avec buildPlan quand leur code existe.
     planExtras(room, plan, costs);
+    // Un seul lab, celui du boost des upgraders (voir boost), posé avec le terminal et des crédits au-dessus de la réserve :
+    // le premier lab de sortie du bloc, les labs d'entrée restent libres pour les réactions.
+    // ponytail: les autres labs du plan restent réservés sans être posés tant qu'aucune réaction n'est codée.
+    if (plan.lab && plan.lab.length > LAB_INPUTS.length && boost.wanted(room)) {
+      buildPlan(room, { [STRUCTURE_LAB]: [plan.lab[LAB_INPUTS.length]] }, STRUCTURE_LAB);
+    }
     planLate(room, plan, costs);
     planHubTowers(room, plan, costs);
     orderTowers(plan);

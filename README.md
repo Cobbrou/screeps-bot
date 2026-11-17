@@ -55,10 +55,11 @@ Sans `secrets.json`, `deploy` et `watch` se contentent du build et affichent un 
 screeps-bot/
 ├── src/
 │   ├── main.js              # point d'entrée (loop exécutée à chaque tick)
+│   ├── boost.js             # boost des upgraders (GH, GH2O, XGH2O) : achat, lab, application
 │   ├── defense.js           # tours, mode sans échec, détection des hostiles
 │   ├── expansion.js         # choix de la salle à revendiquer, pose de son premier spawn
 │   ├── intel.js             # renseignements sur les salles explorées (Memory.rooms[*].intel)
-│   ├── market.js            # vente du minerai au meilleur ordre d'achat, équilibrage de l'énergie entre salles
+│   ├── market.js            # vente du minerai au meilleur ordre d'achat, achat des composés de boost, équilibrage de l'énergie entre salles
 │   ├── memory.js            # nettoyage de Memory (créeps morts)
 │   ├── minCut.js            # coupe minimale entre la base et les sorties (flot de Dinic, sans objet du jeu)
 │   ├── move.js              # déplacements : moveTo avec contournement des créeps en cas de blocage
@@ -86,7 +87,8 @@ screeps-bot/
 │       ├── scout.js         # explore les salles voisines
 │       └── upgrader.js      # posté au dépôt du contrôleur, améliore sans aller chercher l'énergie
 ├── test/
-│   └── minCut.test.js       # vérifie que la coupe sépare la base des sorties
+│   ├── minCut.test.js       # vérifie que la coupe sépare la base des sorties
+│   └── boost.test.js        # vérifie le choix des achats, des parties boostées et des trajets vers le lab
 ├── docs/
 │   ├── architecture.md      # architecture prévue
 │   ├── e25s3-analysis.md    # état de E25S3 et corrections à apporter (relevé du 2026-11-03)
