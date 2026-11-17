@@ -198,10 +198,6 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   // Plus petit corps d'upgrader possible ici : avant les extensions, la capacité ne permet pas MIN_UPGRADER_WORK.
   const step = Math.min(MIN_UPGRADER_WORK, buildBody('upgrader', room.energyCapacityAvailable, room).filter((p) => p === WORK).length);
   const upNet = upgradeBudget(room, net, work);
-  // WORK d'upgraders que le revenu finance, lu par builder.run avant de reconvertir un builder sans chantier.
-  // Revenu brut : le builder qui se reconvertit cesse ses réparations, leur dépense (REPAIR_SPEND) disparaît avec.
-  // ponytail: les réparations des autres builders sont ignorées (un seul hors chantier, voir builder plus bas).
-  room.memory.upgradeWork = Math.floor(net / UPGRADE_SPEND);
   const funded = up ? (work.upgrader || 0) + step <= upNet / UPGRADE_SPEND : upNet > 0;
   // Rétrogradation proche : au moins un upgrader, même pendant les chantiers.
   // Pendant les chantiers, l'effectif voulu avant eux (room.memory.upgraders) est maintenu : les upgraders
@@ -416,6 +412,18 @@ module.exports.run = function () {
     if (creep.memory.role === 'reserver' && !dying) reservers[creep.memory.target] = (reservers[creep.memory.target] || 0) + 1;
     if (ECONOMY_ROLES.includes(creep.memory.role)) addUpkeep(room, creep.body);
     if (role === 'builder' || (role === 'upgrader' && !dying)) addWork(room, role, creep.body);
+  }
+
+  // WORK d'upgraders que le revenu finance, lu par builder.run avant de reconvertir un builder sans chantier.
+  // Revenu brut : le builder qui se reconvertit cesse ses réparations, leur dépense (REPAIR_SPEND) disparaît avec.
+  // Recalculé à chaque tick, pas seulement quand un spawn est libre : au tick où un hauler en fin de vie est remplacé,
+  // ni lui ni son successeur ne comptent, le revenu tombe sous 0, et la valeur restait figée (-2 sur E25S3)
+  // pendant tout le spawn du successeur, ~100 ticks sans reconversion possible.
+  // ponytail: les réparations des autres builders sont ignorées (un seul hors chantier, voir targets).
+  for (const room of Object.values(Game.rooms)) {
+    if (!room.controller || !room.controller.my) continue;
+    const net = netIncome(room, miners, carry[room.name], remote, upkeep[room.name]);
+    room.memory.upgradeWork = Math.floor(net / UPGRADE_SPEND);
   }
 
   for (const name in Game.spawns) {

@@ -144,7 +144,7 @@ La zone de respawn de E25S3 (avec E24S3, E25S4 et E24S2) prend fin le 2026-12-01
 - [x] Terminal (RCL 6) : posé dès que du minerai attend au stockage, rempli par le `mineralHauler` (minerai, 5 000 d'énergie)
 - [x] Terminal : équilibrage de l'énergie entre nos salles (`market` : de la plus riche, 100 000 au moins, vers la plus pauvre, sous 50 000 ; le `mineralHauler` range l'envoi au stockage)
 - [ ] Récolte de E25S4 (salle à keepers voisine, dans notre zone, 3 sources et un minerai) au RCL 7 : un tueur de keepers (`ATTACK` et `HEAL`) qui tue chaque Source Keeper à sa réapparition, mineurs et transporteurs distants derrière lui. Environ +40 énergie/tick brute, soit le double du revenu actuel
-- [ ] Correction : `room.memory.upgradeWork` n'est recalculé que lorsque le spawn est libre. Relevé du 2026-11-17 : il est resté à -2 pendant tout le spawn d'un hauler, calculé au tick où le hauler mourant ne comptait plus et où son successeur n'existait pas encore. Le builder ne peut pas redevenir upgrader pendant ce temps (~100 ticks à chaque spawn de hauler). Le calculer à chaque tick, ou compter le créep en cours de spawn
+- [x] Correction : `room.memory.upgradeWork` n'est recalculé que lorsque le spawn est libre. Relevé du 2026-11-17 : il est resté à -2 pendant tout le spawn d'un hauler, calculé au tick où le hauler mourant ne comptait plus et où son successeur n'existait pas encore. Le builder ne peut pas redevenir upgrader pendant ce temps (~100 ticks à chaque spawn de hauler). Recalculé désormais à chaque tick pour chaque salle possédée, spawn libre ou non
 - [ ] Nettoyage : `Memory._dbg`, clé de débogage que le code n'écrit plus, à supprimer de la mémoire
 
 ## Phase 8 : économie et marché (RCL 6+)
