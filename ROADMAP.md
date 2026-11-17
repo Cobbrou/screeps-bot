@@ -121,6 +121,14 @@ Priorité immédiate, d'après l'[analyse de E25S3](docs/e25s3-analysis.md) : l'
 - [x] Trajet noté par les mineurs (`travel: 213`, puis 220, pour 14 cases) : la source `…e63` n'a que la case du conteneur, le successeur attendait loin et comptait l'attente. Trajet noté dès qu'il touche la source ou le conteneur, attente collée au conteneur (mineurs locaux et distants)
 - [x] Remparts sur les spawns, tours et stockage (avec la ceinture de murs) ; liens au RCL 5 : lien du hub et lien de la source à la route la plus longue
 
+## Ouverture de la zone de respawn (2026-12-01 13:07 UTC)
+
+La zone de respawn de E25S3 (avec E24S3, E25S4 et E24S2) prend fin le 2026-12-01 à 13:07 UTC. Les 19 murs de zone de E25S3 disparaissent alors : au nord en y = 0, x 24 à 39, et à l'est en x = 49, y 25 à 27. La coupe min-cut est déjà construite en face : murs et remparts en y = 2 et en x = 47, à ~120 000 PV. Relevé du 2026-11-17 : aucune récolte distante (E25S2 et E26S3, voisines nord et est, jamais explorées), `Memory.enclosed` vrai depuis 330 000 ticks.
+
+- [ ] Vérifier après l'ouverture que l'éclaireur explore E25S2 et E26S3 et que la récolte distante y démarre : 2 salles au plus, environ +10 énergie/tick par source réservée, pour un revenu actuel de ~20
+- [ ] Vérifier que l'expansion trouve une cible et lève `Memory.enclosed` : GCL 4 pour une seule salle possédée
+- [ ] Surveiller E27S4 et E27S5, qui deviennent joignables : premiers passages de créeps de joueurs, tenue des remparts de la coupe
+
 ## Phase 7 : logistique avancée (RCL 5-6)
 
 - [x] Plan de base : spawns suivants à côté du stockage (lien du hub déjà à portée 2)
@@ -135,6 +143,9 @@ Priorité immédiate, d'après l'[analyse de E25S3](docs/e25s3-analysis.md) : l'
 - [x] Extracteur et mineur de minerai (RCL 6) : `mineralMiner` sur le conteneur du minerai, `mineralHauler` vers le stockage (100 000 au plus)
 - [x] Terminal (RCL 6) : posé dès que du minerai attend au stockage, rempli par le `mineralHauler` (minerai, 5 000 d'énergie)
 - [x] Terminal : équilibrage de l'énergie entre nos salles (`market` : de la plus riche, 100 000 au moins, vers la plus pauvre, sous 50 000 ; le `mineralHauler` range l'envoi au stockage)
+- [ ] Récolte de E25S4 (salle à keepers voisine, dans notre zone, 3 sources et un minerai) au RCL 7 : un tueur de keepers (`ATTACK` et `HEAL`) qui tue chaque Source Keeper à sa réapparition, mineurs et transporteurs distants derrière lui. Environ +40 énergie/tick brute, soit le double du revenu actuel
+- [ ] Correction : `room.memory.upgradeWork` n'est recalculé que lorsque le spawn est libre. Relevé du 2026-11-17 : il est resté à -2 pendant tout le spawn d'un hauler, calculé au tick où le hauler mourant ne comptait plus et où son successeur n'existait pas encore. Le builder ne peut pas redevenir upgrader pendant ce temps (~100 ticks à chaque spawn de hauler). Le calculer à chaque tick, ou compter le créep en cours de spawn
+- [ ] Nettoyage : `Memory._dbg`, clé de débogage que le code n'écrit plus, à supprimer de la mémoire
 
 ## Phase 8 : économie et marché (RCL 6+)
 
@@ -143,6 +154,8 @@ Priorité immédiate, d'après l'[analyse de E25S3](docs/e25s3-analysis.md) : l'
 - [ ] Laboratoires : réactions de base
 
 En attente du marché : relevé du 2026-11-06 sur shard0, ordres réels (les prix moyens sur 14 jours sont trompeurs, énergie à 10 de moyenne). Énergie vendue à 3 000 au moins, soit aucun achat possible. H acheté à ~550, GH à 225 et KH à 67 : un produit de nos labs rapporterait moins que H brut. À revoir si ces ordres changent, ou pour les boosts.
+
+- [ ] Boost des upgraders au GH (+50 % de progression du contrôleur pour la même énergie) : 1 lab du plan posé au RCL 6, rempli depuis le terminal avec du GH acheté au marché, upgrader neuf boosté avant de rejoindre son poste. Relevé du 2026-11-17 : GH vendu à ~3 700 crédits l'unité, 30 par `WORK`, soit ~1,7 million par vie d'upgrader à 15 `WORK`, pour 55 millions de crédits qui ne servent à rien. Gain : ~7,5 points de contrôleur par tick sur un revenu de ~15 ; il reste 1,36 million de points avant le RCL 7. Plafond de prix à prévoir, et rien acheté sous la pause du stockage bas
 
 ## Phase 9 : défense et attaque avancées (RCL 7+)
 
@@ -153,7 +166,7 @@ En attente du marché : relevé du 2026-11-06 sur shard0, ordres réels (les pri
 - [ ] Boosts des défenseurs depuis les laboratoires
 - [ ] Escouades d'attaque (soin + attaque) contre les salles hostiles voisines
 
-En attente, d'après un relevé du 2026-11-17 sur shard0. Boosts : aucun lab construit, minerai H vendu au fur et à mesure, et KO à ~580 crédits l'unité. Un défenseur à 10 `RANGED_ATTACK` boostés coûterait ~174 000 crédits, pour ~55 000 en caisse. Escouades : voisins hostiles E27S4 (Franz, RCL 7, 14 créeps) et E27S5 (explicit, RCL 6, 35 remparts), en zone normale et séparés de notre zone de respawn jusqu'au 2026-12-01. En face, une seule salle RCL 6 avec 14 500 d'énergie stockée. À revoir après l'expansion (GCL 4 pour une seule salle possédée) ou si les prix baissent.
+En attente, d'après un relevé du 2026-11-17 sur shard0. Boosts des défenseurs : abordables (KO à ~630 crédits l'unité, ~190 000 pour un défenseur à 10 `RANGED_ATTACK`, sur 55 millions en caisse d'après `Game.market.credits`), mais seuls des Invaders sont venus jusqu'ici, que les tours tuent seules. À faire avec le boost des upgraders (phase 8), qui pose le premier lab, si un joueur attaque. Escouades : voisins hostiles E27S4 (Franz, RCL 7, 14 créeps) et E27S5 (explicit, RCL 6, 35 remparts), en zone normale et séparés de notre zone de respawn jusqu'au 2026-12-01. En face, une seule salle RCL 6 avec 14 500 d'énergie stockée. À revoir après l'expansion (GCL 4 pour une seule salle possédée).
 
 ## Phase 10 : fin de partie (RCL 8)
 
