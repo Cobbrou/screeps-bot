@@ -324,6 +324,8 @@ function buildBody(role, energy, room, sourceId, target) {
   if (role === 'mineralMiner') return repeat([WORK, WORK, MOVE], energy);
   if (role === 'mineralHauler') return repeat([CARRY, MOVE], Math.min(energy, mineralHauler.LOAD / CARRY_CAPACITY * cost([CARRY, MOVE])));
   if (role === 'remoteBuilder') return repeat([WORK, CARRY, MOVE], Math.min(energy, 4 * cost([WORK, CARRY, MOVE])));
+  // Cœur d'Invader (100 000 PV, sans créep ni tour) : ATTACK au contact, 3 fois les dégâts d'un RANGED_ATTACK.
+  if (role === 'remoteDefender' && intel.get(target) && intel.get(target).core) return repeat([ATTACK, MOVE], energy);
   if (role === 'defender' || role === 'remoteDefender') return repeat([RANGED_ATTACK, MOVE], energy);
   if (role === 'scout') return [MOVE];
   // Claimer : 5 MOVE si l'énergie le permet (850), de quoi annuler la fatigue du CLAIM en marais (10) : une case

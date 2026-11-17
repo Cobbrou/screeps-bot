@@ -149,7 +149,7 @@ En attente du marché : relevé du 2026-11-06 sur shard0, ordres réels (les pri
 - [x] Planner : 2e spawn (RCL 7), factory, observer, puis 3e spawn, power spawn et nuker (RCL 8) ajoutés au plan (cases réservées près du stockage ; seuls les spawns sont posés)
 - [x] Remparts par coupe minimale (min-cut) autour de la base au lieu de la ceinture aux sorties : `plan.cut`, murs existants repris, ancienne ceinture laissée sans réparation (remparts compris, sauf sur une structure) ; portes réduites au minimum par côté de salle (`plan.doors`), barrière du mauvais type remplacée par le builder une fois sur place (`room.memory.swapBarrier`)
 - [x] Défense des salles de remote mining : `remoteDefender` contre les Invaders, salle rendue aux mineurs dès qu'elle est vide (actif quand la récolte distante reprendra : zone de respawn de E25S3 jusqu'au 2026-12-01)
-- [ ] Cœurs d'Invader dans les salles distantes
+- [x] Cœurs d'Invader dans les salles distantes : noté par l'intel, `remoteDefender` en `[ATTACK, MOVE]` qui le frappe au contact, puis `reserver` qui retire la réservation restante (`attackController`) avant le retour des mineurs
 - [ ] Boosts des défenseurs depuis les laboratoires
 - [ ] Escouades d'attaque (soin + attaque) contre les salles hostiles voisines
 

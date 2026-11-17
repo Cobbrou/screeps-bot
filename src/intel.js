@@ -25,7 +25,14 @@ function record(room) {
     hostile: threats.length ? Game.time : (previous && previous.hostile) || 0,
     // Vrai si les derniers hostiles vus n'étaient que des Invaders : seuls ceux-là sont chassés (remoteDefender).
     invader: threats.length ? threats.every((c) => c.owner.username === defense.INVADER) : !!(previous && previous.invader),
+    // Cœur d'Invader présent : il réserve le contrôleur, aucune récolte possible tant qu'il tient (remoteDefender).
+    core: !!core(room),
   };
+}
+
+// Cœur d'Invader de la salle, ou undefined.
+function core(room) {
+  return room.find(FIND_HOSTILE_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_INVADER_CORE })[0];
 }
 
 // Réenregistre la salle où se trouve un de nos créeps si elle a des hostiles dangereux, ou si son propriétaire
@@ -37,7 +44,7 @@ function watch(room) {
   const i = room.memory.intel;
   const owner = c && c.owner ? c.owner.username : null;
   const reserved = c && c.reservation ? c.reservation.username : null;
-  if (!i || i.owner !== owner || i.reserved !== reserved || defense.threats(room).length) record(room);
+  if (!i || i.owner !== owner || i.reserved !== reserved || !!i.core !== !!core(room) || defense.threats(room).length) record(room);
 }
 
 // Salle injoignable : notée comme explorée, sans contrôleur, pour ne plus y être envoyé.
@@ -98,27 +105,38 @@ function route(from, to) {
   return r === ERR_NO_PATH ? null : r;
 }
 
-// Vrai si la salle a un contrôleur libre (ni possédé, ni réservé par un autre) et pas d'hostiles récents.
-function safe(name) {
+// Vrai si la réservation notée est le reste d'un cœur d'Invader détruit : le reserver la retire (attackController),
+// et la récolte attend qu'elle tombe (harvest refusé sur un contrôleur réservé par un autre).
+function invaderReserved(name) {
   const i = get(name);
+  return !!(i && i.reserved === defense.INVADER && !i.core);
+}
+
+// Vrai si le contrôleur est libre : ni possédé, ni réservé par un autre que nous (reste d'un cœur détruit admis).
+function free(name) {
+  const i = get(name);
+  return !!(i && i.controller && !i.owner && (!i.reserved || i.reserved === me() || invaderReserved(name)));
+}
+
+// Vrai si la salle a un contrôleur libre (voir free) et pas d'hostiles récents.
+function safe(name) {
   const room = Game.rooms[name];
   if (room && room.controller && room.controller.my) return false;
-  return !!(i && i.controller && !i.owner && (!i.reserved || i.reserved === me())
-    && Game.time - i.hostile > HOSTILE_COOLDOWN);
+  return free(name) && Game.time - get(name).hostile > HOSTILE_COOLDOWN;
 }
 
-// Vrai si la salle serait sûre (voir safe) sans les Invaders qui y sont passés depuis moins de HOSTILE_COOLDOWN ticks.
-// ponytail: cœur d'Invader ignoré (salle réservée par `Invader`, jamais sûre) ; à attaquer si ça coupe la récolte.
+// Vrai si un remoteDefender doit y aller : cœur d'Invader (hors salle à keepers, où sont les forteresses à tours),
+// ou salle qui serait sûre sans les Invaders passés depuis moins de HOSTILE_COOLDOWN ticks.
 function invaded(name) {
   const i = get(name);
-  return !!(i && i.invader && i.controller && !i.owner && (!i.reserved || i.reserved === me())
-    && Game.time - i.hostile <= HOSTILE_COOLDOWN);
+  if (!i || !i.controller || i.owner || keeperRoom(name)) return false;
+  return !!i.core || (i.invader && free(name) && Game.time - i.hostile <= HOSTILE_COOLDOWN);
 }
 
-// Salle vue vide par notre défenseur : elle redevient sûre tout de suite.
+// Salle vue sans créep hostile par notre défenseur : elle redevient sûre tout de suite (le cœur reste noté à part).
 function clear(name) {
   const i = get(name);
   if (i) Object.assign(i, { hostile: 0, invader: false });
 }
 
-module.exports = { get, record, watch, skip, safe, invaded, clear, me, reservedByMe, keeperRoom, friendly, route };
+module.exports = { get, record, watch, skip, safe, invaded, invaderReserved, core, clear, me, reservedByMe, keeperRoom, friendly, route };

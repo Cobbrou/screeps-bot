@@ -95,7 +95,7 @@ function needsReserve(name) {
   const room = Game.rooms[name];
   if (!room || !room.controller) return true;
   const r = room.controller.reservation;
-  return !r || r.ticksToEnd < RESERVE_REFILL;
+  return !r || r.username !== intel.me() || r.ticksToEnd < RESERVE_REFILL;
 }
 
 // Première source distante sans mineur vivant, première dont les transporteurs portent moins que son débit réel
@@ -105,6 +105,8 @@ function missing(room, remote, reservers) {
   const result = {};
   const list = sourceList(room);
   for (const source of list) {
+    // Réservation laissée par un cœur d'Invader : aucun mineur ni transporteur tant qu'elle tient.
+    if (intel.invaderReserved(source.room)) continue;
     const r = remote[source.id] || { work: 0, carry: 0 };
     if (!result.miner && !r.work) result.miner = source;
     const flow = Math.min(r.work * HARVEST_POWER, rate(source.room));
@@ -117,7 +119,10 @@ function missing(room, remote, reservers) {
   for (const name of rooms(room)) {
     const roomSources = list.filter((s) => s.room === name);
     if (!roomSources.length || reservers[name] || !needsReserve(name)) continue;
-    if (worthReserving(room, name, roomSources)) {
+    // Reste d'un cœur d'Invader : reserver envoyé dès que son corps est payable, il rouvre la récolte.
+    // ponytail: sous RESERVER_COST (RCL < 4), la salle attend le passage de l'éclaireur (SCOUT_REFRESH) qui note la fin de la réservation.
+    const invader = intel.invaderReserved(name) && room.energyCapacityAvailable >= RESERVER_COST;
+    if (invader || worthReserving(room, name, roomSources)) {
       result.reserver = name;
       break;
     }
