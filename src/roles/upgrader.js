@@ -5,9 +5,10 @@ const boost = require('../boost');
 
 // Sous ce stock d'énergie dans le stockage, l'amélioration s'arrête : l'énergie va au spawn et aux tours.
 // Elle ne reprend qu'au-dessus de STORAGE_HIGH (hystérésis : sans elle, upgraders créés puis mis en pause
-// en boucle autour du seuil). Dès le RCL 7, seuils relevés (RESERVE_*) : une réserve reste au stockage en cas de besoin.
-const STORAGE_LOW = 10000;
-const STORAGE_HIGH = 15000;
+// en boucle autour du seuil). Seuils bas avant le RCL 7 : l'amélioration repart vite après un chantier qui a vidé
+// le stockage (lab du RCL 6). Dès le RCL 7, seuils relevés (RESERVE_*) : une réserve reste au stockage en cas de besoin.
+const STORAGE_LOW = 2000;
+const STORAGE_HIGH = 5000;
 const RESERVE_RCL = 7;
 const RESERVE_LOW = 50000;
 const RESERVE_HIGH = 55000;
