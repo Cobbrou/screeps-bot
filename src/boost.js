@@ -57,7 +57,11 @@ function purchase(room) {
     .filter((o) => o.cost <= MAX_PRICE_PER_POINT)
     .sort((a, b) => a.cost - b.cost)[0];
   if (!best) return undefined;
-  return { order: best.order, amount: Math.min(best.order.amount, missing) };
+  // Achat plafonné pour que la caisse reste au-dessus de la réserve après paiement ; rien sous une partie boostée.
+  const affordable = Math.floor((Game.market.credits - CREDIT_RESERVE) / best.order.price);
+  const amount = Math.min(best.order.amount, missing, affordable);
+  if (amount < LAB_BOOST_MINERAL) return undefined;
+  return { order: best.order, amount };
 }
 
 // Chargement à porter au lab pour le mineralHauler ({ from, resource, to }), ou undefined :
