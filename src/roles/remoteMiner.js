@@ -15,6 +15,8 @@ module.exports.run = function (creep) {
     remoteMining.retreat(creep);
     return;
   }
+  // Salle à keepers : s'écarte de son keeper (ou de l'antre qui va le faire réapparaître) le temps que le tueur l'abatte.
+  if (remoteMining.dodge(creep)) return;
   const source = { x: creep.memory.x, y: creep.memory.y, room: creep.memory.target };
   const pos = new RoomPosition(source.x, source.y, source.room);
   const box = remoteMining.container(source);

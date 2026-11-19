@@ -36,7 +36,7 @@ const REPAIR_SPEND = 0.4 + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPAR
 // ponytail: plafond fixe, lent après une attaque (~3 énergie/tick de réparation) ; le tailler sur le déficit des murs si besoin.
 const REPAIR_BUILDER_UNITS = 3;
 // Rôles dont l'entretien est déduit du revenu : ceux qui récoltent et transportent.
-const ECONOMY_ROLES = ['miner', 'hauler', 'filler', 'remoteMiner', 'remoteHauler', 'reserver', 'mineralMiner', 'mineralHauler'];
+const ECONOMY_ROLES = ['miner', 'hauler', 'filler', 'remoteMiner', 'remoteHauler', 'reserver', 'keeperKiller', 'mineralMiner', 'mineralHauler'];
 // Renseignements sur une salle voisine jugés périmés après ce nombre de ticks : un éclaireur va les rafraîchir.
 const SCOUT_REFRESH = 5000;
 // Garde-fou de rétrogradation : priorité à l'amélioration sous DOWNGRADE_LOW de CONTROLLER_DOWNGRADE,
@@ -242,6 +242,9 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     claimer: expanding && !expansion.claimed() ? 1 : 0,
     pioneer: expanding && expansion.claimed() ? 2 : 0,
     // Récolte distante dès le RCL 2, en dernier : elle ne prend que le temps de spawn laissé libre par le reste.
+    // Salle à keepers : son tueur d'abord, mineurs et transporteurs n'y vont qu'avec lui (remoteMining.missing).
+    // ponytail: un tueur au plus, pour la première salle à keepers (E25S3 n'en a qu'une voisine).
+    keeperKiller: Math.min(1, remoteMining.keeperRooms(room).length),
     // Transporteur avant mineur, comme dans la salle : les deux alternent source par source.
     remoteHauler: (roomCounts.remoteHauler || 0) + (remoteNeed.hauler ? 1 : 0),
     remoteMiner: (roomCounts.remoteMiner || 0) + (remoteNeed.miner ? 1 : 0),
@@ -320,6 +323,9 @@ function buildBody(role, energy, room, sourceId, target) {
   // Minerai, hors route : le mineur ne fait qu'un trajet (2 WORK par MOVE), le transporteur avance d'une case par tick chargé.
   if (role === 'mineralMiner') return repeat([WORK, WORK, MOVE], energy);
   if (role === 'mineralHauler') return repeat([CARRY, MOVE], Math.min(energy, mineralHauler.LOAD / CARRY_CAPACITY * cost([CARRY, MOVE])));
+  if (role === 'keeperKiller') {
+    return cost(remoteMining.KILLER_BODY) <= energy ? remoteMining.KILLER_BODY.slice() : [];
+  }
   if (role === 'remoteBuilder') return repeat([WORK, CARRY, MOVE], Math.min(energy, 4 * cost([WORK, CARRY, MOVE])));
   // Cœur d'Invader (100 000 PV, sans créep ni tour) : ATTACK au contact, 3 fois les dégâts d'un RANGED_ATTACK.
   if (role === 'remoteDefender' && intel.get(target) && intel.get(target).core) return repeat([ATTACK, MOVE], energy);
@@ -402,8 +408,8 @@ module.exports.run = function () {
     // qu'après le spawner (upgrader.run, même condition) : sans ça, un builder neuf au premier tick de chaque lot.
     const role = creep.memory.role === 'upgrader' && creep.name.startsWith('builder-') && creep.room.name === room
       && upgraders.builderWork(creep.room) ? 'builder' : creep.memory.role;
-    // Upgrader et filler en fin de vie ne comptent plus : leur successeur prend la relève sans trou.
-    if (!(dying && (role === 'upgrader' || role === 'filler'))) {
+    // Upgrader, filler et tueur de keepers en fin de vie ne comptent plus : leur successeur prend la relève sans trou.
+    if (!(dying && ['upgrader', 'filler', 'keeperKiller'].includes(role))) {
       counts[room][role] = (counts[room][role] || 0) + 1;
     }
     if (creep.memory.role === 'miner') addMiner(creep.memory.sourceId, creep.body, dying);
@@ -455,6 +461,7 @@ module.exports.run = function () {
     if (role === 'reserver') memory.target = remoteNeed.reserver;
     if (role === 'remoteBuilder') memory.target = remoteMining.roadWork(room);
     if (role === 'remoteDefender') memory.target = remoteMining.invaded(room);
+    if (role === 'keeperKiller') memory.target = remoteMining.keeperRooms(room)[0];
     if (role === 'remoteMiner' || role === 'remoteHauler') {
       const source = role === 'remoteMiner' ? remoteNeed.miner : remoteNeed.hauler;
       Object.assign(memory, { target: source.room, sourceId: source.id, x: source.x, y: source.y });

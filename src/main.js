@@ -24,6 +24,7 @@ const roles = {
   reserver: require('./roles/reserver'),
   remoteBuilder: require('./roles/remoteBuilder'),
   remoteDefender: require('./roles/remoteDefender'),
+  keeperKiller: require('./roles/keeperKiller'),
   mineralMiner: require('./roles/mineralMiner'),
   mineralHauler: require('./roles/mineralHauler'),
 };

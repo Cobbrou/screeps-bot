@@ -51,6 +51,7 @@ module.exports.run = function (creep) {
     remoteMining.retreat(creep);
     return;
   }
+  if (remoteMining.dodge(creep)) return;
   if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) creep.memory.working = false;
   if (!creep.memory.working && creep.store.getFreeCapacity() === 0) creep.memory.working = true;
   if (creep.room.name !== creep.memory.target) {

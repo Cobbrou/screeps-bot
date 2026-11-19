@@ -43,7 +43,7 @@ Pour un serveur privé sans token, remplacer `token` par `email` et `password`.
 | Commande | Effet |
 |----------|-------|
 | `npm run build` | Bundle `src/main.js` vers `dist/main.js`, sans envoi |
-| `npm test` | Vérifie la coupe minimale hors du jeu |
+| `npm test` | Vérifie hors du jeu la coupe minimale, le boost et la récolte des salles à keepers |
 | `npm run deploy` | Build puis envoi du code sur le serveur défini dans `secrets.json` |
 | `npm run watch` | Rebuild et envoi à chaque modification de `src/` |
 
@@ -74,6 +74,7 @@ screeps-bot/
 │       ├── defender.js      # tire à distance depuis le rempart le plus proche de l'ennemi
 │       ├── filler.js        # remplit spawn, extensions et tours depuis le stockage quand les sources sont liées
 │       ├── harvester.js     # récolte et remplit spawn, extensions et tours, construit le surplus
+│       ├── keeperKiller.js  # tue à distance les Source Keepers des sources d'une salle à keepers
 │       ├── hauler.js        # transporte l'énergie des conteneurs vers spawn, extensions, tours, dépôt du contrôleur
 │       ├── miner.js         # récolte statique sur une source (conteneur, ou au sol)
 │       ├── pioneer.js       # amorce la nouvelle salle (construit son spawn)
@@ -88,7 +89,8 @@ screeps-bot/
 │       └── upgrader.js      # posté au dépôt du contrôleur, améliore sans aller chercher l'énergie
 ├── test/
 │   ├── minCut.test.js       # vérifie que la coupe sépare la base des sorties
-│   └── boost.test.js        # vérifie le choix des achats, des parties boostées et des trajets vers le lab
+│   ├── boost.test.js        # vérifie le choix des achats, des parties boostées et des trajets vers le lab
+│   └── keeper.test.js       # vérifie le corps du tueur de keepers, le mineur et la sûreté des salles à keepers
 ├── docs/
 │   ├── architecture.md      # architecture prévue
 │   ├── e25s3-analysis.md    # état de E25S3 et corrections à apporter (relevé du 2026-11-03)

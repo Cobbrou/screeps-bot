@@ -5,6 +5,19 @@ const sources = require('./sources');
 // Débit d'une source de salle non réservée (1 500 énergie par régénération) : 5 énergie/tick ; réservée : 10.
 const NEUTRAL_RATE = SOURCE_ENERGY_NEUTRAL_CAPACITY / ENERGY_REGEN_TIME;
 const RESERVED_RATE = SOURCE_ENERGY_CAPACITY / ENERGY_REGEN_TIME;
+// Source d'une salle à keepers : 4 000 par régénération, ~13,3 énergie/tick.
+const KEEPER_RATE = SOURCE_ENERGY_KEEPER_CAPACITY / ENERGY_REGEN_TIME;
+// Ticks par régénération où le mineur fuit son keeper (alerte de l'antre, puis combat du tueur) : WORK en plus pour rattraper.
+const KEEPER_DOWNTIME = 60;
+// Tueur de keepers : à portée 3, un keeper ne frappe qu'à distance (10 RANGED_ATTACK, 100 PV/tick) et ne poursuit jamais.
+// 9 HEAL (108 PV/tick) annulent ces dégâts, 14 RANGED_ATTACK (140/tick) tuent ses 5 000 PV en ~36 ticks.
+// Corps de 5 500 : RCL 7 avec ses extensions (5 600). MOVE devant, les premières parties touchées.
+const KILLER_BODY = [...Array(23).fill(MOVE), ...Array(14).fill(RANGED_ATTACK), ...Array(9).fill(HEAL)];
+const KILLER_COST = KILLER_BODY.reduce((sum, part) => sum + BODYPART_COST[part], 0);
+// Un créep de la salle à keepers s'écarte d'un keeper, ou d'un antre qui le fait réapparaître dans moins de LAIR_WARN ticks,
+// jusqu'à DODGE_RANGE cases : le keeper tire à portée 3 et ne s'approche que de sa source.
+const LAIR_WARN = 20;
+const DODGE_RANGE = 5;
 // RCL minimal : au RCL 1, la salle n'a que son spawn et ses propres sources occupent le temps de spawn.
 const MIN_RCL = 2;
 const MAX_ROOMS = 2;
@@ -27,24 +40,62 @@ const HAUL_BACKLOG = CONTAINER_CAPACITY / 2;
 const trips = {};
 
 // Salles voisines exploitées : sûres, explorées avec la position de leurs sources, hors cible d'expansion.
-// Au plus MAX_ROOMS, celles qui ont le plus de sources.
+// Salle à keepers seulement si la salle peut payer le tueur. Au plus MAX_ROOMS, celles qui ont le plus de sources.
 function rooms(room) {
   if (room.controller.level < MIN_RCL) return [];
   const exp = Memory.expansion;
   return Object.values(Game.map.describeExits(room.name) || {})
-    .filter((name) => intel.safe(name) && intel.get(name).sourcePos && (!exp || exp.target !== name))
+    .filter((name) => intel.safe(name) && intel.get(name).sourcePos && (!exp || exp.target !== name)
+      && (!intel.keeperRoom(name) || room.energyCapacityAvailable >= KILLER_COST))
     .sort((a, b) => intel.get(b).sourcePos.length - intel.get(a).sourcePos.length)
     .slice(0, MAX_ROOMS);
 }
 
 // Débit d'une source de la salle distante (énergie/tick), selon qu'on la réserve.
 function rate(name) {
+  if (intel.keeperRoom(name)) return KEEPER_RATE;
   return intel.reservedByMe(name) ? RESERVED_RATE : NEUTRAL_RATE;
 }
 
-// WORK d'un mineur distant : de quoi vider la source (3 non réservée, 5 réservée).
+// WORK d'un mineur distant : de quoi vider la source (3 non réservée, 5 réservée, 9 chez les keepers, fuites comprises).
 function minerWork(name) {
-  return Math.ceil(rate(name) / HARVEST_POWER);
+  const uptime = intel.keeperRoom(name) ? (ENERGY_REGEN_TIME - KEEPER_DOWNTIME) / ENERGY_REGEN_TIME : 1;
+  return Math.ceil(rate(name) / uptime / HARVEST_POWER);
+}
+
+// Salles à keepers exploitées : chacune veut un tueur.
+function keeperRooms(room) {
+  return rooms(room).filter((name) => intel.keeperRoom(name));
+}
+
+// Vrai si un tueur de keepers vivant est affecté à la salle (en route compris).
+function guarded(name) {
+  return Object.values(Game.creeps).some((c) => c.memory.role === 'keeperKiller' && c.memory.target === name);
+}
+
+// Antres qui gardent une source de la salle (le keeper reste à portée 5 de sa ressource) : celui du minerai est ignoré.
+function lairs(room) {
+  const list = room.find(FIND_SOURCES);
+  return room.find(FIND_STRUCTURES, {
+    filter: (s) => s.structureType === STRUCTURE_KEEPER_LAIR && list.some((src) => s.pos.inRangeTo(src, 5)),
+  });
+}
+
+// Dans une salle à keepers, écarte le créep d'un keeper ou d'un antre sur le point de le faire réapparaître.
+// Vrai s'il a dû fuir ce tick (le rôle s'arrête là).
+// ponytail: les chemins des transporteurs ne contournent pas les antres ; le tueur abat le keeper, ils repassent après.
+function dodge(creep) {
+  if (!intel.keeperRoom(creep.room.name)) return false;
+  const danger = [
+    ...creep.room.find(FIND_HOSTILE_CREEPS, { filter: (c) => c.owner.username === intel.KEEPER }),
+    ...creep.room.find(FIND_STRUCTURES, {
+      filter: (s) => s.structureType === STRUCTURE_KEEPER_LAIR && s.ticksToSpawn !== undefined && s.ticksToSpawn <= LAIR_WARN,
+    }),
+  ].filter((o) => creep.pos.inRangeTo(o, DODGE_RANGE - 1)).map((o) => ({ pos: o.pos, range: DODGE_RANGE }));
+  if (!danger.length) return false;
+  const result = PathFinder.search(creep.pos, danger, { flee: true, maxRooms: 1, plainCost: 2, swampCost: 10 });
+  if (result.path.length) move.step(creep, creep.pos.getDirectionTo(result.path[0]));
+  return true;
 }
 
 // Aller-retour (en ticks) entre le spawn de la salle et la source distante, ou null.
@@ -107,6 +158,8 @@ function missing(room, remote, reservers) {
   for (const source of list) {
     // Réservation laissée par un cœur d'Invader : aucun mineur ni transporteur tant qu'elle tient.
     if (intel.invaderReserved(source.room)) continue;
+    // Salle à keepers : personne avant le tueur.
+    if (intel.keeperRoom(source.room) && !guarded(source.room)) continue;
     const r = remote[source.id] || { work: 0, carry: 0 };
     if (!result.miner && !r.work) result.miner = source;
     const flow = Math.min(r.work * HARVEST_POWER, rate(source.room));
@@ -118,7 +171,8 @@ function missing(room, remote, reservers) {
   }
   for (const name of rooms(room)) {
     const roomSources = list.filter((s) => s.room === name);
-    if (!roomSources.length || reservers[name] || !needsReserve(name)) continue;
+    // Salle à keepers : pas de contrôleur à réserver.
+    if (!roomSources.length || intel.keeperRoom(name) || reservers[name] || !needsReserve(name)) continue;
     // Reste d'un cœur d'Invader : reserver envoyé dès que son corps est payable, il rouvre la récolte.
     // ponytail: sous RESERVER_COST (RCL < 4), la salle attend le passage de l'éclaireur (SCOUT_REFRESH) qui note la fin de la réservation.
     const invader = intel.invaderReserved(name) && room.energyCapacityAvailable >= RESERVER_COST;
@@ -262,7 +316,7 @@ function roadWork(room) {
 }
 
 module.exports = {
-  RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, minerWork, container, missing, income, safe, invaded, retreat,
+  RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, KILLER_BODY, minerWork, keeperRooms, lairs, dodge, container, missing, income, safe, invaded, retreat,
   roads, paved, roadWork, roadCells,
 };
 

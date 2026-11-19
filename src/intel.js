@@ -2,6 +2,13 @@ const defense = require('./defense');
 
 // Salle évitée pendant ce nombre de ticks après y avoir vu des hostiles dangereux.
 const HOSTILE_COOLDOWN = 1500;
+// Propriétaire des Source Keepers : toujours là, ils ne rendent pas leur salle dangereuse (voir remoteMining.dodge).
+const KEEPER = 'Source Keeper';
+
+// Hostiles dangereux de la salle, Source Keepers exclus.
+function threats(room) {
+  return defense.threats(room).filter((c) => c.owner.username !== KEEPER);
+}
 
 // Renseignements sur une salle déjà explorée (`room.memory.intel`), ou undefined.
 function get(name) {
@@ -14,7 +21,7 @@ function record(room) {
   const c = room.controller;
   const previous = room.memory.intel;
   const sources = room.find(FIND_SOURCES);
-  const threats = defense.threats(room);
+  const hostiles = threats(room);
   room.memory.intel = {
     time: Game.time,
     sources: sources.length,
@@ -22,9 +29,9 @@ function record(room) {
     controller: !!c,
     owner: c && c.owner ? c.owner.username : null,
     reserved: c && c.reservation ? c.reservation.username : null,
-    hostile: threats.length ? Game.time : (previous && previous.hostile) || 0,
+    hostile: hostiles.length ? Game.time : (previous && previous.hostile) || 0,
     // Vrai si les derniers hostiles vus n'étaient que des Invaders : seuls ceux-là sont chassés (remoteDefender).
-    invader: threats.length ? threats.every((c) => c.owner.username === defense.INVADER) : !!(previous && previous.invader),
+    invader: hostiles.length ? hostiles.every((c) => c.owner.username === defense.INVADER) : !!(previous && previous.invader),
     // Cœur d'Invader présent : il réserve le contrôleur, aucune récolte possible tant qu'il tient (remoteDefender).
     core: !!core(room),
   };
@@ -44,7 +51,7 @@ function watch(room) {
   const i = room.memory.intel;
   const owner = c && c.owner ? c.owner.username : null;
   const reserved = c && c.reservation ? c.reservation.username : null;
-  if (!i || i.owner !== owner || i.reserved !== reserved || !!i.core !== !!core(room) || defense.threats(room).length) record(room);
+  if (!i || i.owner !== owner || i.reserved !== reserved || !!i.core !== !!core(room) || threats(room).length) record(room);
 }
 
 // Salle injoignable : notée comme explorée, sans contrôleur, pour ne plus y être envoyé.
@@ -118,11 +125,15 @@ function free(name) {
   return !!(i && i.controller && !i.owner && (!i.reserved || i.reserved === me() || invaderReserved(name)));
 }
 
-// Vrai si la salle a un contrôleur libre (voir free) et pas d'hostiles récents.
+// Vrai si la salle a un contrôleur libre (voir free) et pas d'hostiles récents. Salle à keepers (sans contrôleur) :
+// explorée et sans cœur d'Invader, celui des forteresses qui y apparaissent avec leurs tours ; les keepers ne comptent pas.
+// ponytail: des Invaders de passage la ferment HOSTILE_COOLDOWN ticks (pas de remoteDefender ici) ; le tueur pourrait les tirer.
 function safe(name) {
   const room = Game.rooms[name];
   if (room && room.controller && room.controller.my) return false;
-  return free(name) && Game.time - get(name).hostile > HOSTILE_COOLDOWN;
+  const i = get(name);
+  const open = keeperRoom(name) ? !!(i && i.sourcePos && !i.core) : free(name);
+  return open && Game.time - i.hostile > HOSTILE_COOLDOWN;
 }
 
 // Vrai si un remoteDefender doit y aller : cœur d'Invader (hors salle à keepers, où sont les forteresses à tours),
@@ -139,4 +150,4 @@ function clear(name) {
   if (i) Object.assign(i, { hostile: 0, invader: false });
 }
 
-module.exports = { get, record, watch, skip, safe, invaded, invaderReserved, core, clear, me, reservedByMe, keeperRoom, friendly, route };
+module.exports = { KEEPER, threats, get, record, watch, skip, safe, invaded, invaderReserved, core, clear, me, reservedByMe, keeperRoom, friendly, route };

@@ -41,6 +41,7 @@ module.exports.run = function (creep) {
 
   // Salle devenue dangereuse : il rapporte ce qu'il porte, sinon il attend chez lui.
   const safe = remoteMining.safe(creep);
+  if (remoteMining.dodge(creep)) return;
   if (creep.memory.working || (!safe && creep.store[RESOURCE_ENERGY])) deliver(creep);
   else if (!safe) remoteMining.retreat(creep);
   else collect(creep);
