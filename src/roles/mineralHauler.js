@@ -56,6 +56,11 @@ function take(creep, next) {
 function job(room, alive) {
   const { storage, terminal } = room;
   if (!storage) return undefined;
+  // Terminal sous la moitié de sa réserve : rechargé avant le minerai. Le conteneur du minerai a toujours LOAD
+  // à chaque retour, il passait devant à chaque voyage et le terminal restait à 0, sans plus aucune vente.
+  if (terminal && terminal.store[RESOURCE_ENERGY] < TERMINAL_ENERGY / 2 && !room.memory.storageLow) {
+    return { from: storage, resource: RESOURCE_ENERGY };
+  }
   const fromBox = boxJob(room, alive);
   if (fromBox) return fromBox;
   if (!terminal) return undefined;
