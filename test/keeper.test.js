@@ -42,6 +42,18 @@ assert.ok(!intel.safe('E25S4'));
 Memory.rooms.E25S4.intel.core = false;
 Memory.rooms.E25S4.intel.hostile = Game.time - 10;
 assert.ok(!intel.safe('E25S4'));
+// Fermée par des Invaders seulement : le tueur y va (keeperInvaded) ; par un joueur ou une forteresse : non.
+Memory.rooms.E25S4.intel.invader = true;
+assert.ok(intel.keeperInvaded('E25S4'));
+Memory.rooms.E25S4.intel.core = true;
+assert.ok(!intel.keeperInvaded('E25S4'));
+Memory.rooms.E25S4.intel.core = false;
+Memory.rooms.E25S4.intel.invader = false;
+assert.ok(!intel.keeperInvaded('E25S4'));
+// Invaders abattus (clear) : la salle rouvre sans attendre HOSTILE_COOLDOWN.
+Memory.rooms.E25S4.intel.invader = true;
+intel.clear('E25S4');
+assert.ok(intel.safe('E25S4') && !intel.keeperInvaded('E25S4'));
 // Salle normale sans contrôleur libre : toujours fermée.
 assert.ok(!intel.safe('E25S2'));
 

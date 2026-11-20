@@ -127,7 +127,7 @@ function free(name) {
 
 // Vrai si la salle a un contrôleur libre (voir free) et pas d'hostiles récents. Salle à keepers (sans contrôleur) :
 // explorée et sans cœur d'Invader, celui des forteresses qui y apparaissent avec leurs tours ; les keepers ne comptent pas.
-// ponytail: des Invaders de passage la ferment HOSTILE_COOLDOWN ticks (pas de remoteDefender ici) ; le tueur pourrait les tirer.
+// Des Invaders y sont tirés par le tueur de keepers (keeperInvaded), qui la rouvre dès qu'il n'en voit plus (clear).
 function safe(name) {
   const room = Game.rooms[name];
   if (room && room.controller && room.controller.my) return false;
@@ -144,10 +144,18 @@ function invaded(name) {
   return !!i.core || (i.invader && free(name) && Game.time - i.hostile <= HOSTILE_COOLDOWN);
 }
 
+// Salle à keepers explorée, sans forteresse, fermée seulement par des Invaders vus depuis moins de HOSTILE_COOLDOWN ticks :
+// le tueur de keepers y va quand même et les abat (le remoteDefender, sans soin ni fuite, n'y tiendrait pas face aux keepers).
+// ponytail: aucune mesure de leur force ; si des Invaders plus gros tuent le tueur, il est recréé à chaque mort.
+function keeperInvaded(name) {
+  const i = get(name);
+  return keeperRoom(name) && !!(i && i.sourcePos && !i.core && i.invader) && Game.time - i.hostile <= HOSTILE_COOLDOWN;
+}
+
 // Salle vue sans créep hostile par notre défenseur : elle redevient sûre tout de suite (le cœur reste noté à part).
 function clear(name) {
   const i = get(name);
   if (i) Object.assign(i, { hostile: 0, invader: false });
 }
 
-module.exports = { KEEPER, threats, get, record, watch, skip, safe, invaded, invaderReserved, core, clear, me, reservedByMe, keeperRoom, friendly, route };
+module.exports = { KEEPER, threats, get, record, watch, skip, safe, invaded, keeperInvaded, invaderReserved, core, clear, me, reservedByMe, keeperRoom, friendly, route };

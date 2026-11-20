@@ -63,9 +63,14 @@ function minerWork(name) {
   return Math.ceil(rate(name) / uptime / HARVEST_POWER);
 }
 
-// Salles à keepers exploitées : chacune veut un tueur.
+// Salles à keepers exploitées : chacune veut un tueur. Celle que des Invaders ferment (intel.keeperInvaded) aussi :
+// rooms() l'écarte, mais le tueur va les abattre pour la rouvrir sans attendre HOSTILE_COOLDOWN.
 function keeperRooms(room) {
-  return rooms(room).filter((name) => intel.keeperRoom(name));
+  const list = rooms(room).filter((name) => intel.keeperRoom(name));
+  if (room.controller.level < MIN_RCL || room.energyCapacityAvailable < KILLER_COST) return list;
+  const invaded = Object.values(Game.map.describeExits(room.name) || {})
+    .filter((name) => intel.keeperInvaded(name) && !list.includes(name));
+  return [...invaded, ...list];
 }
 
 // Vrai si un tueur de keepers vivant est affecté à la salle (en route compris).

@@ -8,32 +8,35 @@ const RANGE = 3;
 // Tue les Source Keepers qui gardent les sources de sa salle (creep.memory.target), pour les mineurs distants.
 // Se soigne à chaque tick blessé, tire à portée 3 et s'écarte d'un keeper au contact (300 PV/tick en mêlée).
 // Sans keeper vivant : attend à portée 3 de l'antre qui le fait réapparaître le plus tôt.
-// Salle devenue dangereuse (Invaders, forteresse) : rentre et attend.
-// ponytail: un seul tueur par salle ; il ignore le keeper du minerai et les Invaders.
+// Invaders dans la salle : tirés avant les keepers ; plus aucun en vue, la salle est rouverte tout de suite (intel.clear).
+// Salle devenue dangereuse autrement (joueur, forteresse) : rentre et attend.
+// ponytail: un seul tueur par salle ; il ignore le keeper du minerai.
 module.exports.run = function (creep) {
   if (creep.hits < creep.hitsMax) creep.heal(creep);
-  if (!remoteMining.safe(creep)) {
+  const name = creep.memory.target;
+  if (!remoteMining.safe(creep) && !intel.keeperInvaded(name)) {
     remoteMining.retreat(creep);
     return;
   }
-  const name = creep.memory.target;
   if (creep.room.name !== name) {
     move.to(creep, new RoomPosition(25, 25, name), { range: 20 });
     return;
   }
   // Trajet noté à l'arrivée : le spawner lance le successeur pour qu'il arrive à la mort de celui-ci.
   if (creep.memory.travel === undefined) creep.memory.travel = CREEP_LIFE_TIME - creep.ticksToLive;
+  const invaders = intel.threats(creep.room);
+  if (!invaders.length && intel.keeperInvaded(name)) intel.clear(name);
   const lairs = remoteMining.lairs(creep.room);
   const names = new Set(lairs.map((l) => `Keeper${l.id}`));
-  const keeper = creep.pos.findClosestByRange(FIND_HOSTILE_CREEPS, {
+  const enemy = creep.pos.findClosestByRange(invaders) || creep.pos.findClosestByRange(FIND_HOSTILE_CREEPS, {
     filter: (c) => c.owner.username === intel.KEEPER && names.has(c.name),
   });
-  if (keeper) {
-    const range = creep.pos.getRangeTo(keeper);
-    if (range <= RANGE) creep.rangedAttack(keeper);
-    if (range > RANGE) move.to(creep, keeper, { range: RANGE, reusePath: 3 });
+  if (enemy) {
+    const range = creep.pos.getRangeTo(enemy);
+    if (range <= RANGE) creep.rangedAttack(enemy);
+    if (range > RANGE) move.to(creep, enemy, { range: RANGE, reusePath: 3 });
     else if (range <= 1) {
-      const flee = PathFinder.search(creep.pos, { pos: keeper.pos, range: RANGE }, { flee: true, maxRooms: 1 });
+      const flee = PathFinder.search(creep.pos, { pos: enemy.pos, range: RANGE }, { flee: true, maxRooms: 1 });
       if (flee.path.length) move.step(creep, creep.pos.getDirectionTo(flee.path[0]));
     }
     return;
