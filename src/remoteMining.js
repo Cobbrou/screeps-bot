@@ -99,6 +99,8 @@ function dodge(creep) {
 }
 
 // Aller-retour (en ticks) entre le spawn de la salle et la source distante, ou null.
+// Recherche limitée aux deux salles, comme roadPath : avec maxRooms 3 seul, les autres voisines (E24S3, E26S3)
+// prenaient le quota avant la salle de la source, chemin incomplet, source écartée et aucun mineur distant.
 function trip(room, source) {
   if (source.id in trips) return trips[source.id];
   const spawn = sources.mainSpawn(room);
@@ -106,8 +108,9 @@ function trip(room, source) {
   const result = PathFinder.search(spawn.pos, { pos: new RoomPosition(source.x, source.y, source.room), range: 1 }, {
     plainCost: 1,
     swampCost: 5,
-    maxRooms: 3,
+    maxRooms: 2,
     maxOps: 4000,
+    roomCallback: (name) => (name === room.name || name === source.room ? undefined : false),
   });
   trips[source.id] = result.incomplete ? null : result.path.length + result.cost;
   return trips[source.id];
