@@ -4,7 +4,7 @@ const remoteMining = require('../remoteMining');
 const sources = require('../sources');
 
 // Ramasse l'énergie posée au sol autour de sa source distante (le tas le plus gros d'abord : il se perd)
-// ou celle du conteneur de la source (sources.pickFrom).
+// ou celle du conteneur de la source (sources.pickFrom), puis celle des pierres tombales.
 // Rien à prendre : livre s'il porte déjà la moitié de sa capacité, sinon attend à 2 cases de la source.
 function collect(creep) {
   const pos = new RoomPosition(creep.memory.x, creep.memory.y, creep.memory.target);
@@ -15,7 +15,9 @@ function collect(creep) {
   const pile = pos.findInRange(FIND_DROPPED_RESOURCES, 2, { filter: (r) => r.resourceType === RESOURCE_ENERGY })
     .sort((a, b) => b.amount - a.amount)[0];
   const box = remoteMining.container({ x: creep.memory.x, y: creep.memory.y, room: creep.memory.target });
-  const from = sources.pickFrom(pile, box, creep.store.getFreeCapacity(RESOURCE_ENERGY));
+  // Pierre tombale (keeper abattu par le tueur, créep mort) : après tas et conteneur, elle ne perd rien avant de tomber.
+  const tomb = pos.findInRange(FIND_TOMBSTONES, 2, { filter: (t) => t.store[RESOURCE_ENERGY] > 0 })[0];
+  const from = sources.pickFrom(pile, box, creep.store.getFreeCapacity(RESOURCE_ENERGY)) || tomb;
   if (from) {
     const result = from.store ? creep.withdraw(from, RESOURCE_ENERGY) : creep.pickup(from);
     if (result === ERR_NOT_IN_RANGE) move.to(creep, from);
