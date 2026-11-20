@@ -94,13 +94,23 @@ function unload(creep, held) {
 
 // Livre au terminal ce qu'il porte, puis prend le chargement suivant. Au stockage sans terminal, et pour l'énergie
 // dont le terminal n'a plus besoin (envoi reçu d'une autre salle).
-// Sans chargement, ramasse le minerai abandonné (leftover).
+// Sans chargement, ramasse d'abord le minerai abandonné (leftover) : au sol ou dans une pierre tombale il disparaît,
+// le conteneur et le terminal attendent.
+// Pas plein à côté du conteneur du minerai (tas ramassé à son pied, posé par le mineur quand il déborde) : complète
+// son chargement avant de livrer, pas d'aller-retour pour quelques unités.
 // Rien à prendre : attend le prochain voyage tant qu'un mineur est voulu, sinon se suicide.
 function run(creep) {
   const room = creep.room;
   const held = carried(creep);
-  if (held) return unload(creep, held);
-  const next = job(room, true) || leftover(creep);
+  if (held) {
+    const source = box(room);
+    if (creep.store.getFreeCapacity() && source && source.store[held] && creep.pos.isNearTo(source)) {
+      creep.withdraw(source, held);
+      return;
+    }
+    return unload(creep, held);
+  }
+  const next = leftover(creep) || job(room, true);
   if (next) {
     take(creep, next);
   } else if (!mineralMiner.wanted(room)) {

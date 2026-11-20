@@ -172,10 +172,10 @@ function collect(creep) {
   const t = pickupTarget(creep);
   if (!t) return;
   if (t.wait) {
-    // Vide et sans source à vider : va chercher le minerai de l'extracteur (LOAD au moins), sinon le minerai
-    // abandonné au sol ou dans une pierre tombale (mineralHauler.leftover), déchargé par run.
+    // Vide et sans source à vider : va chercher le minerai abandonné au sol ou dans une pierre tombale
+    // (mineralHauler.leftover, il disparaît), sinon celui de l'extracteur (LOAD au moins), déchargé par run.
     const mineral = !creep.store.getUsedCapacity()
-      && (mineralHauler.boxJob(creep.room, false) || mineralHauler.leftover(creep));
+      && (mineralHauler.leftover(creep) || mineralHauler.boxJob(creep.room, false));
     if (creep.store[RESOURCE_ENERGY] >= creep.store.getCapacity() / 2) {
       startDelivery(creep);
       deliver(creep);
