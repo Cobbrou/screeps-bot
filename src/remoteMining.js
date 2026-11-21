@@ -293,11 +293,17 @@ function roadPath(room, source, homeCosts) {
 
 // Routes à poser pour la récolte distante : par source distante dont le conteneur est construit, son chemin.
 // Note `done` quand toutes ses cases ont une route (salles visibles) : les transporteurs passent alors à 2 CARRY par MOVE.
-// Les chemins des sources qui ne sont plus exploitées sont oubliés.
+// Les chemins des sources qui ne sont plus exploitées sont oubliés, pas ceux d'une salle seulement fermée.
 function roads(room, homeCosts) {
   const all = sourceList(room);
   const memory = room.memory.remoteRoads = room.memory.remoteRoads || {};
-  for (const id in memory) if (!all.some((s) => s.id === id)) delete memory[id];
+  // Salle seulement fermée (Invaders, hostiles : sourceList l'écarte) : chemin et `done` gardés. Sans ça, chaque
+  // invasion effaçait `done` et les transporteurs neufs repassaient en 1:1 (1 250 au lieu de 1 650 pour 2 500).
+  for (const id in memory) {
+    if (all.some((s) => s.id === id)) continue;
+    const remote = Object.keys(memory[id].path).find((name) => name !== room.name);
+    if (!remote || intel.safe(remote)) delete memory[id];
+  }
   const paths = [];
   for (const source of all.filter((s) => container(s))) {
     const path = roadPath(room, source, homeCosts);
