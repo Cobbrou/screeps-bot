@@ -14,6 +14,8 @@ const KEEPER_DOWNTIME = 60;
 // Corps de 5 500 : RCL 7 avec ses extensions (5 600). MOVE devant, les premières parties touchées.
 const KILLER_BODY = [...Array(23).fill(MOVE), ...Array(14).fill(RANGED_ATTACK), ...Array(9).fill(HEAL)];
 const KILLER_COST = KILLER_BODY.reduce((sum, part) => sum + BODYPART_COST[part], 0);
+// Dégâts du tueur par tick (140) : des Invaders qui soignent au moins autant ne tombent jamais.
+const KILLER_DAMAGE = KILLER_BODY.filter((part) => part === RANGED_ATTACK).length * RANGED_ATTACK_POWER;
 // Un créep de la salle à keepers s'écarte d'un keeper, ou d'un antre qui le fait réapparaître dans moins de LAIR_WARN ticks,
 // jusqu'à DODGE_RANGE cases : le keeper tire à portée 3 et ne s'approche que de sa source.
 const LAIR_WARN = 20;
@@ -63,13 +65,21 @@ function minerWork(name) {
   return Math.ceil(rate(name) / uptime / HARVEST_POWER);
 }
 
-// Salles à keepers exploitées : chacune veut un tueur. Celle que des Invaders ferment (intel.keeperInvaded) aussi :
-// rooms() l'écarte, mais le tueur va les abattre pour la rouvrir sans attendre HOSTILE_COOLDOWN.
+// Salle à keepers fermée par des Invaders que le tueur peut abattre : leur soin cumulé (intel `heal`) reste sous ses dégâts.
+// Plus forts (healer boosté : le 2026-11-21, 5 tueurs morts en ~30 ticks chacun sans rien abattre) : personne n'y va,
+// ils meurent seuls (1 500 ticks de vie) avant la fin de HOSTILE_COOLDOWN.
+// ponytail: dégâts reçus ignorés ; des tireurs boostés sans healer pourraient encore tuer le tueur.
+function huntable(name) {
+  return intel.keeperInvaded(name) && (intel.get(name).heal || 0) < KILLER_DAMAGE;
+}
+
+// Salles à keepers exploitées : chacune veut un tueur. Celle que des Invaders ferment (intel.keeperInvaded) aussi,
+// s'il peut les abattre (huntable) : rooms() l'écarte, mais le tueur va la rouvrir sans attendre HOSTILE_COOLDOWN.
 function keeperRooms(room) {
   const list = rooms(room).filter((name) => intel.keeperRoom(name));
   if (room.controller.level < MIN_RCL || room.energyCapacityAvailable < KILLER_COST) return list;
   const invaded = Object.values(Game.map.describeExits(room.name) || {})
-    .filter((name) => intel.keeperInvaded(name) && !list.includes(name));
+    .filter((name) => huntable(name) && !list.includes(name));
   return [...invaded, ...list];
 }
 
@@ -324,7 +334,7 @@ function roadWork(room) {
 }
 
 module.exports = {
-  RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, KILLER_BODY, minerWork, keeperRooms, lairs, dodge, container, missing, income, safe, invaded, retreat,
+  RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, huntable, lairs, dodge, container, missing, income, safe, invaded, retreat,
   roads, paved, roadWork, roadCells,
 };
 

@@ -8,13 +8,14 @@ const RANGE = 3;
 // Tue les Source Keepers qui gardent les sources de sa salle (creep.memory.target), pour les mineurs distants.
 // Se soigne à chaque tick blessé, tire à portée 3 et s'écarte d'un keeper au contact (300 PV/tick en mêlée).
 // Sans keeper vivant : attend à portée 3 de l'antre qui le fait réapparaître le plus tôt.
-// Invaders dans la salle : tirés avant les keepers ; plus aucun en vue, la salle est rouverte tout de suite (intel.clear).
-// Salle devenue dangereuse autrement (joueur, forteresse) : rentre et attend.
+// Invaders dans la salle : tirés avant les keepers, d'abord le healer à portée le plus entamé, sinon le plus proche
+// (tant qu'un healer vit, la cible remonte à chaque tick) ; plus aucun en vue, la salle est rouverte tout de suite (intel.clear).
+// Invaders trop forts (remoteMining.huntable) ou salle dangereuse autrement (joueur, forteresse) : rentre et attend.
 // ponytail: un seul tueur par salle ; il ignore le keeper du minerai.
 module.exports.run = function (creep) {
   if (creep.hits < creep.hitsMax) creep.heal(creep);
   const name = creep.memory.target;
-  if (!remoteMining.safe(creep) && !intel.keeperInvaded(name)) {
+  if (!remoteMining.safe(creep) && !remoteMining.huntable(name)) {
     remoteMining.retreat(creep);
     return;
   }
@@ -28,7 +29,9 @@ module.exports.run = function (creep) {
   if (!invaders.length && intel.keeperInvaded(name)) intel.clear(name);
   const lairs = remoteMining.lairs(creep.room);
   const names = new Set(lairs.map((l) => `Keeper${l.id}`));
-  const enemy = creep.pos.findClosestByRange(invaders) || creep.pos.findClosestByRange(FIND_HOSTILE_CREEPS, {
+  const healer = invaders.filter((c) => c.getActiveBodyparts(HEAL) && creep.pos.inRangeTo(c, RANGE))
+    .sort((a, b) => a.hits - b.hits)[0];
+  const enemy = healer || creep.pos.findClosestByRange(invaders) ||creep.pos.findClosestByRange(FIND_HOSTILE_CREEPS, {
     filter: (c) => c.owner.username === intel.KEEPER && names.has(c.name),
   });
   if (enemy) {

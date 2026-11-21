@@ -48,6 +48,12 @@ assert.ok(intel.keeperInvaded('E25S4'));
 Memory.rooms.E25S4.intel.core = true;
 assert.ok(!intel.keeperInvaded('E25S4'));
 Memory.rooms.E25S4.intel.core = false;
+// Healers plus forts que le tueur : il n'y va pas. 2 healers à 5 HEAL (120) : abattables ; un healer boosté
+// en plus (LO, x2 : 120 de plus, 2026-11-21) : non.
+Memory.rooms.E25S4.intel.heal = 2 * 5 * HEAL_POWER;
+assert.ok(remoteMining.huntable('E25S4'));
+Memory.rooms.E25S4.intel.heal += 5 * HEAL_POWER * 2;
+assert.ok(!remoteMining.huntable('E25S4'));
 Memory.rooms.E25S4.intel.invader = false;
 assert.ok(!intel.keeperInvaded('E25S4'));
 // Invaders abattus (clear) : la salle rouvre sans attendre HOSTILE_COOLDOWN.

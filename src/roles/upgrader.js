@@ -79,6 +79,7 @@ function posts(room, depot) {
   const route = new Set((room.memory.routes && room.memory.routes[room.controller.id]) || []);
   const depotKey = depot.pos.x * 50 + depot.pos.y;
   const cells = [];
+  const roads = new Set();
   for (let dx = -1; dx <= 1; dx++) {
     for (let dy = -1; dy <= 1; dy++) {
       const x = depot.pos.x + dx;
@@ -86,11 +87,16 @@ function posts(room, depot) {
       if (x < 1 || x > 48 || y < 1 || y > 48 || terrain.get(x, y) === TERRAIN_MASK_WALL) continue;
       if (!dx && !dy && !depot.container) continue;
       if (room.controller.pos.getRangeTo(x, y) > 3) continue;
-      if (room.lookForAt(LOOK_STRUCTURES, x, y).some((st) => OBSTACLE_OBJECT_TYPES.includes(st.structureType))) continue;
+      const structures = room.lookForAt(LOOK_STRUCTURES, x, y);
+      if (structures.some((st) => OBSTACLE_OBJECT_TYPES.includes(st.structureType))) continue;
+      if (structures.some((st) => st.structureType === STRUCTURE_ROAD)) roads.add(x * 50 + y);
       cells.push(x * 50 + y);
     }
   }
-  let list = cells.filter((k) => k === depotKey || !route.has(k));
+  // Routes construites exclues aussi : un upgrader posé dessus ne cède pas sa case (poste exact), et les haulers,
+  // tenus à la route, piétinaient derrière lui. Sur E25S3, celui de (43,24) fermait la seule route vers Spawn2 :
+  // spawn vide jusqu'à 680 ticks, énergie bloquée à 5 300 sous les 5 500 du tueur de keepers.
+  let list = cells.filter((k) => k === depotKey || (!route.has(k) && !roads.has(k)));
   if (list.length === cells.length) {
     const spawn = sources.mainSpawn(room);
     const lane = spawn && cells.filter((k) => k !== depotKey)
