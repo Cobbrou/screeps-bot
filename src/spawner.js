@@ -416,7 +416,11 @@ module.exports.run = function () {
     if (creep.memory.role === 'hauler' && !dying) addCarry(room, creep.body);
     if (remoteRole && !dying) addRemote(creep.memory.role, creep.memory.sourceId, creep.body);
     if (creep.memory.role === 'reserver' && !dying) reservers[creep.memory.target] = (reservers[creep.memory.target] || 0) + 1;
-    if (ECONOMY_ROLES.includes(creep.memory.role)) addUpkeep(room, creep.body);
+    // Mineur ou transporteur distant dont la salle est fermée (Invaders, hostiles) : déjà payé, il attend chez lui
+    // et n'est pas remplacé tant qu'elle l'est (remoteMining.missing). Son entretien n'est pas déduit : le revenu distant
+    // tombe à 0 pendant la fermeture, son coût aussi. Sans ça, upgradeWork tombait à 3 au lieu de ~16 (E25S3, 2026-11-21).
+    const idle = remoteRole && !intel.safe(creep.memory.target);
+    if (ECONOMY_ROLES.includes(creep.memory.role) && !idle) addUpkeep(room, creep.body);
     if (role === 'builder' || (role === 'upgrader' && !dying)) addWork(room, role, creep.body);
   }
 
