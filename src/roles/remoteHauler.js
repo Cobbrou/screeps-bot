@@ -41,10 +41,10 @@ module.exports.run = function (creep) {
   if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) creep.memory.working = false;
   if (!creep.memory.working && creep.store.getFreeCapacity() === 0) creep.memory.working = true;
 
-  // Salle devenue dangereuse : il rapporte ce qu'il porte, sinon il attend chez lui.
+  // Salle devenue dangereuse : il rapporte ce qu'il porte, sinon il attend chez lui (ou se recycle, remoteMining.recycle).
   const safe = remoteMining.safe(creep);
   if (remoteMining.dodge(creep)) return;
   if (creep.memory.working || (!safe && creep.store[RESOURCE_ENERGY])) deliver(creep);
-  else if (!safe) remoteMining.retreat(creep);
+  else if (!safe && !remoteMining.recycle(creep)) remoteMining.retreat(creep);
   else collect(creep);
 };

@@ -76,5 +76,10 @@ intel.clear('E25S4');
 assert.ok(intel.safe('E25S4') && !intel.keeperInvaded('E25S4'));
 // Salle normale sans contrôleur libre : toujours fermée.
 assert.ok(!intel.safe('E25S2'));
+// Réouverture (recyclage des créeps distants) : 0 si sûre, fin de HOSTILE_COOLDOWN après des hostiles, jamais sinon.
+assert.strictEqual(intel.reopenIn('E25S4'), 0);
+Memory.rooms.E25S4.intel.hostile = Game.time - 500;
+assert.strictEqual(intel.reopenIn('E25S4'), 1001);
+assert.strictEqual(intel.reopenIn('E25S2'), Infinity);
 
 console.log('keeper : ok');

@@ -243,6 +243,23 @@ function retreat(creep) {
   if (creep.room.name !== center.roomName || !creep.pos.inRangeTo(center, 20)) move.to(creep, center, { range: 20 });
 }
 
+// Mineur ou transporteur distant qui mourra avant la réouverture de sa salle (intel.reopenIn, plus le demi aller-retour
+// pour retourner à sa source) : il se recycle au spawn le plus proche, qui rend l'énergie de sa vie restante dans
+// une pierre tombale (ramassée par les haulers), au lieu de l'attendre en pure perte. Le 2026-11-21 sur E25S4,
+// toute la flotte (7 transporteurs, 3 mineurs) est morte en attendant, ~14 k d'énergie de vie restante perdus.
+// Pas si le tueur peut abattre les Invaders (huntable) : il rouvrira la salle bien avant. Vrai s'il va se recycler.
+function recycle(creep) {
+  const home = Game.rooms[creep.memory.room];
+  const name = creep.memory.target;
+  if (!home || huntable(name)) return false;
+  const back = (trip(home, { id: creep.memory.sourceId, x: creep.memory.x, y: creep.memory.y, room: name }) || 0) / 2;
+  if (creep.ticksToLive >= intel.reopenIn(name) + back) return false;
+  const spawn = creep.room.name === home.name ? creep.pos.findClosestByRange(FIND_MY_SPAWNS) : sources.mainSpawn(home);
+  if (!spawn) return false;
+  if (spawn.recycleCreep(creep) === ERR_NOT_IN_RANGE) move.to(creep, spawn, { range: 1 });
+  return true;
+}
+
 // Sous cette part de ses points de vie, une route distante est réparée par le remoteBuilder (pas de tour hors de nos salles).
 const ROAD_REPAIR_RATIO = 0.5;
 
@@ -349,7 +366,7 @@ function roadWork(room) {
 }
 
 module.exports = {
-  RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, huntable, lairs, dodge, container, missing, income, safe, invaded, retreat,
+  RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, huntable, lairs, dodge, container, missing, income, safe, invaded, retreat, recycle,
   roads, paved, roadWork, roadCells,
 };
 

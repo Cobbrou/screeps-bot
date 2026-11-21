@@ -9,10 +9,10 @@ const REPAIR_RATIO = 0.5;
 // à l'arrivée, il pose le chantier sur sa case (à côté de la source, du côté de la maison) et le construit
 // dès que son CARRY est plein ; ensuite il se tient dessus et le répare quand il est abîmé.
 // Le reste de la récolte tombe dans le conteneur (au sol tant qu'il n'existe pas), où les remoteHauler le ramassent.
-// Salle devenue dangereuse : rentre et attend.
+// Salle devenue dangereuse : rentre et attend, ou se recycle s'il mourra avant sa réouverture (remoteMining.recycle).
 module.exports.run = function (creep) {
   if (!remoteMining.safe(creep)) {
-    remoteMining.retreat(creep);
+    if (!remoteMining.recycle(creep)) remoteMining.retreat(creep);
     return;
   }
   // Salle à keepers : s'écarte de son keeper (ou de l'antre qui va le faire réapparaître) le temps que le tueur l'abatte.

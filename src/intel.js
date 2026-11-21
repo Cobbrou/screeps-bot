@@ -147,11 +147,17 @@ function free(name) {
 // explorée et sans cœur d'Invader, celui des forteresses qui y apparaissent avec leurs tours ; les keepers ne comptent pas.
 // Des Invaders y sont tirés par le tueur de keepers (keeperInvaded), qui la rouvre dès qu'il n'en voit plus (clear).
 function safe(name) {
+  return reopenIn(name) === 0;
+}
+
+// Ticks avant que la salle redevienne sûre (voir safe) : 0 si elle l'est, la fin de HOSTILE_COOLDOWN après des hostiles,
+// Infinity si elle ne le redeviendra pas d'elle-même (à nous, prise, réservée, cœur d'Invader, inconnue).
+function reopenIn(name) {
   const room = Game.rooms[name];
-  if (room && room.controller && room.controller.my) return false;
+  if (room && room.controller && room.controller.my) return Infinity;
   const i = get(name);
   const open = keeperRoom(name) ? !!(i && i.sourcePos && !i.core) : free(name);
-  return open && Game.time - i.hostile > HOSTILE_COOLDOWN;
+  return open ? Math.max(0, i.hostile + HOSTILE_COOLDOWN + 1 - Game.time) : Infinity;
 }
 
 // Vrai si un remoteDefender doit y aller : cœur d'Invader (hors salle à keepers, où sont les forteresses à tours),
@@ -176,4 +182,4 @@ function clear(name) {
   if (i) Object.assign(i, { hostile: 0, invader: false, force: null });
 }
 
-module.exports = { KEEPER, threats, get, record, watch, skip, safe, invaded, keeperInvaded, invaderReserved, core, clear, me, reservedByMe, keeperRoom, friendly, route };
+module.exports = { KEEPER, threats, get, record, watch, skip, safe, reopenIn, invaded, keeperInvaded, invaderReserved, core, clear, me, reservedByMe, keeperRoom, friendly, route };
