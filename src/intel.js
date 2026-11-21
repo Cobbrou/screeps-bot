@@ -16,14 +16,23 @@ function power(creeps, part, base, action) {
     ? base * (p.boost ? BOOSTS[part][p.boost][action] : 1) : 0), 0), 0);
 }
 
-// Force d'un groupe d'hostiles : soin s'ils soignent tous la même cible (au contact), tir à distance cumulé, PV.
-// ponytail: ATTACK ignoré (le tueur tire à portée 3 et s'écarte au contact) ; TOUGH boostés comptés sans réduction.
+// PV à abattre d'un créep : une partie TOUGH boostée ne prend qu'une part des dégâts (XGHO2 : 30 %), ses PV comptent d'autant plus.
+function effectiveHits(creep) {
+  return creep.body.reduce((sum, p) => sum + p.hits / (p.type === TOUGH && p.boost ? BOOSTS[TOUGH][p.boost].damage : 1), 0);
+}
+
+// Force d'un groupe d'hostiles : soin s'ils soignent tous la même cible (au contact), tir à distance cumulé, PV à abattre,
+// et le détail par créep (`creeps`), qui laisse remoteMining.huntable les abattre un à un, healers d'abord.
+// ponytail: ATTACK ignoré (le tueur tire à portée 3 et s'écarte au contact).
 function force(creeps) {
-  return {
-    heal: power(creeps, HEAL, HEAL_POWER, 'heal'),
-    damage: power(creeps, RANGED_ATTACK, RANGED_ATTACK_POWER, 'rangedAttack'),
-    hits: creeps.reduce((sum, c) => sum + c.hits, 0),
-  };
+  const one = (c) => ({
+    heal: power([c], HEAL, HEAL_POWER, 'heal'),
+    damage: power([c], RANGED_ATTACK, RANGED_ATTACK_POWER, 'rangedAttack'),
+    hits: Math.round(effectiveHits(c)),
+  });
+  const list = creeps.map(one);
+  const sum = (key) => list.reduce((s, c) => s + c[key], 0);
+  return { heal: sum('heal'), damage: sum('damage'), hits: sum('hits'), creeps: list };
 }
 
 // Renseignements sur une salle déjà explorée (`room.memory.intel`), ou undefined.

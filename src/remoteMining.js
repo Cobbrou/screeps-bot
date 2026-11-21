@@ -68,28 +68,55 @@ function minerWork(name) {
   return Math.ceil(rate(name) / uptime / HARVEST_POWER);
 }
 
-// Salle à keepers fermée par des Invaders que le tueur peut abattre (intel `force`) : leur soin reste sous ses dégâts,
-// et il les tue tous avant de mourir. Estimation prudente : tous leurs PV à abattre sous tout leur soin, pendant que
-// tout leur tir l'use (moins son soin) à partir de `hits` (tueur neuf par défaut ; le tueur sur place passe les siens).
-// Plus forts (healer boosté : le 2026-11-21, 5 tueurs morts en ~30 ticks chacun sans rien abattre) : personne n'y va,
-// ils meurent seuls (1 500 ticks de vie) avant la fin de HOSTILE_COOLDOWN.
-function huntable(name, hits = KILLER_HITS) {
+// Tueurs envoyés ensemble au plus contre des Invaders : deux abattent le groupe boosté du 2026-11-21 (2 tireurs
+// XKHO2, healer XLHO2 : 240 de soin et de tir) qui tuait un tueur seul en ~34 ticks (simulation : gagné en ~29 ticks).
+const MAX_KILLERS = 2;
+
+// Salle à keepers fermée par des Invaders que `n` tueurs peuvent abattre (intel `force`). Estimation prudente :
+// ils tombent un à un, healers d'abord (le plus de soin en premier), sous le soin de tous les healers encore en vie,
+// pendant que le tir de tous ceux qui restent vise un seul tueur, qui ne se soigne que lui-même, à partir de `hits`
+// (tueur neuf par défaut ; en combat, le plus entamé). Vrai s'ils sont tous abattus avant qu'il meure.
+// Force notée sans le détail par créep (intel d'avant) : un seul bloc, tous les PV sous tout le soin.
+// Plus forts (raid boosté de 5) : personne n'y va, ils meurent seuls (1 500 ticks de vie) avant la fin de HOSTILE_COOLDOWN.
+function huntable(name, hits = KILLER_HITS, n = 1) {
   if (!intel.keeperInvaded(name)) return false;
   const f = intel.get(name).force || { heal: 0, damage: 0, hits: 0 };
-  const net = KILLER_DAMAGE - f.heal;
-  if (net <= 0) return false;
-  const loss = f.damage - KILLER_HEAL;
-  return loss <= 0 || f.hits / net < hits / loss;
+  const order = (f.creeps || [f]).slice().sort((a, b) => b.heal - a.heal || b.damage - a.damage);
+  let left = hits;
+  for (let k = 0; k < order.length; k++) {
+    const rest = order.slice(k);
+    const net = n * KILLER_DAMAGE - rest.reduce((sum, c) => sum + c.heal, 0);
+    if (net <= 0) return false;
+    left -= (order[k].hits / net) * Math.max(0, rest.reduce((sum, c) => sum + c.damage, 0) - KILLER_HEAL);
+    if (left <= 0) return false;
+  }
+  return true;
+}
+
+// Tueurs voulus pour la salle à keepers : 1 pour les keepers, contre des Invaders le plus petit nombre qui les abat
+// (MAX_KILLERS au plus), 0 si aucun.
+function killers(name) {
+  if (!intel.keeperInvaded(name)) return 1;
+  for (let n = 1; n <= MAX_KILLERS; n++) if (huntable(name, KILLER_HITS, n)) return n;
+  return 0;
 }
 
 // Salles à keepers exploitées : chacune veut un tueur. Celle que des Invaders ferment (intel.keeperInvaded) aussi,
-// s'il peut les abattre (huntable) : rooms() l'écarte, mais le tueur va la rouvrir sans attendre HOSTILE_COOLDOWN.
+// si MAX_KILLERS tueurs peuvent les abattre (huntable) : rooms() l'écarte, mais les tueurs vont la rouvrir
+// sans attendre HOSTILE_COOLDOWN.
 function keeperRooms(room) {
   const list = rooms(room).filter((name) => intel.keeperRoom(name));
   if (room.controller.level < MIN_RCL || room.energyCapacityAvailable < KILLER_COST) return list;
   const invaded = Object.values(Game.map.describeExits(room.name) || {})
-    .filter((name) => huntable(name) && !list.includes(name));
+    .filter((name) => huntable(name, KILLER_HITS, MAX_KILLERS) && !list.includes(name));
   return [...invaded, ...list];
+}
+
+// Tueurs voulus par la salle : ceux de sa première salle à keepers (spawner).
+// ponytail: une seule salle à keepers servie (E25S3 n'en a qu'une voisine).
+function killersWanted(room) {
+  const name = keeperRooms(room)[0];
+  return name ? killers(name) : 0;
 }
 
 // Vrai si un tueur de keepers vivant est affecté à la salle (en route compris).
@@ -247,11 +274,11 @@ function retreat(creep) {
 // pour retourner à sa source) : il se recycle au spawn le plus proche, qui rend l'énergie de sa vie restante dans
 // une pierre tombale (ramassée par les haulers), au lieu de l'attendre en pure perte. Le 2026-11-21 sur E25S4,
 // toute la flotte (7 transporteurs, 3 mineurs) est morte en attendant, ~14 k d'énergie de vie restante perdus.
-// Pas si le tueur peut abattre les Invaders (huntable) : il rouvrira la salle bien avant. Vrai s'il va se recycler.
+// Pas si les tueurs peuvent abattre les Invaders (huntable) : ils rouvriront la salle bien avant. Vrai s'il va se recycler.
 function recycle(creep) {
   const home = Game.rooms[creep.memory.room];
   const name = creep.memory.target;
-  if (!home || huntable(name)) return false;
+  if (!home || huntable(name, KILLER_HITS, MAX_KILLERS)) return false;
   const back = (trip(home, { id: creep.memory.sourceId, x: creep.memory.x, y: creep.memory.y, room: name }) || 0) / 2;
   if (creep.ticksToLive >= intel.reopenIn(name) + back) return false;
   const spawn = creep.room.name === home.name ? creep.pos.findClosestByRange(FIND_MY_SPAWNS) : sources.mainSpawn(home);
@@ -366,7 +393,7 @@ function roadWork(room) {
 }
 
 module.exports = {
-  RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, huntable, lairs, dodge, container, missing, income, safe, invaded, retreat, recycle,
+  RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, killersWanted, huntable, lairs, dodge, container, missing, income, safe, invaded, retreat, recycle,
   roads, paved, roadWork, roadCells,
 };
 

@@ -243,8 +243,8 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     pioneer: expanding && expansion.claimed() ? 2 : 0,
     // Récolte distante dès le RCL 2, en dernier : elle ne prend que le temps de spawn laissé libre par le reste.
     // Salle à keepers : son tueur d'abord, mineurs et transporteurs n'y vont qu'avec lui (remoteMining.missing).
-    // ponytail: un tueur au plus, pour la première salle à keepers (E25S3 n'en a qu'une voisine).
-    keeperKiller: Math.min(1, remoteMining.keeperRooms(room).length),
+    // Un tueur pour les keepers, deux contre des Invaders qu'un seul n'abat pas (remoteMining.killersWanted).
+    keeperKiller: remoteMining.killersWanted(room),
     // Transporteur avant mineur, comme dans la salle : les deux alternent source par source.
     remoteHauler: (roomCounts.remoteHauler || 0) + (remoteNeed.hauler ? 1 : 0),
     remoteMiner: (roomCounts.remoteMiner || 0) + (remoteNeed.miner ? 1 : 0),

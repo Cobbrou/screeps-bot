@@ -4,21 +4,47 @@ const remoteMining = require('../remoteMining');
 
 // Portée de RANGED_ATTACK.
 const RANGE = 3;
+// Contre des Invaders, les tueurs avancent groupés : chacun à cette portée au plus du meneur avant d'approcher.
+const GROUP_RANGE = 2;
+// Plus aucun ennemi à cette portée du meneur : le groupe se reforme (sinon le combat est engagé, chacun pour soi).
+const CONTACT_RANGE = 5;
+
+// Vrai si un des tueurs doit attendre ou rejoindre les autres avant d'avancer vers les Invaders. Le meneur (nom le plus
+// petit) attend tant qu'un autre est à plus de GROUP_RANGE ; les autres le rejoignent. Pas en plein combat (ennemi à
+// CONTACT_RANGE du meneur) : le recul de chacun à portée 3 les écarte un peu, ils restent sur la même cible.
+function regroup(creep, mates) {
+  const leader = mates[0];
+  if (leader.room.find(FIND_HOSTILE_CREEPS, { filter: (c) => leader.pos.inRangeTo(c, CONTACT_RANGE) }).length) return false;
+  const apart = mates.some((c) => c.room.name !== leader.room.name || !c.pos.inRangeTo(leader, GROUP_RANGE));
+  if (!apart) return false;
+  if (creep !== leader) move.to(creep, leader, { range: 1 });
+  return true;
+}
 
 // Tue les Source Keepers qui gardent les sources de sa salle (creep.memory.target), pour les mineurs distants.
-// Se soigne à chaque tick blessé, tire à portée 3 et s'écarte d'un keeper au contact (300 PV/tick en mêlée).
-// Sans keeper vivant : attend à portée 3 de l'antre qui le fait réapparaître le plus tôt.
+// Soigne à chaque tick le plus entamé de lui-même et des tueurs à son contact, tire à portée 3 et s'écarte
+// d'un keeper au contact (300 PV/tick en mêlée). Sans keeper vivant : attend à portée 3 de l'antre qui le fait
+// réapparaître le plus tôt.
 // Invaders dans la salle : tirés avant les keepers, d'abord le healer à portée le plus entamé, sinon le plus proche
 // (tant qu'un healer vit, la cible remonte à chaque tick) ; plus aucun en vue, la salle est rouverte tout de suite (intel.clear).
-// Invaders trop forts pour ses PV du moment (remoteMining.huntable, revu à chaque tick en combat) ou salle dangereuse
-// autrement (joueur, forteresse) : rentre, se soigne et attend ; remonté, il y retourne si le combat redevient gagnable.
-// ponytail: un seul tueur par salle ; il ignore le keeper du minerai.
+// Combat jugé sur les tueurs vivants de la salle et les PV du plus entamé (remoteMining.huntable, revu à chaque tick) :
+// perdu, ou salle dangereuse autrement (joueur, forteresse), ils rentrent, se soignent et attendent (le spawner envoie
+// le second tueur qui manque) ; gagnable, ils y vont groupés (regroup).
+// ponytail: il ignore le keeper du minerai.
 module.exports.run = function (creep) {
-  if (creep.hits < creep.hitsMax) creep.heal(creep);
   const name = creep.memory.target;
-  if (!remoteMining.safe(creep) && !remoteMining.huntable(name, creep.hits)) {
-    remoteMining.retreat(creep);
-    return;
+  const mates = Object.values(Game.creeps)
+    .filter((c) => c.memory.role === 'keeperKiller' && c.memory.target === name && !c.spawning)
+    .sort((a, b) => (a.name < b.name ? -1 : 1));
+  const hurt = mates.filter((c) => c.hits < c.hitsMax && c.room.name === creep.room.name && creep.pos.isNearTo(c))
+    .sort((a, b) => a.hits / a.hitsMax - b.hits / b.hitsMax)[0];
+  if (hurt) creep.heal(hurt);
+  if (!remoteMining.safe(creep)) {
+    if (!remoteMining.huntable(name, Math.min(...mates.map((c) => c.hits)), mates.length)) {
+      remoteMining.retreat(creep);
+      return;
+    }
+    if (mates.length > 1 && regroup(creep, mates)) return;
   }
   if (creep.room.name !== name) {
     move.to(creep, new RoomPosition(25, 25, name), { range: 20 });
@@ -32,7 +58,7 @@ module.exports.run = function (creep) {
   const names = new Set(lairs.map((l) => `Keeper${l.id}`));
   const healer = invaders.filter((c) => c.getActiveBodyparts(HEAL) && creep.pos.inRangeTo(c, RANGE))
     .sort((a, b) => a.hits - b.hits)[0];
-  const enemy = healer || creep.pos.findClosestByRange(invaders) ||creep.pos.findClosestByRange(FIND_HOSTILE_CREEPS, {
+  const enemy = healer || creep.pos.findClosestByRange(invaders) || creep.pos.findClosestByRange(FIND_HOSTILE_CREEPS, {
     filter: (c) => c.owner.username === intel.KEEPER && names.has(c.name),
   });
   if (enemy) {

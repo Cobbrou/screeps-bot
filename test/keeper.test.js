@@ -67,6 +67,14 @@ assert.ok(remoteMining.huntable('E25S4'));
 Memory.rooms.E25S4.intel.force.damage *= 2;
 assert.ok(remoteMining.huntable('E25S4'));
 assert.ok(!remoteMining.huntable('E25S4', 1000));
+// Groupe du 2026-11-21 détaillé par créep : healer XLHO2 (240 de soin, 1 000 PV), 2 tireurs XKHO2 (120 chacun ;
+// 2 TOUGH XGHO2 : 200 / 0,3 + 800 PV à abattre). Un tueur seul : non ; deux, healer abattu d'abord : oui.
+const shooter = { heal: 0, damage: 120, hits: 1467 };
+Memory.rooms.E25S4.intel.force = { heal: 240, damage: 240, hits: 3934, creeps: [shooter, { heal: 240, damage: 0, hits: 1000 }, shooter] };
+assert.ok(!remoteMining.huntable('E25S4'));
+assert.ok(remoteMining.huntable('E25S4', undefined, 2));
+// Deux tueurs déjà entamés (le plus touché à 3 000 PV) : le tir les use trop pendant le healer, ils rentrent.
+assert.ok(!remoteMining.huntable('E25S4', 3000, 2));
 Memory.rooms.E25S4.intel.force = null;
 Memory.rooms.E25S4.intel.invader = false;
 assert.ok(!intel.keeperInvaded('E25S4'));
