@@ -48,12 +48,26 @@ assert.ok(intel.keeperInvaded('E25S4'));
 Memory.rooms.E25S4.intel.core = true;
 assert.ok(!intel.keeperInvaded('E25S4'));
 Memory.rooms.E25S4.intel.core = false;
-// Healers plus forts que le tueur : il n'y va pas. 2 healers à 5 HEAL (120) : abattables ; un healer boosté
-// en plus (LO, x2 : 120 de plus, 2026-11-21) : non.
-Memory.rooms.E25S4.intel.heal = 2 * 5 * HEAL_POWER;
+// Force notée inconnue : il y va.
 assert.ok(remoteMining.huntable('E25S4'));
-Memory.rooms.E25S4.intel.heal += 5 * HEAL_POWER * 2;
+// Combat du 2026-11-20 (gagné) : 2 healers à 5 HEAL (120), 2 tireurs à 3 RANGED_ATTACK (60, sous son soin), 4 000 PV.
+const force = { heal: 2 * 5 * HEAL_POWER, damage: 2 * 3 * RANGED_ATTACK_POWER, hits: 4000 };
+Memory.rooms.E25S4.intel.force = force;
+assert.ok(remoteMining.huntable('E25S4'));
+// Un healer boosté en plus (LO, x2 : 120 de plus, 2026-11-21) : soin au-dessus de ses dégâts, il n'y va pas.
+Memory.rooms.E25S4.intel.force = Object.assign({}, force, { heal: force.heal + 5 * HEAL_POWER * 2 });
 assert.ok(!remoteMining.huntable('E25S4'));
+// Sans healer, 3 tireurs boostés (XKHO2, x4 : 360/tick) : 3 000 PV abattus en ~21 ticks, il tient ~18 ticks : non.
+Memory.rooms.E25S4.intel.force = { heal: 0, damage: 3 * 3 * RANGED_ATTACK_POWER * 4, hits: 3000 };
+assert.ok(!remoteMining.huntable('E25S4'));
+// Mêmes tireurs non boostés (90/tick, sous son soin) : oui ; boostés x2 (180) : il tient ~64 ticks, oui ;
+// mais pas avec 1 000 PV restants (~14 ticks).
+Memory.rooms.E25S4.intel.force.damage = 3 * 3 * RANGED_ATTACK_POWER;
+assert.ok(remoteMining.huntable('E25S4'));
+Memory.rooms.E25S4.intel.force.damage *= 2;
+assert.ok(remoteMining.huntable('E25S4'));
+assert.ok(!remoteMining.huntable('E25S4', 1000));
+Memory.rooms.E25S4.intel.force = null;
 Memory.rooms.E25S4.intel.invader = false;
 assert.ok(!intel.keeperInvaded('E25S4'));
 // Invaders abattus (clear) : la salle rouvre sans attendre HOSTILE_COOLDOWN.

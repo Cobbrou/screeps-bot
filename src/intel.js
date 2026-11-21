@@ -10,10 +10,20 @@ function threats(room) {
   return defense.threats(room).filter((c) => c.owner.username !== KEEPER);
 }
 
-// Soin par tick de ces créeps s'ils visent tous la même cible (HEAL actifs, au contact, boosts compris).
-function healPower(creeps) {
-  return creeps.reduce((sum, c) => sum + c.body.reduce((s, p) => s + (p.type === HEAL && p.hits
-    ? HEAL_POWER * (p.boost ? BOOSTS[HEAL][p.boost].heal : 1) : 0), 0), 0);
+// Puissance par tick des parties `part` actives de ces créeps, boosts compris (`action` : clé de BOOSTS).
+function power(creeps, part, base, action) {
+  return creeps.reduce((sum, c) => sum + c.body.reduce((s, p) => s + (p.type === part && p.hits
+    ? base * (p.boost ? BOOSTS[part][p.boost][action] : 1) : 0), 0), 0);
+}
+
+// Force d'un groupe d'hostiles : soin s'ils soignent tous la même cible (au contact), tir à distance cumulé, PV.
+// ponytail: ATTACK ignoré (le tueur tire à portée 3 et s'écarte au contact) ; TOUGH boostés comptés sans réduction.
+function force(creeps) {
+  return {
+    heal: power(creeps, HEAL, HEAL_POWER, 'heal'),
+    damage: power(creeps, RANGED_ATTACK, RANGED_ATTACK_POWER, 'rangedAttack'),
+    hits: creeps.reduce((sum, c) => sum + c.hits, 0),
+  };
 }
 
 // Renseignements sur une salle déjà explorée (`room.memory.intel`), ou undefined.
@@ -38,8 +48,8 @@ function record(room) {
     hostile: hostiles.length ? Game.time : (previous && previous.hostile) || 0,
     // Vrai si les derniers hostiles vus n'étaient que des Invaders : seuls ceux-là sont chassés (remoteDefender).
     invader: hostiles.length ? hostiles.every((c) => c.owner.username === defense.INVADER) : !!(previous && previous.invader),
-    // Soin cumulé des derniers hostiles vus (healPower) : le tueur de keepers ne les attaque que s'il frappe plus fort.
-    heal: hostiles.length ? healPower(hostiles) : (previous && previous.heal) || 0,
+    // Force des derniers hostiles vus (soin, tir, PV) : le tueur de keepers ne les attaque que s'il gagne (remoteMining.huntable).
+    force: hostiles.length ? force(hostiles) : (previous && previous.force) || null,
     // Cœur d'Invader présent : il réserve le contrôleur, aucune récolte possible tant qu'il tient (remoteDefender).
     core: !!core(room),
   };
@@ -154,7 +164,7 @@ function invaded(name) {
 
 // Salle à keepers explorée, sans forteresse, fermée seulement par des Invaders vus depuis moins de HOSTILE_COOLDOWN ticks :
 // le tueur de keepers y va quand même et les abat (le remoteDefender, sans soin ni fuite, n'y tiendrait pas face aux keepers).
-// Leur force (soin cumulé, `heal`) est comparée aux dégâts du tueur par remoteMining.huntable.
+// Leur force (`force` : soin, tir, PV) est comparée à celle du tueur par remoteMining.huntable.
 function keeperInvaded(name) {
   const i = get(name);
   return keeperRoom(name) && !!(i && i.sourcePos && !i.core && i.invader) && Game.time - i.hostile <= HOSTILE_COOLDOWN;
@@ -163,7 +173,7 @@ function keeperInvaded(name) {
 // Salle vue sans créep hostile par notre défenseur : elle redevient sûre tout de suite (le cœur reste noté à part).
 function clear(name) {
   const i = get(name);
-  if (i) Object.assign(i, { hostile: 0, invader: false, heal: 0 });
+  if (i) Object.assign(i, { hostile: 0, invader: false, force: null });
 }
 
 module.exports = { KEEPER, threats, get, record, watch, skip, safe, invaded, keeperInvaded, invaderReserved, core, clear, me, reservedByMe, keeperRoom, friendly, route };

@@ -10,12 +10,13 @@ const RANGE = 3;
 // Sans keeper vivant : attend à portée 3 de l'antre qui le fait réapparaître le plus tôt.
 // Invaders dans la salle : tirés avant les keepers, d'abord le healer à portée le plus entamé, sinon le plus proche
 // (tant qu'un healer vit, la cible remonte à chaque tick) ; plus aucun en vue, la salle est rouverte tout de suite (intel.clear).
-// Invaders trop forts (remoteMining.huntable) ou salle dangereuse autrement (joueur, forteresse) : rentre et attend.
+// Invaders trop forts pour ses PV du moment (remoteMining.huntable, revu à chaque tick en combat) ou salle dangereuse
+// autrement (joueur, forteresse) : rentre, se soigne et attend ; remonté, il y retourne si le combat redevient gagnable.
 // ponytail: un seul tueur par salle ; il ignore le keeper du minerai.
 module.exports.run = function (creep) {
   if (creep.hits < creep.hitsMax) creep.heal(creep);
   const name = creep.memory.target;
-  if (!remoteMining.safe(creep) && !remoteMining.huntable(name)) {
+  if (!remoteMining.safe(creep) && !remoteMining.huntable(name, creep.hits)) {
     remoteMining.retreat(creep);
     return;
   }

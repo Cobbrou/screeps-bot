@@ -16,6 +16,9 @@ const KILLER_BODY = [...Array(23).fill(MOVE), ...Array(14).fill(RANGED_ATTACK), 
 const KILLER_COST = KILLER_BODY.reduce((sum, part) => sum + BODYPART_COST[part], 0);
 // Dégâts du tueur par tick (140) : des Invaders qui soignent au moins autant ne tombent jamais.
 const KILLER_DAMAGE = KILLER_BODY.filter((part) => part === RANGED_ATTACK).length * RANGED_ATTACK_POWER;
+// Soin du tueur sur lui-même par tick (108) et PV neufs (100 par partie : 4 600).
+const KILLER_HEAL = KILLER_BODY.filter((part) => part === HEAL).length * HEAL_POWER;
+const KILLER_HITS = KILLER_BODY.length * 100;
 // Un créep de la salle à keepers s'écarte d'un keeper, ou d'un antre qui le fait réapparaître dans moins de LAIR_WARN ticks,
 // jusqu'à DODGE_RANGE cases : le keeper tire à portée 3 et ne s'approche que de sa source.
 const LAIR_WARN = 20;
@@ -65,12 +68,18 @@ function minerWork(name) {
   return Math.ceil(rate(name) / uptime / HARVEST_POWER);
 }
 
-// Salle à keepers fermée par des Invaders que le tueur peut abattre : leur soin cumulé (intel `heal`) reste sous ses dégâts.
+// Salle à keepers fermée par des Invaders que le tueur peut abattre (intel `force`) : leur soin reste sous ses dégâts,
+// et il les tue tous avant de mourir. Estimation prudente : tous leurs PV à abattre sous tout leur soin, pendant que
+// tout leur tir l'use (moins son soin) à partir de `hits` (tueur neuf par défaut ; le tueur sur place passe les siens).
 // Plus forts (healer boosté : le 2026-11-21, 5 tueurs morts en ~30 ticks chacun sans rien abattre) : personne n'y va,
 // ils meurent seuls (1 500 ticks de vie) avant la fin de HOSTILE_COOLDOWN.
-// ponytail: dégâts reçus ignorés ; des tireurs boostés sans healer pourraient encore tuer le tueur.
-function huntable(name) {
-  return intel.keeperInvaded(name) && (intel.get(name).heal || 0) < KILLER_DAMAGE;
+function huntable(name, hits = KILLER_HITS) {
+  if (!intel.keeperInvaded(name)) return false;
+  const f = intel.get(name).force || { heal: 0, damage: 0, hits: 0 };
+  const net = KILLER_DAMAGE - f.heal;
+  if (net <= 0) return false;
+  const loss = f.damage - KILLER_HEAL;
+  return loss <= 0 || f.hits / net < hits / loss;
 }
 
 // Salles à keepers exploitées : chacune veut un tueur. Celle que des Invaders ferment (intel.keeperInvaded) aussi,
