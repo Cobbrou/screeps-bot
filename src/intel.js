@@ -1,6 +1,6 @@
 const defense = require('./defense');
 
-// Salle évitée pendant ce nombre de ticks après y avoir vu des hostiles dangereux.
+// Salle évitée pendant ce nombre de ticks après y avoir vu des hostiles dangereux (Invaders seuls : jusqu'à leur mort, voir record).
 const HOSTILE_COOLDOWN = 1500;
 // Propriétaire des Source Keepers : toujours là, ils ne rendent pas leur salle dangereuse (voir remoteMining.dodge).
 const KEEPER = 'Source Keeper';
@@ -40,6 +40,15 @@ function get(name) {
   return Memory.rooms && Memory.rooms[name] && Memory.rooms[name].intel;
 }
 
+// Date notée du passage d'hostiles (`intel.hostile`) : la salle reste fermée HOSTILE_COOLDOWN ticks après.
+// Que des Invaders : ils ne partent pas et meurent à la fin de leur vie, la fermeture s'arrête à la mort du dernier.
+// Le 2026-11-22 sur E25S4, sans personne pour les voir partir, la salle restait fermée 1 500 ticks après le dernier
+// passage, jusqu'à 1h30 après leur mort.
+function hostileTime(hostiles) {
+  if (!hostiles.every((c) => c.owner.username === defense.INVADER)) return Game.time;
+  return Game.time + Math.max(...hostiles.map((c) => c.ticksToLive || 0)) - HOSTILE_COOLDOWN;
+}
+
 // Note ce que la salle contient : sources (nombre et positions), contrôleur, propriétaire, réservation
 // et dernier passage d'hostiles. Les positions servent aux mineurs distants, envoyés sans visibilité sur la salle.
 function record(room) {
@@ -54,7 +63,7 @@ function record(room) {
     controller: !!c,
     owner: c && c.owner ? c.owner.username : null,
     reserved: c && c.reservation ? c.reservation.username : null,
-    hostile: hostiles.length ? Game.time : (previous && previous.hostile) || 0,
+    hostile: hostiles.length ? hostileTime(hostiles) : (previous && previous.hostile) || 0,
     // Vrai si les derniers hostiles vus n'étaient que des Invaders : seuls ceux-là sont chassés (remoteDefender).
     invader: hostiles.length ? hostiles.every((c) => c.owner.username === defense.INVADER) : !!(previous && previous.invader),
     // Force des derniers hostiles vus (soin, tir, PV) : le tueur de keepers ne les attaque que s'il gagne (remoteMining.huntable).
