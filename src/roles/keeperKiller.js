@@ -30,8 +30,8 @@ function regroup(creep, mates) {
 // Soigne à chaque tick le plus entamé de lui-même et des tueurs à son contact, tire à portée 3 et s'écarte
 // d'un keeper au contact (300 PV/tick en mêlée). Sans keeper vivant : attend à portée 3 de l'antre qui le fait
 // réapparaître le plus tôt.
-// Invaders dans la salle : tirés avant les keepers, d'abord le healer à portée le plus entamé, sinon le plus proche
-// (tant qu'un healer vit, la cible remonte à chaque tick) ; plus aucun en vue, la salle est rouverte tout de suite (intel.clear),
+// Invaders dans la salle : tirés avant les keepers, d'abord le healer à portée le plus entamé, sinon le healer le plus
+// proche (rejoint à portée 3), sinon l'Invader le plus proche (tant qu'un healer vit, la cible remonte à chaque tick) ; plus aucun en vue, la salle est rouverte tout de suite (intel.clear),
 // même si le combat était jugé perdu.
 // Combat jugé sur les tueurs vivants de la salle et les PV du plus entamé (remoteMining.huntable, revu à chaque tick) :
 // perdu, ou salle dangereuse autrement (joueur, forteresse), ils rentrent, se soignent et attendent (le spawner envoie
@@ -64,14 +64,19 @@ module.exports.run = function (creep) {
   const invaders = intel.threats(creep.room);
   const lairs = remoteMining.lairs(creep.room);
   const names = new Set(lairs.map((l) => `Keeper${l.id}`));
-  const healer = invaders.filter((c) => c.getActiveBodyparts(HEAL) && creep.pos.inRangeTo(c, RANGE))
-    .sort((a, b) => a.hits - b.hits)[0];
+  // Healer hors de portée : rejoint (remoteMining.huntable compte les healers abattus d'abord). Le 2026-11-22, healer
+  // XLHO2 resté à portée 4 derrière son tireur : les deux tueurs ont tiré 1 500 ticks le tireur qu'il soignait.
+  const healers = invaders.filter((c) => c.getActiveBodyparts(HEAL));
+  const healer = healers.filter((c) => creep.pos.inRangeTo(c, RANGE)).sort((a, b) => a.hits - b.hits)[0]
+    || creep.pos.findClosestByRange(healers);
   const enemy = healer || creep.pos.findClosestByRange(invaders) || creep.pos.findClosestByRange(FIND_HOSTILE_CREEPS, {
     filter: (c) => c.owner.username === intel.KEEPER && names.has(c.name),
   });
   if (enemy) {
     const range = creep.pos.getRangeTo(enemy);
-    if (range <= RANGE) creep.rangedAttack(enemy);
+    // En route vers sa cible, il tire l'Invader à portée le plus entamé.
+    const shot = range <= RANGE ? enemy : creep.pos.findInRange(invaders, RANGE).sort((a, b) => a.hits - b.hits)[0];
+    if (shot) creep.rangedAttack(shot);
     if (range > RANGE) move.to(creep, enemy, { range: RANGE, reusePath: 3 });
     else if (range <= 1) {
       const flee = PathFinder.search(creep.pos, { pos: enemy.pos, range: RANGE }, { flee: true, maxRooms: 1 });
