@@ -42,6 +42,8 @@ function damagedRoad(creep, home) {
 // sinon rentre et devient builder. Salle devenue dangereuse : rentre et attend.
 module.exports.run = function (creep) {
   const home = Game.rooms[creep.memory.room];
+  // Esquive des keepers avant tout, retour à la maison compris : son chemin longe les antres.
+  if (remoteMining.dodge(creep)) return;
   if (!creep.memory.target) {
     if (creep.room.name === creep.memory.room) creep.memory.role = 'builder';
     else move.to(creep, new RoomPosition(25, 25, creep.memory.room), { range: 20 });
@@ -51,7 +53,6 @@ module.exports.run = function (creep) {
     remoteMining.retreat(creep);
     return;
   }
-  if (remoteMining.dodge(creep)) return;
   if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) creep.memory.working = false;
   if (!creep.memory.working && creep.store.getFreeCapacity() === 0) creep.memory.working = true;
   if (creep.room.name !== creep.memory.target) {

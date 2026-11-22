@@ -11,12 +11,14 @@ const REPAIR_RATIO = 0.5;
 // Le reste de la récolte tombe dans le conteneur (au sol tant qu'il n'existe pas), où les remoteHauler le ramassent.
 // Salle devenue dangereuse : rentre et attend, ou se recycle s'il mourra avant sa réouverture (remoteMining.recycle).
 module.exports.run = function (creep) {
-  if (!remoteMining.safe(creep)) {
+  // Salle à keepers : s'écarte de son keeper (ou de l'antre qui va le faire réapparaître) le temps que le tueur l'abatte,
+  // repli vers la maison compris.
+  const safe = remoteMining.safe(creep);
+  if (remoteMining.dodge(creep)) return;
+  if (!safe) {
     if (!remoteMining.recycle(creep)) remoteMining.retreat(creep);
     return;
   }
-  // Salle à keepers : s'écarte de son keeper (ou de l'antre qui va le faire réapparaître) le temps que le tueur l'abatte.
-  if (remoteMining.dodge(creep)) return;
   const source = { x: creep.memory.x, y: creep.memory.y, room: creep.memory.target };
   const pos = new RoomPosition(source.x, source.y, source.room);
   const box = remoteMining.container(source);
