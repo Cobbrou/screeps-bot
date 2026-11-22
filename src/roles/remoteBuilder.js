@@ -45,7 +45,12 @@ module.exports.run = function (creep) {
   // Esquive des keepers avant tout, retour à la maison compris : son chemin longe les antres.
   if (remoteMining.dodge(creep)) return;
   if (!creep.memory.target) {
-    if (creep.room.name === creep.memory.room) creep.memory.role = 'builder';
+    // Route distante oubliée : gardée, le builder (sans esquive des keepers) y retournait la réparer et restait
+    // travailler dans la salle à keepers (6 remoteBuilders tués le 2026-11-22).
+    if (creep.room.name === creep.memory.room) {
+      creep.memory.role = 'builder';
+      delete creep.memory.repairId;
+    }
     else move.to(creep, new RoomPosition(25, 25, creep.memory.room), { range: 20 });
     return;
   }
