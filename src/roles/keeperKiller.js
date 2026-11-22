@@ -26,7 +26,8 @@ function regroup(creep, mates) {
 // d'un keeper au contact (300 PV/tick en mêlée). Sans keeper vivant : attend à portée 3 de l'antre qui le fait
 // réapparaître le plus tôt.
 // Invaders dans la salle : tirés avant les keepers, d'abord le healer à portée le plus entamé, sinon le plus proche
-// (tant qu'un healer vit, la cible remonte à chaque tick) ; plus aucun en vue, la salle est rouverte tout de suite (intel.clear).
+// (tant qu'un healer vit, la cible remonte à chaque tick) ; plus aucun en vue, la salle est rouverte tout de suite (intel.clear),
+// même si le combat était jugé perdu.
 // Combat jugé sur les tueurs vivants de la salle et les PV du plus entamé (remoteMining.huntable, revu à chaque tick) :
 // perdu, ou salle dangereuse autrement (joueur, forteresse), ils rentrent, se soignent et attendent (le spawner envoie
 // le second tueur qui manque) ; gagnable, ils y vont groupés (regroup).
@@ -39,6 +40,9 @@ module.exports.run = function (creep) {
   const hurt = mates.filter((c) => c.hits < c.hitsMax && c.room.name === creep.room.name && creep.pos.isNearTo(c))
     .sort((a, b) => a.hits / a.hitsMax - b.hits / b.hitsMax)[0];
   if (hurt) creep.heal(hurt);
+  // Plus aucun Invader en vue dans sa salle : rouverte tout de suite, avant de juger le combat. La force notée
+  // (huntable) est celle des Invaders partis : jugé perdu, le tueur rentrait sans jamais la rouvrir.
+  if (creep.room.name === name && intel.keeperInvaded(name) && !intel.threats(creep.room).length) intel.clear(name);
   if (!remoteMining.safe(creep)) {
     if (!remoteMining.huntable(name, Math.min(...mates.map((c) => c.hits)), mates.length)) {
       remoteMining.retreat(creep);
@@ -53,7 +57,6 @@ module.exports.run = function (creep) {
   // Trajet noté à l'arrivée : le spawner lance le successeur pour qu'il arrive à la mort de celui-ci.
   if (creep.memory.travel === undefined) creep.memory.travel = CREEP_LIFE_TIME - creep.ticksToLive;
   const invaders = intel.threats(creep.room);
-  if (!invaders.length && intel.keeperInvaded(name)) intel.clear(name);
   const lairs = remoteMining.lairs(creep.room);
   const names = new Set(lairs.map((l) => `Keeper${l.id}`));
   const healer = invaders.filter((c) => c.getActiveBodyparts(HEAL) && creep.pos.inRangeTo(c, RANGE))
