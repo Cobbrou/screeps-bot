@@ -137,8 +137,13 @@ function lairs(room) {
 }
 
 // Dans une salle à keepers, écarte le créep d'un keeper ou d'un antre sur le point de le faire réapparaître.
-// Vrai s'il a dû fuir ce tick (le rôle s'arrête là). La fuite contourne les créeps.
+// À portée DODGE_RANGE pile, il attend sur place sans avancer : repartir vers sa cible le ramenait à portée 4, il refuyait
+// au tick suivant. Le 2026-11-22, 3 transporteurs oscillaient ainsi entre deux cases à chaque tick et barraient le passage
+// au tueur, bloqué hors de portée du keeper qu'ils attendaient. Immobiles, ils sont poussés ou contournés (move).
+// Vrai s'il a dû fuir ou attendre ce tick (le rôle s'arrête là). La fuite contourne les créeps.
 // ponytail: les chemins des transporteurs ne contournent pas les antres ; le tueur abat le keeper, ils repassent après.
+// ponytail: le keeper du minerai n'est jamais abattu : un créep dont le chemin passe à 5 cases y attendrait sans fin
+// (aucun de nos chemins d'E25S4 ne s'en approche) ; ne compter alors que les keepers des sources (lairs).
 function dodge(creep) {
   if (!intel.keeperRoom(creep.room.name)) return false;
   const danger = [
@@ -146,8 +151,9 @@ function dodge(creep) {
     ...creep.room.find(FIND_STRUCTURES, {
       filter: (s) => s.structureType === STRUCTURE_KEEPER_LAIR && s.ticksToSpawn !== undefined && s.ticksToSpawn <= LAIR_WARN,
     }),
-  ].filter((o) => creep.pos.inRangeTo(o, DODGE_RANGE - 1)).map((o) => ({ pos: o.pos, range: DODGE_RANGE }));
+  ].filter((o) => creep.pos.inRangeTo(o, DODGE_RANGE));
   if (!danger.length) return false;
+  if (!danger.some((o) => creep.pos.inRangeTo(o, DODGE_RANGE - 1))) return true;
   // Cases occupées par un créep évitées : la file des transporteurs sur la route bloquait le pas de fuite (move.run
   // ne pousse pas un créep qui a lui-même un pas), le mineur restait à portée du keeper jusqu'à sa mort.
   const roomCallback = (name) => {
@@ -155,7 +161,8 @@ function dodge(creep) {
     for (const c of Game.rooms[name].find(FIND_CREEPS)) if (c !== creep) costs.set(c.pos.x, c.pos.y, 255);
     return costs;
   };
-  const result = PathFinder.search(creep.pos, danger, { flee: true, maxRooms: 1, plainCost: 2, swampCost: 10, roomCallback });
+  const goals = danger.map((o) => ({ pos: o.pos, range: DODGE_RANGE }));
+  const result = PathFinder.search(creep.pos, goals, { flee: true, maxRooms: 1, plainCost: 2, swampCost: 10, roomCallback });
   if (result.path.length) move.step(creep, creep.pos.getDirectionTo(result.path[0]));
   return true;
 }
