@@ -139,6 +139,17 @@ require('../src/move').to = () => assert.fail('collect');
 remoteHauler.run({
   room: { name: 'E25S3' }, memory: { x: 1, y: 1, target: 'E25S4' }, store: { energy: 0, getFreeCapacity: () => 50 },
 });
+// remoteBuilder rentré : encore sur la case de sortie, il garde son rôle (et son esquive) ; à l'intérieur, il devient builder.
+const remoteBuilder = require('../src/roles/remoteBuilder');
+const builder = (near) => ({ room: { name: 'E25S3' }, memory: { role: 'remoteBuilder', room: 'E25S3' }, pos: { inRangeTo: () => near } });
+let moved = 0;
+require('../src/move').to = () => { moved++; };
+const edge = builder(false);
+remoteBuilder.run(edge);
+assert.ok(edge.memory.role === 'remoteBuilder' && moved === 1);
+const inside = builder(true);
+remoteBuilder.run(inside);
+assert.strictEqual(inside.memory.role, 'builder');
 Object.assign(remoteMining, real);
 
 console.log('keeper : ok');
