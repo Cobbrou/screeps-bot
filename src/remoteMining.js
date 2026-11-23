@@ -44,7 +44,7 @@ const HAUL_BACKLOG = CONTAINER_CAPACITY / 2;
 const HAUL_BACKLOG_RATIO = 2;
 
 // Aller-retour d'un transporteur 1:1 entre le spawn et chaque source distante (vide : 1 tick par case ;
-// chargé : 1 en plaine, 5 en marais), null si injoignable. Gardé jusqu'au reset du global.
+// chargé : 1 en plaine, 5 en marais), null si injoignable. Gardé jusqu'au reset du global. Route pavée : voir trip.
 // ponytail: chemin calculé sur le seul terrain (structures ignorées) : estimation, pas le trajet exact.
 const trips = {};
 
@@ -167,10 +167,20 @@ function dodge(creep) {
   return true;
 }
 
+// Pas d'un chemin de route non gardés dans remoteRoads : les deux cases de sortie et la case du conteneur.
+const UNPAVED_STEPS = 3;
+
 // Aller-retour (en ticks) entre le spawn de la salle et la source distante, ou null.
+// Route pavée : le transporteur 2:1 fait une case par tick dans les deux sens, 2 fois la longueur du chemin.
+// Sans ça, l'estimation sur le terrain (marais à 5) gardait le besoin 1,5 à 1,8 fois trop haut une fois la route
+// construite : le 2026-11-23 sur E25S4, 11 transporteurs pour 3 sources au lieu de 4 à 5 (~10 énergie/tick d'entretien perdus).
 // Recherche limitée aux deux salles, comme roadPath : avec maxRooms 3 seul, les autres voisines (E24S3, E26S3)
 // prenaient le quota avant la salle de la source, chemin incomplet, source écartée et aucun mineur distant.
 function trip(room, source) {
+  if (paved(room, source.id)) {
+    const path = room.memory.remoteRoads[source.id].path;
+    return 2 * (Object.values(path).reduce((sum, cells) => sum + cells.length, 0) + UNPAVED_STEPS);
+  }
   if (source.id in trips) return trips[source.id];
   const spawn = sources.mainSpawn(room);
   if (!spawn) return null;
@@ -413,6 +423,6 @@ function roadWork(room) {
 
 module.exports = {
   RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, killersWanted, huntable, lairs, dodge, container, missing, income, safe, invaded, retreat, recycle,
-  roads, paved, roadWork, roadCells,
+  roads, paved, roadWork, roadCells, trip,
 };
 

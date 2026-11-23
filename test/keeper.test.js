@@ -90,4 +90,8 @@ Memory.rooms.E25S4.intel.hostile = Game.time - 500;
 assert.strictEqual(intel.reopenIn('E25S4'), 1001);
 assert.strictEqual(intel.reopenIn('E25S2'), Infinity);
 
+// Route pavée : aller-retour = 2 fois le chemin gardé, plus les sorties et le conteneur (sans pathfinding).
+const home = { memory: { remoteRoads: { a: { path: { E25S3: [1, 2, 3], E25S4: [4, 5] }, done: true } } } };
+assert.strictEqual(remoteMining.trip(home, { id: 'a', x: 1, y: 1, room: 'E25S4' }), 2 * (5 + 3));
+
 console.log('keeper : ok');
