@@ -26,16 +26,19 @@ function pointsPerUnit(compound) {
   return (BOOSTS.work[compound].upgradeController - 1) * CREEP_LIFE_TIME / LAB_BOOST_MINERAL;
 }
 
-// Composé en stock (lab d'abord, puis terminal), ou undefined : on rachète le même pour ne pas mélanger dans le lab.
-function held(room) {
-  const l = lab(room);
-  return COMPOUNDS.find((c) => l && l.store[c] > 0) || COMPOUNDS.find((c) => room.terminal && room.terminal.store[c] > 0);
-}
-
 // Stock du composé dans le lab et le terminal.
 function stock(room, compound) {
   const l = lab(room);
   return (l ? l.store[compound] : 0) + (room.terminal ? room.terminal.store[compound] : 0);
+}
+
+// Composé en stock (lab d'abord, puis terminal), ou undefined : on rachète le même pour ne pas mélanger dans le lab.
+// Un reste trop petit pour booster une partie ne compte pas : le 2026-11-23, 7 GH2O au lab, que personne ne vendait plus,
+// empêchaient tout achat (20 millions de crédits disponibles). labJob l'ôte du lab quand un autre composé arrive.
+function held(room) {
+  const l = lab(room);
+  const usable = COMPOUNDS.filter((c) => stock(room, c) >= LAB_BOOST_MINERAL);
+  return usable.find((c) => l && l.store[c] > 0) || usable[0];
 }
 
 // Vrai si la salle peut booster : terminal, crédits au-dessus de la réserve.
@@ -65,11 +68,13 @@ function purchase(room) {
 }
 
 // Chargement à porter au lab pour le mineralHauler ({ from, resource, to }), ou undefined :
-// composé du terminal, puis énergie du stockage.
+// reste d'un autre composé rendu au terminal (un lab n'en garde qu'un), composé du terminal, puis énergie du stockage.
 function labJob(room) {
   const l = lab(room);
   if (!l || !room.terminal || !room.storage) return undefined;
   const compound = held(room);
+  const rest = compound && COMPOUNDS.find((c) => c !== compound && l.store[c] > 0);
+  if (rest) return { from: l, resource: rest, to: room.terminal };
   if (compound && l.store[compound] < STOCK && room.terminal.store[compound] > 0) {
     return { from: room.terminal, resource: compound, to: l };
   }

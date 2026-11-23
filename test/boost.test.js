@@ -43,6 +43,11 @@ assert.deepStrictEqual(boost.purchase(r), { order: orders[1], amount: 900 });
 r = room({ GH: 300 }, { energy: 5000 });
 assert.strictEqual(boost.purchase(r).order.id, 'gh');
 assert.strictEqual(boost.purchase(r).amount, 600);
+// Reste inutilisable au lab (7 GH2O, le 2026-11-23) : il n'impose plus son composé. Une partie boostable (30), si.
+const gh2o = orders.splice(1, 1)[0];
+assert.strictEqual(boost.purchase(room({ GH2O: 7 }, { energy: 5000 })).order.id, 'x');
+assert.strictEqual(boost.purchase(room({ GH2O: 30 }, { energy: 5000 })), undefined);
+orders.splice(1, 0, gh2o);
 // Stock presque plein, stockage bas, crédits sous la réserve ou pas de lab : aucun achat.
 assert.strictEqual(boost.purchase(room({ GH2O: 700 }, {})), undefined);
 assert.strictEqual(boost.purchase(room({}, {}, { storageLow: true })), undefined);
@@ -68,5 +73,10 @@ r = room({ GH: 900, energy: 100 }, {});
 assert.strictEqual(boost.labJob(r).resource, 'energy');
 assert.strictEqual(boost.labJob(room({ GH: 900, energy: 100 }, {}, { storageLow: true })), undefined);
 assert.strictEqual(boost.labJob(room({ GH: 900, energy: 2000 }, { GH: 500 })), undefined);
+// Reste d'un autre composé au lab : rendu au terminal d'abord. Sans rien à mettre à la place, il y reste.
+r = room({ GH2O: 7, energy: 2000 }, { XGH2O: 900 });
+assert.strictEqual(boost.labJob(r).resource, 'GH2O');
+assert.strictEqual(boost.labJob(r).to, r.terminal);
+assert.strictEqual(boost.labJob(room({ GH2O: 7, energy: 2000 }, {})), undefined);
 
 console.log('boost : OK');
