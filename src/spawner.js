@@ -402,9 +402,12 @@ module.exports.run = function () {
     // Créep en fin de vie (il lui reste moins que le trajet plus la durée de spawn) : déjà compté comme absent,
     // pour que son successeur arrive quand il meurt au lieu de laisser son poste vide.
     // Trajet noté à l'arrivée par les mineurs et l'upgrader ; les transporteurs n'ont pas de poste fixe,
-    // seule la durée de spawn compte.
+    // seule la durée de spawn compte. Tueur de keepers jamais entré dans sa salle (fermée, il attend chez lui) :
+    // sans trajet noté, il comptait jusqu'à sa mort et son successeur partait trop tard. Le 2026-11-23, mort 10 ticks
+    // après la réouverture d'E25S4, tueur suivant arrivé 259 ticks après elle.
     const remoteRole = creep.memory.role === 'remoteMiner' || creep.memory.role === 'remoteHauler';
-    const lead = ['hauler', 'remoteHauler', 'filler'].includes(creep.memory.role) ? 0 : creep.memory.travel;
+    const lead = ['hauler', 'remoteHauler', 'filler'].includes(creep.memory.role) ? 0
+      : creep.memory.role === 'keeperKiller' ? creep.memory.travel || 0 : creep.memory.travel;
     const dying = lead !== undefined && creep.ticksToLive <= lead + creep.body.length * CREEP_SPAWN_TIME;
     // Ancien builder devenu upgrader, travail de builder revenu : compté builder dès ce tick. Il ne reprend son rôle
     // qu'après le spawner (upgrader.run, même condition) : sans ça, un builder neuf au premier tick de chaque lot.

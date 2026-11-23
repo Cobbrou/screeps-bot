@@ -35,7 +35,7 @@ function regroup(creep, mates) {
 // même si le combat était jugé perdu.
 // Combat jugé sur les tueurs vivants de la salle et les PV du plus entamé (remoteMining.huntable, revu à chaque tick) :
 // perdu, ou salle dangereuse autrement (joueur, forteresse), ils rentrent, se soignent et attendent (le spawner envoie
-// le second tueur qui manque) ; gagnable, ils y vont groupés (regroup).
+// le second tueur qui manque), ou se recyclent s'ils mourront avant sa réouverture (remoteMining.recycle) ; gagnable, ils y vont groupés (regroup).
 // ponytail: il ignore le keeper du minerai.
 module.exports.run = function (creep) {
   const name = creep.memory.target;
@@ -50,7 +50,8 @@ module.exports.run = function (creep) {
   if (creep.room.name === name && intel.keeperInvaded(name) && !intel.threats(creep.room).length) intel.clear(name);
   if (!remoteMining.safe(creep)) {
     if (!remoteMining.huntable(name, Math.min(...mates.map((c) => c.hits)), mates.length)) {
-      remoteMining.retreat(creep);
+      // Il mourra avant la réouverture : recyclé (jusqu'à 4 025 sur 5 500 rendus) plutôt que d'attendre pour rien.
+      if (!remoteMining.recycle(creep)) remoteMining.retreat(creep);
       return;
     }
     if (mates.length > 1 && regroup(creep, mates)) return;

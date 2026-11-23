@@ -320,7 +320,7 @@ function retreat(creep) {
   if (creep.room.name !== center.roomName || !creep.pos.inRangeTo(center, 20)) move.to(creep, center, { range: 20 });
 }
 
-// Mineur ou transporteur distant qui mourra avant la réouverture de sa salle (intel.reopenIn, plus le demi aller-retour
+// Mineur, transporteur distant ou tueur de keepers (trajet noté en guise de demi aller-retour) qui mourra avant la réouverture de sa salle (intel.reopenIn, plus le demi aller-retour
 // pour retourner à sa source) : il se recycle au spawn le plus proche, qui rend l'énergie de sa vie restante dans
 // une pierre tombale (ramassée par les haulers), au lieu de l'attendre en pure perte. Le 2026-11-21 sur E25S4,
 // toute la flotte (7 transporteurs, 3 mineurs) est morte en attendant, ~14 k d'énergie de vie restante perdus.
@@ -329,7 +329,9 @@ function recycle(creep) {
   const home = Game.rooms[creep.memory.room];
   const name = creep.memory.target;
   if (!home || huntable(name, KILLER_HITS, MAX_KILLERS)) return false;
-  const back = (trip(home, { id: creep.memory.sourceId, x: creep.memory.x, y: creep.memory.y, room: name }) || 0) / 2;
+  const back = creep.memory.sourceId
+    ? (trip(home, { id: creep.memory.sourceId, x: creep.memory.x, y: creep.memory.y, room: name }) || 0) / 2
+    : creep.memory.travel || 0;
   if (creep.ticksToLive >= intel.reopenIn(name) + back) return false;
   const spawn = creep.room.name === home.name ? creep.pos.findClosestByRange(FIND_MY_SPAWNS) : sources.mainSpawn(home);
   if (!spawn) return false;

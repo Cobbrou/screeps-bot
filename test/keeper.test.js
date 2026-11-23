@@ -102,6 +102,16 @@ Memory.rooms.E25S4.intel.hostile = Game.time - 1400;
 assert.strictEqual(remoteMining.killersWanted(e25s3), 1);
 assert.strictEqual(remoteMining.keeperRooms(e25s3)[0], 'E25S4');
 Memory.rooms.E25S4.intel.hostile = Game.time - 500;
+// Tueur qui attend chez lui (réouverture dans 1 001 ticks) : recyclé s'il meurt avant, gardé sinon.
+let recycled = 0;
+global.FIND_MY_SPAWNS = 112;
+global.ERR_NOT_IN_RANGE = -9;
+Game.rooms.E25S3 = e25s3;
+const killer = (ticksToLive) => ({ ticksToLive, room: e25s3, memory: { room: 'E25S3', target: 'E25S4' },
+  pos: { findClosestByRange: () => ({ recycleCreep: () => { recycled++; return 0; } }) } });
+assert.ok(remoteMining.recycle(killer(1000)) && recycled === 1);
+assert.ok(!remoteMining.recycle(killer(1100)) && recycled === 1);
+delete Game.rooms.E25S3;
 Memory.rooms.E25S4.intel.invader = false;
 Memory.rooms.E25S4.intel.force = null;
 
