@@ -234,6 +234,10 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
     // Après la récolte locale : il rend ses sources à la salle distante envahie.
     remoteDefender: remoteMining.invaded(room) ? 1 : 0,
+    // Tueur de keepers avant builders et upgraders : son successeur part à temps (remplacé à l'avance selon son trajet).
+    // Placé après eux, l'upgrader prenait le spawn libéré et la salle à keepers restait ~85 ticks sans tueur (E25S4, 2026-11-23).
+    // Un tueur pour les keepers, deux contre des Invaders qu'un seul n'abat pas (remoteMining.killersWanted).
+    keeperKiller: remoteMining.killersWanted(room),
     // Builders avant upgraders : chaque structure (extensions d'abord) améliore la salle plus tôt.
     builder,
     upgrader,
@@ -242,9 +246,7 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     claimer: expanding && !expansion.claimed() ? 1 : 0,
     pioneer: expanding && expansion.claimed() ? 2 : 0,
     // Récolte distante dès le RCL 2, en dernier : elle ne prend que le temps de spawn laissé libre par le reste.
-    // Salle à keepers : son tueur d'abord, mineurs et transporteurs n'y vont qu'avec lui (remoteMining.missing).
-    // Un tueur pour les keepers, deux contre des Invaders qu'un seul n'abat pas (remoteMining.killersWanted).
-    keeperKiller: remoteMining.killersWanted(room),
+    // Salle à keepers : mineurs et transporteurs n'y vont qu'avec son tueur, demandé plus haut (remoteMining.missing).
     // Transporteur avant mineur, comme dans la salle : les deux alternent source par source.
     remoteHauler: (roomCounts.remoteHauler || 0) + (remoteNeed.hauler ? 1 : 0),
     remoteMiner: (roomCounts.remoteMiner || 0) + (remoteNeed.miner ? 1 : 0),
