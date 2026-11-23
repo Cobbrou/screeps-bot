@@ -7,7 +7,7 @@ Object.assign(global, {
   BODYPART_COST: { move: 50, work: 100, carry: 50, attack: 80, ranged_attack: 150, heal: 250, claim: 600 },
   SOURCE_ENERGY_NEUTRAL_CAPACITY: 1500, SOURCE_ENERGY_CAPACITY: 3000, SOURCE_ENERGY_KEEPER_CAPACITY: 4000,
   ENERGY_REGEN_TIME: 300, HARVEST_POWER: 2, CONTROLLER_RESERVE_MAX: 5000, CARRY_CAPACITY: 50, CREEP_LIFE_TIME: 1500,
-  CONTAINER_CAPACITY: 2000, RANGED_ATTACK_POWER: 10, HEAL_POWER: 12,
+  CONTAINER_CAPACITY: 2000, RANGED_ATTACK_POWER: 10, HEAL_POWER: 12, CREEP_SPAWN_TIME: 3,
 });
 // Modules qui chargent le reste du bot : remplacés par des modules vides.
 for (const name of ['move', 'sources', 'defense']) {
@@ -89,6 +89,21 @@ assert.strictEqual(intel.reopenIn('E25S4'), 0);
 Memory.rooms.E25S4.intel.hostile = Game.time - 500;
 assert.strictEqual(intel.reopenIn('E25S4'), 1001);
 assert.strictEqual(intel.reopenIn('E25S2'), Infinity);
+// Invaders qu'aucun groupe de tueurs n'abat (2026-11-23 : 300 de soin) : pas de tueur, sauf à moins de son spawn
+// et de son trajet de leur mort, pour qu'il soit là à la réouverture.
+Game.map = { describeExits: () => ({ 5: 'E25S4' }) };
+const e25s3 = { name: 'E25S3', controller: { level: 7 }, energyCapacityAvailable: 5600 };
+Memory.rooms.E25S4.intel.invader = true;
+Memory.rooms.E25S4.intel.force = { heal: 300, damage: 60, hits: 4000, creeps: [
+  { heal: 0, damage: 30, hits: 1000 }, { heal: 0, damage: 30, hits: 1000 },
+  { heal: 240, damage: 0, hits: 1000 }, { heal: 60, damage: 0, hits: 1000 }] };
+assert.strictEqual(remoteMining.killersWanted(e25s3), 0);
+Memory.rooms.E25S4.intel.hostile = Game.time - 1400;
+assert.strictEqual(remoteMining.killersWanted(e25s3), 1);
+assert.strictEqual(remoteMining.keeperRooms(e25s3)[0], 'E25S4');
+Memory.rooms.E25S4.intel.hostile = Game.time - 500;
+Memory.rooms.E25S4.intel.invader = false;
+Memory.rooms.E25S4.intel.force = null;
 
 // Route pavée : aller-retour = 2 fois le chemin gardé, plus les sorties et le conteneur (sans pathfinding).
 const home = { memory: { remoteRoads: { a: { path: { E25S3: [1, 2, 3], E25S4: [4, 5] }, done: true } } } };

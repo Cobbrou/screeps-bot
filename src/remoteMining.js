@@ -19,6 +19,11 @@ const KILLER_DAMAGE = KILLER_BODY.filter((part) => part === RANGED_ATTACK).lengt
 // Soin du tueur sur lui-même par tick (108) et PV neufs (100 par partie : 4 600).
 const KILLER_HEAL = KILLER_BODY.filter((part) => part === HEAL).length * HEAL_POWER;
 const KILLER_HITS = KILLER_BODY.length * 100;
+// Avance du tueur sur la réouverture d'une salle à keepers fermée par des Invaders qu'il n'abat pas : son spawn (138 ticks)
+// plus le trajet. Demandé seulement à la réouverture, il arrivait ~180 ticks après, mineurs et transporteurs à l'attendre
+// (E25S4, 2026-11-23). Spawné en avance, il attend chez lui qu'elle rouvre (keeperKiller : combat jugé perdu).
+// ponytail: trajet fixe (39 ticks notés vers E25S4) ; lire memory.travel du dernier tueur si d'autres salles à keepers.
+const KILLER_LEAD = KILLER_BODY.length * CREEP_SPAWN_TIME + 50;
 // Un créep de la salle à keepers s'écarte d'un keeper, ou d'un antre qui le fait réapparaître dans moins de LAIR_WARN ticks,
 // jusqu'à DODGE_RANGE cases : le keeper tire à portée 3 et ne s'approche que de sa source.
 const LAIR_WARN = 20;
@@ -97,22 +102,28 @@ function huntable(name, hits = KILLER_HITS, n = 1) {
   return true;
 }
 
+// Vrai si la salle à keepers rouvrira d'elle-même dans moins de KILLER_LEAD ticks (mort des Invaders, intel.reopenIn).
+function reopenSoon(name) {
+  const left = intel.reopenIn(name);
+  return intel.keeperRoom(name) && left > 0 && left <= KILLER_LEAD;
+}
+
 // Tueurs voulus pour la salle à keepers : 1 pour les keepers, contre des Invaders le plus petit nombre qui les abat
-// (MAX_KILLERS au plus), 0 si aucun.
+// (MAX_KILLERS au plus), sinon 1 s'ils meurent bientôt (reopenSoon), 0 avant.
 function killers(name) {
   if (!intel.keeperInvaded(name)) return 1;
   for (let n = 1; n <= MAX_KILLERS; n++) if (huntable(name, KILLER_HITS, n)) return n;
-  return 0;
+  return reopenSoon(name) ? 1 : 0;
 }
 
 // Salles à keepers exploitées : chacune veut un tueur. Celle que des Invaders ferment (intel.keeperInvaded) aussi,
 // si MAX_KILLERS tueurs peuvent les abattre (huntable) : rooms() l'écarte, mais les tueurs vont la rouvrir
-// sans attendre HOSTILE_COOLDOWN.
+// sans attendre HOSTILE_COOLDOWN ; sinon dès qu'elle rouvre bientôt (reopenSoon) : le tueur y sera à sa réouverture.
 function keeperRooms(room) {
   const list = rooms(room).filter((name) => intel.keeperRoom(name));
   if (room.controller.level < MIN_RCL || room.energyCapacityAvailable < KILLER_COST) return list;
   const invaded = Object.values(Game.map.describeExits(room.name) || {})
-    .filter((name) => huntable(name, KILLER_HITS, MAX_KILLERS) && !list.includes(name));
+    .filter((name) => (huntable(name, KILLER_HITS, MAX_KILLERS) || reopenSoon(name)) && !list.includes(name));
   return [...invaded, ...list];
 }
 
