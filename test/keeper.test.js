@@ -117,4 +117,18 @@ assert.ok(remoteMining.containable({ room: { name: 'E25S2' } }));
 sources.spots = () => 2;
 assert.ok(remoteMining.containable({ room: { name: 'E25S4' } }));
 
+// Transporteur vide à recycler, salle fermée : il ne repart pas vers sa source (le dernier déplacement demandé l'emporte).
+global.RESOURCE_ENERGY = 'energy';
+const haulerPath = require.resolve('../src/roles/hauler');
+require.cache[haulerPath] = { id: haulerPath, filename: haulerPath, loaded: true, exports: {} };
+const remoteHauler = require('../src/roles/remoteHauler');
+const real = Object.assign({}, remoteMining);
+Object.assign(remoteMining, { safe: () => false, dodge: () => false, recycle: () => true, retreat: () => assert.fail('retreat') });
+global.RoomPosition = class { constructor(x, y, roomName) { Object.assign(this, { x, y, roomName }); } };
+require('../src/move').to = () => assert.fail('collect');
+remoteHauler.run({
+  room: { name: 'E25S3' }, memory: { x: 1, y: 1, target: 'E25S4' }, store: { energy: 0, getFreeCapacity: () => 50 },
+});
+Object.assign(remoteMining, real);
+
 console.log('keeper : ok');

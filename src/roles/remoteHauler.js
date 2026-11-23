@@ -45,6 +45,8 @@ module.exports.run = function (creep) {
   const safe = remoteMining.safe(creep);
   if (remoteMining.dodge(creep)) return;
   if (creep.memory.working || (!safe && creep.store[RESOURCE_ENERGY])) deliver(creep);
-  else if (!safe && !remoteMining.recycle(creep)) remoteMining.retreat(creep);
-  else collect(creep);
+  // Recyclage en cours : surtout pas de collect, son déplacement remplacerait celui vers le spawn. Le 2026-11-23,
+  // 7 transporteurs à recycler repartaient ainsi vers leur source et sont morts dans E25S4 fermée.
+  else if (safe) collect(creep);
+  else if (!remoteMining.recycle(creep)) remoteMining.retreat(creep);
 };
