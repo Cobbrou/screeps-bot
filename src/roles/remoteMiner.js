@@ -8,6 +8,7 @@ const REPAIR_RATIO = 0.5;
 // Rejoint sa source dans une salle voisine et la récolte sans fin. Son CARRY sert au conteneur :
 // à l'arrivée, il pose le chantier sur sa case (à côté de la source, du côté de la maison) et le construit
 // dès que son CARRY est plein ; ensuite il se tient dessus et le répare quand il est abîmé.
+// Aucun chantier là où un keeper le détruirait (remoteMining.containable).
 // Le reste de la récolte tombe dans le conteneur (au sol tant qu'il n'existe pas), où les remoteHauler le ramassent.
 // Salle devenue dangereuse : rentre et attend, ou se recycle s'il mourra avant sa réouverture (remoteMining.recycle).
 module.exports.run = function (creep) {
@@ -46,7 +47,8 @@ module.exports.run = function (creep) {
     return;
   }
   const carrying = creep.store[RESOURCE_ENERGY];
-  if (!box) {
+  const target = Game.getObjectById(creep.memory.sourceId);
+  if (!box && target && remoteMining.containable(target)) {
     const site = pos.findInRange(FIND_CONSTRUCTION_SITES, 1, {
       filter: (s) => s.structureType === STRUCTURE_CONTAINER,
     })[0];
@@ -57,10 +59,9 @@ module.exports.run = function (creep) {
       creep.build(site);
       return;
     }
-  } else if (carrying && box.hits < box.hitsMax * REPAIR_RATIO) {
+  } else if (box && carrying && box.hits < box.hitsMax * REPAIR_RATIO) {
     creep.repair(box);
     return;
   }
-  const target = Game.getObjectById(creep.memory.sourceId);
   if (target) sources.harvestSource(creep, target);
 };

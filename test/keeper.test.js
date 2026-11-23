@@ -109,4 +109,12 @@ Memory.rooms.E25S4.intel.force = null;
 const home = { memory: { remoteRoads: { a: { path: { E25S3: [1, 2, 3], E25S4: [4, 5] }, done: true } } } };
 assert.strictEqual(remoteMining.trip(home, { id: 'a', x: 1, y: 1, room: 'E25S4' }), 2 * (5 + 3));
 
+// Source d'une salle à keepers à une seule case libre : pas de conteneur (chantier détruit par le keeper) ; ailleurs, oui.
+const sources = require('../src/sources');
+sources.spots = () => 1;
+assert.ok(!remoteMining.containable({ room: { name: 'E25S4' } }));
+assert.ok(remoteMining.containable({ room: { name: 'E25S2' } }));
+sources.spots = () => 2;
+assert.ok(remoteMining.containable({ room: { name: 'E25S4' } }));
+
 console.log('keeper : ok');

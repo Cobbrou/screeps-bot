@@ -226,6 +226,13 @@ function container(source) {
   })[0];
 }
 
+// Faux si la source d'une salle à keepers n'a qu'une case libre : son keeper s'y poste à chaque réapparition (~300 ticks)
+// et détruit le chantier en marchant dessus, le mineur seul ne finit pas 5 000 points entre deux. Le 2026-11-23 sur E25S4,
+// 16 chantiers détruits vers 2 650 en 7 600 ticks : 34 650 d'énergie perdus. Sa récolte reste au sol.
+function containable(source) {
+  return !intel.keeperRoom(source.room.name) || sources.spots(source) > 1;
+}
+
 // Vrai si réserver la salle rapporte plus que le reserver ne coûte : 5 énergie/tick de plus par source,
 // moins l'entretien des transporteurs qui les rapportent, contre le corps du reserver sur sa vie utile
 // (CREEP_CLAIM_LIFE_TIME moins l'aller). Il faut aussi pouvoir payer le corps (RCL 4).
@@ -436,7 +443,7 @@ function roadWork(room) {
 }
 
 module.exports = {
-  RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, killersWanted, huntable, lairs, dodge, container, missing, income, safe, invaded, retreat, recycle,
+  RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, killersWanted, huntable, lairs, dodge, container, containable, missing, income, safe, invaded, retreat, recycle,
   roads, paved, roadWork, roadCells, trip,
 };
 
