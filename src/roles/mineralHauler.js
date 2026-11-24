@@ -2,6 +2,7 @@ const move = require('../move');
 const sources = require('../sources');
 const mineralMiner = require('./mineralMiner');
 const boost = require('../boost');
+const remoteMining = require('../remoteMining');
 
 // Charge d'un voyage (corps du spawner) et stock du conteneur qui justifie un voyage.
 const LOAD = 500;
@@ -98,7 +99,8 @@ function unload(creep, held) {
 // le conteneur et le terminal attendent.
 // Pas plein à côté du conteneur du minerai (tas ramassé à son pied, posé par le mineur quand il déborde) : complète
 // son chargement avant de livrer, pas d'aller-retour pour quelques unités.
-// Rien à prendre : attend le prochain voyage tant qu'un mineur est voulu, sinon se suicide.
+// Rien à prendre : attend le prochain voyage tant qu'un mineur est voulu, sinon se recycle au spawn.
+// Le suicide ne rend presque rien : 9 transporteurs de boost en 14 300 ticks le 2026-11-24, ~775 d'énergie perdus chacun.
 function run(creep) {
   const room = creep.room;
   const held = carried(creep);
@@ -113,7 +115,7 @@ function run(creep) {
   const next = leftover(creep) || job(room, true);
   if (next) {
     take(creep, next);
-  } else if (!mineralMiner.wanted(room)) {
+  } else if (!mineralMiner.wanted(room) && !remoteMining.goRecycle(creep, room)) {
     creep.suicide();
   }
 }

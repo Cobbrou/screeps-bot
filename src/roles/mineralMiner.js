@@ -1,5 +1,6 @@
 const move = require('../move');
 const sources = require('../sources');
+const remoteMining = require('../remoteMining');
 
 // Au-delà de ce stock (stockage et terminal), plus de nouveau mineur : les ventes ne suivent pas.
 const MINERAL_STOCK = 100000;
@@ -16,12 +17,15 @@ function wanted(room) {
 }
 
 // Se poste sur le conteneur du minerai et récolte à chaque fin de recharge de l'extracteur.
-// Gisement épuisé (il se régénère en 50 000 ticks) : se suicide au lieu de coûter son entretien.
+// Gisement épuisé (il se régénère en 50 000 ticks) : se recycle au spawn au lieu de coûter son entretien.
 function run(creep) {
   const mineral = creep.room.find(FIND_MINERALS)[0];
   const box = mineral && sources.container(mineral);
   if (!box) return;
-  if (!mineral.mineralAmount) return creep.suicide();
+  if (!mineral.mineralAmount) {
+    if (!remoteMining.goRecycle(creep, creep.room)) creep.suicide();
+    return;
+  }
   if (!creep.pos.isEqualTo(box.pos)) return move.to(creep, box.pos, { range: 0 });
   const site = extractor(mineral);
   // Conteneur plein : la récolte tomberait au sol.
