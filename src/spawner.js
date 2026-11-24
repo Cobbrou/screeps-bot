@@ -493,6 +493,12 @@ module.exports.run = function () {
       const units = Math.max(1, Math.ceil(share / (ratio * CARRY_CAPACITY)));
       energy = Math.min(energy, units * (ratio * BODYPART_COST[CARRY] + BODYPART_COST[MOVE]));
     }
+    // Transporteur distant : la capacité qui manque à sa source (remoteMining.missing), pas le corps plein.
+    if (role === 'remoteHauler') {
+      const ratio = remoteMining.paved(room, memory.sourceId) ? 2 : 1;
+      const units = Math.ceil(remoteNeed.haulerCarry / (ratio * CARRY_CAPACITY));
+      energy = Math.min(energy, units * (ratio * BODYPART_COST[CARRY] + BODYPART_COST[MOVE]));
+    }
     // Filler : de quoi remplir la moitié de la capacité de la salle par trajet.
     if (role === 'filler') {
       const ratio = haulerRatio(room);

@@ -119,6 +119,26 @@ Memory.rooms.E25S4.intel.force = null;
 const home = { memory: { remoteRoads: { a: { path: { E25S3: [1, 2, 3], E25S4: [4, 5] }, done: true } } } };
 assert.strictEqual(remoteMining.trip(home, { id: 'a', x: 1, y: 1, room: 'E25S4' }), 2 * (5 + 3));
 
+// Transport d'une source : besoin (aller-retour 16 × débit des 9 WORK), transporteur taillé au manque avec la marge ;
+// renfort seulement conteneur plein, plus rien une fois la marge atteinte.
+Object.assign(home, { name: 'E25S3', controller: { level: 7 }, energyCapacityAvailable: 5600 });
+Game.creeps = { k: { memory: { role: 'keeperKiller', target: 'E25S4' } } };
+Object.assign(Memory.rooms.E25S4.intel, { hostile: 0, reserved: null });
+global.FIND_STRUCTURES = 107;
+const need = 16 * 4000 / 300;
+const haul = (carry, free) => {
+  global.RESOURCE_ENERGY = 'energy';
+  global.RoomPosition = class { findInRange() { return [{ store: { energy: 2000 - free, getFreeCapacity: () => free } }]; } };
+  Game.rooms.E25S4 = {};
+  const m = remoteMining.missing(home, { a: { work: 9, carry } }, {});
+  delete Game.rooms.E25S4;
+  return m.hauler && m.haulerCarry;
+};
+assert.strictEqual(haul(0, 1000), need * 1.5);
+assert.strictEqual(haul(250, 800), undefined);
+assert.strictEqual(haul(250, 0), need * 1.5 - 250);
+assert.strictEqual(haul(350, 0), undefined);
+
 // Source d'une salle à keepers à une seule case libre : pas de conteneur (chantier détruit par le keeper) ; ailleurs, oui.
 const sources = require('../src/sources');
 sources.spots = () => 1;

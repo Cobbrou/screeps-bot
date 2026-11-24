@@ -41,12 +41,11 @@ const RESERVER_COST = RESERVER_UNITS * (BODYPART_COST[CLAIM] + BODYPART_COST[MOV
 const RESERVE_REFILL = CONTROLLER_RESERVE_MAX - 2000;
 // Énergie/tick d'entretien d'un transporteur [CARRY, MOVE] par énergie/tick transportée, par tick d'aller-retour.
 const HAUL_UPKEEP = (BODYPART_COST[CARRY] + BODYPART_COST[MOVE]) / (CARRY_CAPACITY * CREEP_LIFE_TIME);
-// Énergie dans le conteneur d'une source distante au-delà de laquelle on ajoute un transporteur.
-const HAUL_BACKLOG = CONTAINER_CAPACITY / 2;
-// Ce renfort s'arrête à ce multiple du besoin : sans plafond, chaque pic du conteneur (fuite devant un keeper, réouverture
-// après une invasion) ajoutait un transporteur de 2 500 pour 1 500 ticks. Le 2026-11-22 sur E25S4, jusqu'à 11 pour
-// 3 sources, et 4 (2,75 fois le besoin) sur la source la plus proche.
-const HAUL_BACKLOG_RATIO = 2;
+// Capacité visée pour les transporteurs d'une source, en multiple du besoin (ticks de ramassage et de livraison, attentes
+// devant un keeper, tombes des keepers abattus). Elle plafonne le renfort (conteneur plein) et taille chaque transporteur
+// au manque. Le 2026-11-24 sur E25S4, un renfort au corps plein (2 500) dès 1 000 d'énergie au conteneur, ce qu'un
+// aller-retour normal y laisse déjà : 9 800 de capacité pour ~5 250 utiles, immobiles un quart de leur vie.
+const HAUL_MARGIN = 1.5;
 
 // Aller-retour d'un transporteur 1:1 entre le spawn et chaque source distante (vide : 1 tick par case ;
 // chargé : 1 en plaine, 5 en marais), null si injoignable. Gardé jusqu'au reset du global. Route pavée : voir trip.
@@ -253,7 +252,8 @@ function needsReserve(name) {
 }
 
 // Première source distante sans mineur vivant, première dont les transporteurs portent moins que son débit réel
-// sur l'aller-retour (ou dont le conteneur déborde, jusqu'à HAUL_BACKLOG_RATIO fois ce besoin), et première salle à réserver sans reserver vivant.
+// sur l'aller-retour (ou dont le conteneur est plein, jusqu'à HAUL_MARGIN fois ce besoin) avec la capacité qui manque
+// (`haulerCarry`), et première salle à réserver sans reserver vivant.
 // `remote` : WORK et capacité CARRY vivants par source ; `reservers` : reservers vivants par salle visée.
 function missing(room, remote, reservers) {
   const result = {};
@@ -269,8 +269,9 @@ function missing(room, remote, reservers) {
     const box = container(source);
     const need = trip(room, source) * flow;
     if (!result.hauler && r.work && (r.carry < need
-      || (box && box.store[RESOURCE_ENERGY] > HAUL_BACKLOG && r.carry < need * HAUL_BACKLOG_RATIO))) {
+      || (box && !box.store.getFreeCapacity(RESOURCE_ENERGY) && r.carry < need * HAUL_MARGIN))) {
       result.hauler = source;
+      result.haulerCarry = need * HAUL_MARGIN - r.carry;
     }
   }
   for (const name of rooms(room)) {
