@@ -89,14 +89,20 @@ assert.strictEqual(intel.reopenIn('E25S4'), 0);
 Memory.rooms.E25S4.intel.hostile = Game.time - 500;
 assert.strictEqual(intel.reopenIn('E25S4'), 1001);
 assert.strictEqual(intel.reopenIn('E25S2'), Infinity);
-// Invaders qu'aucun groupe de tueurs n'abat (2026-11-23 : 300 de soin) : pas de tueur, sauf à moins de son spawn
-// et de son trajet de leur mort, pour qu'il soit là à la réouverture.
+// Invaders du 2026-11-23 (300 de soin) : trois tueurs, un seul à moins de son spawn et de son trajet de leur mort.
+// Invaders qu'aucun groupe de tueurs n'abat (900 de soin) : pas de tueur, sauf à ce moment-là, pour qu'il soit là
+// à la réouverture.
 Game.map = { describeExits: () => ({ 5: 'E25S4' }) };
 const e25s3 = { name: 'E25S3', controller: { level: 7 }, energyCapacityAvailable: 5600 };
 Memory.rooms.E25S4.intel.invader = true;
 Memory.rooms.E25S4.intel.force = { heal: 300, damage: 60, hits: 4000, creeps: [
   { heal: 0, damage: 30, hits: 1000 }, { heal: 0, damage: 30, hits: 1000 },
   { heal: 240, damage: 0, hits: 1000 }, { heal: 60, damage: 0, hits: 1000 }] };
+assert.strictEqual(remoteMining.killersWanted(e25s3), 3);
+Memory.rooms.E25S4.intel.hostile = Game.time - 1400;
+assert.strictEqual(remoteMining.killersWanted(e25s3), 1);
+Memory.rooms.E25S4.intel.hostile = Game.time - 500;
+Memory.rooms.E25S4.intel.force = { heal: 900, damage: 0, hits: 1000 };
 assert.strictEqual(remoteMining.killersWanted(e25s3), 0);
 Memory.rooms.E25S4.intel.hostile = Game.time - 1400;
 assert.strictEqual(remoteMining.killersWanted(e25s3), 1);

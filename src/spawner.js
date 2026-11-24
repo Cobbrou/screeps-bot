@@ -236,7 +236,7 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     remoteDefender: remoteMining.invaded(room) ? 1 : 0,
     // Tueur de keepers avant builders et upgraders : son successeur part à temps (remplacé à l'avance selon son trajet).
     // Placé après eux, l'upgrader prenait le spawn libéré et la salle à keepers restait ~85 ticks sans tueur (E25S4, 2026-11-23).
-    // Un tueur pour les keepers, deux contre des Invaders qu'un seul n'abat pas (remoteMining.killersWanted).
+    // Un tueur pour les keepers, jusqu'à trois contre des Invaders qu'un seul n'abat pas (remoteMining.killersWanted).
     keeperKiller: remoteMining.killersWanted(room),
     // Builders avant upgraders : chaque structure (extensions d'abord) améliore la salle plus tôt.
     builder,

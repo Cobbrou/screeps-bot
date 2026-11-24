@@ -78,7 +78,9 @@ function minerWork(name) {
 
 // Tueurs envoyés ensemble au plus contre des Invaders : deux abattent le groupe boosté du 2026-11-21 (2 tireurs
 // XKHO2, healer XLHO2 : 240 de soin et de tir) qui tuait un tueur seul en ~34 ticks (simulation : gagné en ~29 ticks).
-const MAX_KILLERS = 2;
+// Trois : 5 raids sur 7 du 2026-11-23 et 24 soignaient 300 à 360 par tick, au-dessus des 280 de deux tueurs, et fermaient
+// E25S4 jusqu'à leur mort (1 500 ticks). ponytail: quatre en gagneraient ~15 % de plus, à revoir si de tels raids arrivent.
+const MAX_KILLERS = 3;
 
 // Salle à keepers fermée par des Invaders que `n` tueurs peuvent abattre (intel `force`). Estimation prudente :
 // ils tombent un à un, healers d'abord (le plus de soin en premier), sous le soin de tous les healers encore en vie,
@@ -107,12 +109,12 @@ function reopenSoon(name) {
   return intel.keeperRoom(name) && left > 0 && left <= KILLER_LEAD;
 }
 
-// Tueurs voulus pour la salle à keepers : 1 pour les keepers, contre des Invaders le plus petit nombre qui les abat
-// (MAX_KILLERS au plus), sinon 1 s'ils meurent bientôt (reopenSoon), 0 avant.
+// Tueurs voulus pour la salle à keepers : 1 pour les keepers, ou si les Invaders meurent bientôt (reopenSoon : des renforts
+// n'arriveraient qu'après eux), sinon le plus petit nombre qui les abat (MAX_KILLERS au plus), 0 s'il n'y en a pas.
 function killers(name) {
-  if (!intel.keeperInvaded(name)) return 1;
+  if (!intel.keeperInvaded(name) || reopenSoon(name)) return 1;
   for (let n = 1; n <= MAX_KILLERS; n++) if (huntable(name, KILLER_HITS, n)) return n;
-  return reopenSoon(name) ? 1 : 0;
+  return 0;
 }
 
 // Salles à keepers exploitées : chacune veut un tueur. Celle que des Invaders ferment (intel.keeperInvaded) aussi,

@@ -35,7 +35,7 @@ function regroup(creep, mates) {
 // même si le combat était jugé perdu.
 // Combat jugé sur les tueurs vivants de la salle et les PV du plus entamé (remoteMining.huntable, revu à chaque tick) :
 // perdu, ou salle dangereuse autrement (joueur, forteresse), ils rentrent, se soignent et attendent (le spawner envoie
-// le second tueur qui manque), ou se recyclent s'ils mourront avant sa réouverture (remoteMining.recycle) ; gagnable, ils y vont groupés (regroup).
+// les tueurs qui manquent), ou se recyclent s'ils mourront avant sa réouverture (remoteMining.recycle) ; gagnable, ils y vont groupés (regroup).
 // Combat fini : ceux de trop se recyclent, le plus jeune sur place reste (remoteMining.surplus).
 // ponytail: il ignore le keeper du minerai.
 module.exports.run = function (creep) {
