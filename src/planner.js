@@ -802,7 +802,7 @@ module.exports.run = function () {
     for (const path of paths) if (path) planRoad(room, path, roads);
     // Routes de service des extensions et tours, après les routes principales.
     if (roads) planRoad(room, serviceRoads(room, spawn, costs), true);
-    // Routes des sources distantes dont le conteneur est construit, en même temps que celles de la salle :
+    // Routes des sources distantes (remoteMining.roads), en même temps que celles de la salle :
     // la partie dans la salle passe par planRoad (places et priorité des chantiers), le reste par planRemoteRoad.
     if (roads) {
       const posted = {};

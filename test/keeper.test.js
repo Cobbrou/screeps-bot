@@ -146,6 +146,11 @@ assert.ok(!remoteMining.containable({ room: { name: 'E25S4' } }));
 assert.ok(remoteMining.containable({ room: { name: 'E25S2' } }));
 sources.spots = () => 2;
 assert.ok(remoteMining.containable({ room: { name: 'E25S4' } }));
+// Route : sans conteneur, seulement vers la source qui n'en aura jamais.
+Game.getObjectById = () => ({ room: { name: 'E25S4' } });
+assert.deepStrictEqual(remoteMining.roads(home), []);
+sources.spots = () => 1;
+assert.deepStrictEqual(remoteMining.roads(home), [home.memory.remoteRoads.a.path]);
 
 // Transporteur vide à recycler, salle fermée : il ne repart pas vers sa source (le dernier déplacement demandé l'emporte).
 global.RESOURCE_ENERGY = 'energy';

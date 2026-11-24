@@ -343,17 +343,21 @@ function recycle(creep) {
 // Sous cette part de ses points de vie, une route distante est réparée par le remoteBuilder (pas de tour hors de nos salles).
 const ROAD_REPAIR_RATIO = 0.5;
 
-// Coûts d'une salle distante visible : routes et chantiers de route réutilisés, structures bloquantes contournées.
-function remoteCosts(room) {
+// Coûts d'une salle distante visible : routes et chantiers de route réutilisés, structures bloquantes contournées,
+// conteneurs des autres sources aussi (leur mineur y reste posté).
+function remoteCosts(room, source) {
   const costs = new PathFinder.CostMatrix();
   for (const o of [...room.find(FIND_STRUCTURES), ...room.find(FIND_MY_CONSTRUCTION_SITES)]) {
-    if (o.structureType === STRUCTURE_ROAD) costs.set(o.pos.x, o.pos.y, move.PLAN_COSTS.road);
-    else if (OBSTACLE_OBJECT_TYPES.includes(o.structureType)) costs.set(o.pos.x, o.pos.y, 255);
+    const post = o.structureType === STRUCTURE_CONTAINER && !o.pos.inRangeTo(source.x, source.y, 1);
+    if (post || OBSTACLE_OBJECT_TYPES.includes(o.structureType)) costs.set(o.pos.x, o.pos.y, 255);
+    else if (o.structureType === STRUCTURE_ROAD && costs.get(o.pos.x, o.pos.y) !== 255) {
+      costs.set(o.pos.x, o.pos.y, move.PLAN_COSTS.road);
+    }
   }
   return costs;
 }
 
-// Route du spawn jusqu'à une source distante dont le conteneur existe : { salle: [cases x * 50 + y] } dans l'ordre
+// Route du spawn jusqu'à une source distante (voir roads) : { salle: [cases x * 50 + y] } dans l'ordre
 // du trajet, conteneur exclu, gardée dans room.memory.remoteRoads[id].path. Elle ne passe que par la salle
 // et la salle distante ; dans la salle, `homeCosts` (matrice du planner) lui fait éviter les cases du plan.
 // Recalculée si une case est devenue bloquante. Renvoie le chemin, ou undefined.
@@ -363,7 +367,7 @@ function roadPath(room, source, homeCosts) {
   const callback = (name) => {
     if (name === room.name) return homeCosts;
     if (name !== source.room) return false;
-    return Game.rooms[name] ? remoteCosts(Game.rooms[name]) : new PathFinder.CostMatrix();
+    return Game.rooms[name] ? remoteCosts(Game.rooms[name], source) : new PathFinder.CostMatrix();
   };
   const blocked = saved && Object.keys(saved.path).some((name) => {
     const costs = Game.rooms[name] && callback(name);
@@ -388,7 +392,9 @@ function roadPath(room, source, homeCosts) {
   return path;
 }
 
-// Routes à poser pour la récolte distante : par source distante dont le conteneur est construit, son chemin.
+// Routes à poser pour la récolte distante : par source distante dont le conteneur est construit, ou qui n'en aura jamais
+// (containable), son chemin. Le 2026-11-24, la source d'E25S4 à une seule case, sans route, occupait 21 transporteurs
+// 1:1 (1 250 au lieu de 1 650 pour 2 500) sur 48.
 // Note `done` quand toutes ses cases ont une route (salles visibles) : les transporteurs passent alors à 2 CARRY par MOVE.
 // Les chemins des sources qui ne sont plus exploitées sont oubliés, pas ceux d'une salle seulement fermée.
 function roads(room, homeCosts) {
@@ -402,7 +408,8 @@ function roads(room, homeCosts) {
     if (!remote || intel.safe(remote)) delete memory[id];
   }
   const paths = [];
-  for (const source of all.filter((s) => container(s))) {
+  const bare = (s) => { const source = Game.getObjectById(s.id); return source && !containable(source); };
+  for (const source of all.filter((s) => container(s) || bare(s))) {
     const path = roadPath(room, source, homeCosts);
     if (!path) continue;
     paths.push(path);
