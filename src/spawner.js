@@ -306,11 +306,13 @@ function buildBody(role, energy, room, sourceId, target) {
   }
   // Rôles distants, hors route : un MOVE par partie, une case par tick (chargé pour le transporteur).
   // Mineur distant : un CARRY pour construire et réparer son conteneur, plus de quoi vider la source
-  // (3 WORK non réservée, 5 réservée : 550 → 3 WORK, 850 → 5 WORK).
+  // (3 WORK non réservée, 5 réservée : 550 → 3 WORK, 850 → 5 WORK). CARRY en dernier : les premières parties tombent
+  // d'abord, et en tête il était détruit par le premier tir de keeper. Le 2026-11-24 sur E25S4, un mineur sans CARRY est
+  // resté 2 299 ticks sur son conteneur sans le réparer, jusqu'à le perdre (4 995 d'énergie pour le refaire).
   if (role === 'remoteMiner') {
     const carry = cost([CARRY, MOVE]);
     const work = repeat([WORK, MOVE], Math.min(energy - carry, remoteMining.minerWork(target) * cost([WORK, MOVE])));
-    return work.length ? [CARRY, MOVE, ...work] : [];
+    return work.length ? [...work, MOVE, CARRY] : [];
   }
   if (role === 'reserver') {
     const unit = remoteMining.RESERVER_UNIT;
