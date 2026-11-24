@@ -3,6 +3,7 @@ const remoteMining = require('./remoteMining');
 const minCut = require('./minCut');
 const defense = require('./defense');
 const boost = require('./boost');
+const upgraders = require('./roles/upgrader');
 const { PLAN_COSTS } = require('./move');
 
 // Le plan est recalculé tous les INTERVAL ticks : les chantiers manquants sont recréés.
@@ -290,10 +291,40 @@ function planCorners(room, spawn, plan, costs) {
   }
 }
 
+// Case du lien du hub : case libre à portée 2 du stockage qui touche le plus de postes d'upgraders, ou undefined.
+function hubLinkCell(storage, posts, free) {
+  let hub;
+  let best = 0;
+  for (const k of around(storage, 2).filter(free)) {
+    const n = posts.filter((p) => range(p, k) === 1).length;
+    if (n > best) {
+      best = n;
+      hub = k;
+    }
+  }
+  return hub;
+}
+
+// Lien du hub que plus aucun poste ne touche (route construite depuis sur ces postes) : personne ne le vide, la source
+// liée n'envoie plus rien. Sa case change au plan, l'ancien lien est détruit et buildPlan pose le nouveau.
+// Seulement avec de quoi le reconstruire au stockage ; destroy() refuse (ERR_BUSY) avec un créep hostile dans la salle.
+function moveHubLink(room, plan, posts, free, costs) {
+  const old = plan.link[0];
+  if (posts.some((p) => range(p, old) === 1)) return;
+  const hub = hubLinkCell(plan.hub.storage, posts, free);
+  if (hub === undefined || !room.storage || room.storage.store[RESOURCE_ENERGY] < CONSTRUCTION_COST[STRUCTURE_LINK]) return;
+  const pos = new RoomPosition(Math.floor(old / 50), old % 50, room.name);
+  const link = pos.lookFor(LOOK_STRUCTURES).find((s) => s.structureType === STRUCTURE_LINK);
+  if (link && link.destroy() !== OK) return;
+  removeSites([pos], STRUCTURE_LINK);
+  plan.link[0] = hub;
+  costs.set(Math.floor(hub / 50), hub % 50, 255);
+}
+
 // Cases des liens, ajoutées une fois au plan (room.memory.plan.link) quand le stockage du hub et les routes
 // des sources sont connus. D'abord le lien du hub : case libre à portée 2 du stockage qui touche le plus de postes
-// d'upgraders (voisins du stockage, à portée 3 du contrôleur). Puis un lien par source, de la route la plus longue
-// à la plus courte, sur une case libre voisine du conteneur (bout de la route), si possible pas collée à la source.
+// d'upgraders (upgrader.posts), déplacée si plus aucun poste ne la touche (moveHubLink). Puis un lien par source,
+// de la route la plus longue à la plus courte, sur une case libre voisine du conteneur (bout de la route), si possible pas collée à la source.
 // La source la plus proche du spawn n'a pas de lien : ses haulers remplissent spawn et extensions, puis le stockage,
 // que les liens n'alimentent pas. Un plan d'avant cette règle perd sa dernière case (celle de cette source).
 // Pas de case pour le hub : liste vide, rien n'est reposé.
@@ -304,11 +335,11 @@ function planLinks(room, plan, costs) {
   const linked = Math.max(1, list.length - 1);
   if (plan.link) {
     plan.link.length = Math.min(plan.link.length, 1 + linked);
-    return;
+    if (!plan.link.length) return;
   }
   if (!plan.hub || plan.hub.storage === undefined) return;
   const routes = room.memory.routes || {};
-  if (!list.every((s) => routes[s.id])) return;
+  if (!plan.link && !list.every((s) => routes[s.id])) return;
   const terrain = room.getTerrain();
   const free = (k) => {
     const x = Math.floor(k / 50);
@@ -316,18 +347,12 @@ function planLinks(room, plan, costs) {
     return x >= 2 && x <= 47 && y >= 2 && y <= 47 && terrain.get(x, y) !== TERRAIN_MASK_WALL && costs.get(x, y) === 0;
   };
   const storage = plan.hub.storage;
-  const ctrl = room.controller.pos;
-  const posts = around(storage, 1).filter((p) => terrain.get(Math.floor(p / 50), p % 50) !== TERRAIN_MASK_WALL
-    && costs.get(Math.floor(p / 50), p % 50) !== 255 && ctrl.getRangeTo(Math.floor(p / 50), p % 50) <= 3);
-  let hub;
-  let best = 0;
-  for (const k of around(storage, 2).filter(free)) {
-    const n = posts.filter((p) => range(p, k) === 1).length;
-    if (n > best) {
-      best = n;
-      hub = k;
-    }
+  const posts = upgraders.posts(room, { pos: new RoomPosition(Math.floor(storage / 50), storage % 50, room.name) });
+  if (plan.link) {
+    moveHubLink(room, plan, posts, free, costs);
+    return;
   }
+  const hub = hubLinkCell(storage, posts, free);
   plan.link = [];
   if (hub === undefined) return;
   const take = (k) => {
@@ -839,3 +864,4 @@ module.exports.run = function () {
 
 module.exports.priority = priority;
 module.exports.orderTowers = orderTowers;
+module.exports.hubLinkCell = hubLinkCell;

@@ -70,14 +70,14 @@ function roam(creep) {
 // la case du dépôt comprise s'il est un conteneur (pas pour le tas, où les haulers se posent). Les cases de la route
 // du hub voisines du dépôt sont laissées aux haulers : sans elles, les upgraders entassés n'importe où autour
 // pouvaient fermer l'accès au conteneur. Sans route connue, la case la plus proche du spawn leur est laissée.
-// Recalculés une fois par tick et par salle.
+// Recalculés une fois par tick et par dépôt (le planner les demande aussi pour un stockage pas encore construit).
 const postCache = {};
 function posts(room, depot) {
+  const depotKey = depot.pos.x * 50 + depot.pos.y;
   const cached = postCache[room.name];
-  if (cached && cached.time === Game.time) return cached.list;
+  if (cached && cached.time === Game.time && cached.depotKey === depotKey) return cached.list;
   const terrain = room.getTerrain();
   const route = new Set((room.memory.routes && room.memory.routes[room.controller.id]) || []);
-  const depotKey = depot.pos.x * 50 + depot.pos.y;
   const cells = [];
   const roads = new Set();
   for (let dx = -1; dx <= 1; dx++) {
@@ -103,12 +103,13 @@ function posts(room, depot) {
       .sort((a, b) => spawn.pos.getRangeTo(Math.floor(a / 50), a % 50) - spawn.pos.getRangeTo(Math.floor(b / 50), b % 50))[0];
     list = cells.filter((k) => k !== lane);
   }
-  postCache[room.name] = { time: Game.time, list };
+  postCache[room.name] = { time: Game.time, depotKey, list };
   return list;
 }
 
 // Poste attribué à l'upgrader (creep.memory.post, case x * 50 + y) : gardé tant qu'il reste un poste
-// et qu'aucun autre upgrader de la salle ne l'a ; sinon le poste libre le plus proche. undefined si tout est pris.
+// et qu'aucun autre upgrader de la salle ne l'a ; sinon un poste libre, ceux qui touchent le lien du hub d'abord
+// (lui seul le vide), puis le plus proche. undefined si tout est pris.
 function post(creep, depot) {
   const list = posts(creep.room, depot);
   const taken = new Set(Object.values(Game.creeps)
@@ -117,7 +118,9 @@ function post(creep, depot) {
   let k = creep.memory.post;
   if (!list.includes(k) || taken.has(k)) {
     const range = (cell) => creep.pos.getRangeTo(Math.floor(cell / 50), cell % 50);
-    k = list.filter((cell) => !taken.has(cell)).sort((a, b) => range(a) - range(b))[0];
+    const link = sources.hubLink(creep.room);
+    const far = (cell) => (link && link.pos.getRangeTo(Math.floor(cell / 50), cell % 50) > 1 ? 50 : 0);
+    k = list.filter((cell) => !taken.has(cell)).sort((a, b) => far(a) + range(a) - far(b) - range(b))[0];
     creep.memory.post = k;
   }
   return k === undefined ? undefined : new RoomPosition(Math.floor(k / 50), k % 50, creep.room.name);
@@ -184,4 +187,4 @@ function spots(room) {
   return Math.max(1, posts(room, d).length);
 }
 
-module.exports = { run, paused, spots, builderWork, storageHigh };
+module.exports = { run, paused, posts, spots, builderWork, storageHigh };
