@@ -37,14 +37,23 @@ function deliver(creep) {
   hauler.deliver(creep);
 }
 
+// Fin de vie (remoteMining.ending) : vidé chez lui sans assez de vie pour un autre voyage, il se recycle (`last`, décidé
+// à ce moment seulement : en chemin, la vie qui baisse le ferait rebrousser) ; chargé à sa source, il rentre livrer sans
+// attendre le plein. Le 2026-11-24, 18 transporteurs sur 40 sont morts de vieillesse chargés (20 600 d'énergie,
+// dont 11 000 dans E25S4 où presque rien n'est repris).
 module.exports.run = function (creep) {
-  if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) creep.memory.working = false;
+  if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) {
+    creep.memory.working = false;
+    creep.memory.last = remoteMining.ending(creep, 1) || undefined;
+  }
   if (!creep.memory.working && creep.store.getFreeCapacity() === 0) creep.memory.working = true;
+  if (creep.store[RESOURCE_ENERGY] && creep.room.name === creep.memory.target && remoteMining.ending(creep, 0.5)) creep.memory.working = true;
 
   // Salle devenue dangereuse : il rapporte ce qu'il porte, sinon il attend chez lui (ou se recycle, remoteMining.recycle).
   const safe = remoteMining.safe(creep);
   if (remoteMining.dodge(creep)) return;
   if (creep.memory.working || (!safe && creep.store[RESOURCE_ENERGY])) deliver(creep);
+  else if (creep.memory.last && remoteMining.goRecycle(creep, Game.rooms[creep.memory.room])) return;
   // Recyclage en cours : surtout pas de collect, son déplacement remplacerait celui vers le spawn. Le 2026-11-23,
   // 7 transporteurs à recycler repartaient ainsi vers leur source et sont morts dans E25S4 fermée.
   else if (safe) collect(creep);

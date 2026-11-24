@@ -164,6 +164,25 @@ require('../src/move').to = () => assert.fail('collect');
 remoteHauler.run({
   room: { name: 'E25S3' }, memory: { x: 1, y: 1, target: 'E25S4' }, store: { energy: 0, getFreeCapacity: () => 50 },
 });
+// Transporteur en fin de vie (aller-retour 16) : vidé chez lui, il se recycle s'il n'a plus un aller-retour et sa marge ;
+// chargé à sa source, il rentre livrer dès qu'il n'a plus que le retour et sa marge.
+const seen = [];
+Object.assign(remoteMining, { safe: () => true, goRecycle: () => seen.push('recycle') });
+require('../src/move').to = () => { seen.push('move'); };
+require('../src/roles/hauler').deliver = () => seen.push('deliver');
+Game.rooms.E25S3 = home;
+const old = (ticksToLive, room, energy, working) => {
+  seen.length = 0;
+  const c = { ticksToLive, room: { name: room }, store: { energy, getFreeCapacity: () => 50, getCapacity: () => 50 + energy },
+    memory: { room: 'E25S3', target: 'E25S4', sourceId: 'a', x: 1, y: 1, working } };
+  remoteHauler.run(c);
+  return [c.memory.working, seen.join()];
+};
+assert.deepStrictEqual(old(57, 'E25S3', 0, true), [false, 'move']);
+assert.deepStrictEqual(old(56, 'E25S3', 0, true), [false, 'recycle']);
+assert.deepStrictEqual(old(56, 'E25S3', 0, false), [false, 'move']);
+assert.deepStrictEqual(old(48, 'E25S4', 10, false), [true, 'move']);
+delete Game.rooms.E25S3;
 // remoteBuilder rentré : encore sur la case de sortie, il garde son rôle (et son esquive) ; à l'intérieur, il devient builder.
 const remoteBuilder = require('../src/roles/remoteBuilder');
 const builder = (near) => ({ room: { name: 'E25S3' }, memory: { role: 'remoteBuilder', room: 'E25S3' }, pos: { inRangeTo: () => near } });

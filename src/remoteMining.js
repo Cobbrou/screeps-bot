@@ -321,6 +321,24 @@ function retreat(creep) {
   if (creep.room.name !== center.roomName || !creep.pos.inRangeTo(center, 20)) move.to(creep, center, { range: 20 });
 }
 
+// Ticks gardés en plus de l'aller-retour estimé par un transporteur en fin de vie : ramassage, livraison, détours.
+const END_MARGIN = 40;
+
+// Vrai si le transporteur n'a plus assez de vie pour `share` aller-retour à sa source (1 depuis chez lui, 1/2 pour rentrer).
+function ending(creep, share) {
+  const { room, target, sourceId, x, y } = creep.memory;
+  const home = Game.rooms[room];
+  return !!home && creep.ticksToLive <= (trip(home, { id: sourceId, x, y, room: target }) || 0) * share + END_MARGIN;
+}
+
+// Recycle le créep au spawn le plus proche (vers lequel il marche). Faux sans spawn.
+function goRecycle(creep, home) {
+  const spawn = creep.room.name === home.name ? creep.pos.findClosestByRange(FIND_MY_SPAWNS) : sources.mainSpawn(home);
+  if (!spawn) return false;
+  if (spawn.recycleCreep(creep) === ERR_NOT_IN_RANGE) move.to(creep, spawn, { range: 1 });
+  return true;
+}
+
 // Mineur, transporteur distant ou tueur de keepers (trajet noté en guise de demi aller-retour) qui mourra avant la réouverture de sa salle (intel.reopenIn, plus le demi aller-retour
 // pour retourner à sa source) : il se recycle au spawn le plus proche, qui rend l'énergie de sa vie restante dans
 // une pierre tombale (ramassée par les haulers), au lieu de l'attendre en pure perte. Le 2026-11-21 sur E25S4,
@@ -334,10 +352,7 @@ function recycle(creep) {
     ? (trip(home, { id: creep.memory.sourceId, x: creep.memory.x, y: creep.memory.y, room: name }) || 0) / 2
     : creep.memory.travel || 0;
   if (creep.ticksToLive >= intel.reopenIn(name) + back) return false;
-  const spawn = creep.room.name === home.name ? creep.pos.findClosestByRange(FIND_MY_SPAWNS) : sources.mainSpawn(home);
-  if (!spawn) return false;
-  if (spawn.recycleCreep(creep) === ERR_NOT_IN_RANGE) move.to(creep, spawn, { range: 1 });
-  return true;
+  return goRecycle(creep, home);
 }
 
 // Sous cette part de ses points de vie, une route distante est réparée par le remoteBuilder (pas de tour hors de nos salles).
@@ -453,7 +468,7 @@ function roadWork(room) {
 }
 
 module.exports = {
-  RESERVER_UNIT, RESERVER_UNITS, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, killersWanted, huntable, lairs, dodge, container, containable, missing, income, safe, invaded, retreat, recycle,
+  RESERVER_UNIT, RESERVER_UNITS, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, killersWanted, huntable, lairs, dodge, container, containable, missing, income, safe, invaded, retreat, recycle, goRecycle, ending,
   roads, paved, roadWork, roadCells, trip,
 };
 
