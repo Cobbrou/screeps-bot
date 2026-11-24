@@ -2,6 +2,11 @@ const move = require('../move');
 const sources = require('../sources');
 const remoteMining = require('../remoteMining');
 
+// Sur place, il répare toutes nos routes sous cette part de leurs points de vie, pas seulement celles sous ROAD_REPAIR_RATIO
+// qui l'ont fait créer : elles s'usent une à une. Le 2026-11-24 sur E25S4, 13 remoteBuilders (10 400 d'énergie) en
+// 14 300 ticks pour 760 d'énergie de réparation.
+const REPAIR_RATIO = 0.9;
+
 const isRoad = (s) => s.structureType === STRUCTURE_ROAD;
 
 // Énergie prise sur place : tas au sol, puis conteneur de source, sinon récolte de la source active la plus proche.
@@ -25,13 +30,13 @@ function refuel(creep) {
 }
 
 // Route de nos chemins à réparer : celle en cours jusqu'à réparation complète, sinon la plus proche
-// sous ROAD_REPAIR_RATIO.
+// sous REPAIR_RATIO.
 function damagedRoad(creep, home) {
   const current = Game.getObjectById(creep.memory.repairId);
   if (current && current.hits < current.hitsMax) return current;
   const cells = remoteMining.roadCells(home, creep.room.name);
   const road = creep.pos.findClosestByRange(FIND_STRUCTURES, {
-    filter: (s) => isRoad(s) && s.hits < s.hitsMax * remoteMining.ROAD_REPAIR_RATIO && cells.has(s.pos.x * 50 + s.pos.y),
+    filter: (s) => isRoad(s) && s.hits < s.hitsMax * REPAIR_RATIO && cells.has(s.pos.x * 50 + s.pos.y),
   });
   creep.memory.repairId = road ? road.id : undefined;
   return road;

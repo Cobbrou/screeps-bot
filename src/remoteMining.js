@@ -453,7 +453,7 @@ function roadWork(room) {
 }
 
 module.exports = {
-  RESERVER_UNIT, RESERVER_UNITS, ROAD_REPAIR_RATIO, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, killersWanted, huntable, lairs, dodge, container, containable, missing, income, safe, invaded, retreat, recycle,
+  RESERVER_UNIT, RESERVER_UNITS, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, killersWanted, huntable, lairs, dodge, container, containable, missing, income, safe, invaded, retreat, recycle,
   roads, paved, roadWork, roadCells, trip,
 };
 
