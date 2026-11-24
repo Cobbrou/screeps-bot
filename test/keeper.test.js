@@ -115,6 +115,18 @@ delete Game.rooms.E25S3;
 Memory.rooms.E25S4.intel.invader = false;
 Memory.rooms.E25S4.intel.force = null;
 
+// Tueurs de trop, salle rouverte : le plus jeune sur place reste. Renfort pas encore arrivé, relève d'un tueur en fin
+// de vie, salle fermée : personne ne se recycle.
+const mate = (ticksToLive, name = 'E25S4') => ({ ticksToLive, room: { name }, memory: { target: 'E25S4' } });
+const spare = (...mates) => mates.map((c) => remoteMining.surplus(c, mates));
+Memory.rooms.E25S4.intel.hostile = 0;
+assert.deepStrictEqual(spare(mate(700), mate(1300), mate(1200)), [true, false, true]);
+assert.deepStrictEqual(spare(mate(700), mate(1300, 'E25S3')), [false, false]);
+assert.deepStrictEqual(spare(mate(177), mate(1360)), [false, false]);
+assert.deepStrictEqual(spare(mate(1000)), [false]);
+Memory.rooms.E25S4.intel.hostile = Game.time - 500;
+assert.deepStrictEqual(spare(mate(700), mate(1300)), [false, false]);
+
 // Route pavée : aller-retour = 2 fois le chemin gardé, plus les sorties et le conteneur (sans pathfinding).
 const home = { memory: { remoteRoads: { a: { path: { E25S3: [1, 2, 3], E25S4: [4, 5] }, done: true } } } };
 assert.strictEqual(remoteMining.trip(home, { id: 'a', x: 1, y: 1, room: 'E25S4' }), 2 * (5 + 3));

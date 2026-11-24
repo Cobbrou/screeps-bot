@@ -36,6 +36,7 @@ function regroup(creep, mates) {
 // Combat jugé sur les tueurs vivants de la salle et les PV du plus entamé (remoteMining.huntable, revu à chaque tick) :
 // perdu, ou salle dangereuse autrement (joueur, forteresse), ils rentrent, se soignent et attendent (le spawner envoie
 // le second tueur qui manque), ou se recyclent s'ils mourront avant sa réouverture (remoteMining.recycle) ; gagnable, ils y vont groupés (regroup).
+// Combat fini : ceux de trop se recyclent, le plus jeune sur place reste (remoteMining.surplus).
 // ponytail: il ignore le keeper du minerai.
 module.exports.run = function (creep) {
   const name = creep.memory.target;
@@ -48,6 +49,9 @@ module.exports.run = function (creep) {
   // Plus aucun Invader en vue dans sa salle : rouverte tout de suite, avant de juger le combat. La force notée
   // (huntable) est celle des Invaders partis : jugé perdu, le tueur rentrait sans jamais la rouvrir.
   if (creep.room.name === name && intel.keeperInvaded(name) && !intel.threats(creep.room).length) intel.clear(name);
+  // De trop (noté : en rentrant, sa vie qui baisse ou la salle ne le font pas revenir) : il se recycle.
+  if (remoteMining.surplus(creep, mates)) creep.memory.surplus = true;
+  if (creep.memory.surplus && remoteMining.goRecycle(creep, Game.rooms[creep.memory.room])) return;
   if (!remoteMining.safe(creep)) {
     if (!remoteMining.huntable(name, Math.min(...mates.map((c) => c.hits)), mates.length)) {
       // Il mourra avant la réouverture : recyclé (jusqu'à 4 025 sur 5 500 rendus) plutôt que d'attendre pour rien.

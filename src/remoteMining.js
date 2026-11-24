@@ -356,6 +356,15 @@ function recycle(creep) {
   return goRecycle(creep, home);
 }
 
+// Tueur de trop une fois la salle rouverte (renforts contre des Invaders) : un autre, sur place, y vivra plus longtemps.
+// Le plus vieux se recycle, il y perd le moins (le recyclage rend 4 025 sur 5 500, au prorata de la vie restante).
+// Pas une relève normale : le tueur en fin de vie (KILLER_LEAD, au-dessus de son spawn et son trajet) reste jusqu'à sa mort.
+function surplus(creep, mates) {
+  const name = creep.memory.target;
+  return intel.safe(name) && creep.ticksToLive > KILLER_LEAD
+    && mates.some((c) => c.room.name === name && c.ticksToLive > creep.ticksToLive);
+}
+
 // Sous cette part de ses points de vie, une route distante est réparée par le remoteBuilder (pas de tour hors de nos salles).
 const ROAD_REPAIR_RATIO = 0.5;
 
@@ -469,7 +478,7 @@ function roadWork(room) {
 }
 
 module.exports = {
-  RESERVER_UNIT, RESERVER_UNITS, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, killersWanted, huntable, lairs, dodge, container, containable, missing, income, safe, invaded, retreat, recycle, goRecycle, ending,
+  RESERVER_UNIT, RESERVER_UNITS, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, killersWanted, huntable, lairs, dodge, container, containable, missing, income, safe, invaded, retreat, recycle, goRecycle, ending, surplus,
   roads, paved, roadWork, roadCells, trip,
 };
 
