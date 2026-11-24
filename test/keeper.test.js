@@ -119,6 +119,19 @@ Memory.rooms.E25S4.intel.force = null;
 const home = { memory: { remoteRoads: { a: { path: { E25S3: [1, 2, 3], E25S4: [4, 5] }, done: true } } } };
 assert.strictEqual(remoteMining.trip(home, { id: 'a', x: 1, y: 1, room: 'E25S4' }), 2 * (5 + 3));
 
+// Transporteur en attente (réouverture dans 1 001 ticks, aller-retour 16, marge 40) : gardé seulement s'il peut encore
+// faire un voyage à la réouverture.
+home.name = 'E25S3';
+Game.rooms.E25S3 = home;
+Memory.rooms.E25S4.intel.invader = true;
+Memory.rooms.E25S4.intel.force = { heal: 900, damage: 0, hits: 1000 };
+const waiting = (ticksToLive) => Object.assign(killer(ticksToLive), { room: home,
+  memory: { room: 'E25S3', target: 'E25S4', sourceId: 'a', x: 1, y: 1 } });
+assert.ok(remoteMining.recycle(waiting(1056)) && recycled === 2);
+assert.ok(!remoteMining.recycle(waiting(1057)) && recycled === 2);
+delete Game.rooms.E25S3;
+Object.assign(Memory.rooms.E25S4.intel, { invader: false, force: null });
+
 // Transport d'une source : besoin (aller-retour 16 × débit des 9 WORK), transporteur taillé au manque avec la marge ;
 // renfort seulement conteneur plein, plus rien une fois la marge atteinte.
 Object.assign(home, { name: 'E25S3', controller: { level: 7 }, energyCapacityAvailable: 5600 });

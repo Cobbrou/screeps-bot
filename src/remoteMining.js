@@ -339,8 +339,9 @@ function goRecycle(creep, home) {
   return true;
 }
 
-// Mineur, transporteur distant ou tueur de keepers (trajet noté en guise de demi aller-retour) qui mourra avant la réouverture de sa salle (intel.reopenIn, plus le demi aller-retour
-// pour retourner à sa source) : il se recycle au spawn le plus proche, qui rend l'énergie de sa vie restante dans
+// Mineur, transporteur distant ou tueur de keepers (trajet noté en guise d'aller-retour) qui mourra avant la réouverture
+// de sa salle (intel.reopenIn) ou trop peu après pour un aller-retour et END_MARGIN. Le 2026-11-24 sur E25S4, deux
+// transporteurs ont attendu 1 400 ticks pour mourir à la réouverture, ~2 400 d'énergie chacun. Il se recycle au spawn le plus proche, qui rend l'énergie de sa vie restante dans
 // une pierre tombale (ramassée par les haulers), au lieu de l'attendre en pure perte. Le 2026-11-21 sur E25S4,
 // toute la flotte (7 transporteurs, 3 mineurs) est morte en attendant, ~14 k d'énergie de vie restante perdus.
 // Pas si les tueurs peuvent abattre les Invaders (huntable) : ils rouvriront la salle bien avant. Vrai s'il va se recycler.
@@ -349,7 +350,7 @@ function recycle(creep) {
   const name = creep.memory.target;
   if (!home || huntable(name, KILLER_HITS, MAX_KILLERS)) return false;
   const back = creep.memory.sourceId
-    ? (trip(home, { id: creep.memory.sourceId, x: creep.memory.x, y: creep.memory.y, room: name }) || 0) / 2
+    ? (trip(home, { id: creep.memory.sourceId, x: creep.memory.x, y: creep.memory.y, room: name }) || 0) + END_MARGIN
     : creep.memory.travel || 0;
   if (creep.ticksToLive >= intel.reopenIn(name) + back) return false;
   return goRecycle(creep, home);
