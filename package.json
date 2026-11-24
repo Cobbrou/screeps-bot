@@ -5,7 +5,7 @@
   "description": "Bot pour Screeps World",
   "scripts": {
     "build": "rollup -c",
-    "test": "node test/minCut.test.js && node test/boost.test.js && node test/keeper.test.js",
+    "test": "node test/minCut.test.js && node test/boost.test.js && node test/keeper.test.js && node test/spawner.test.js",
     "deploy": "rollup -c --environment DEPLOY",
     "watch": "rollup -cw --environment DEPLOY"
   },

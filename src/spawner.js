@@ -360,6 +360,17 @@ function buildBody(role, energy, room, sourceId, target) {
   return repeat([WORK, CARRY, MOVE], energy, [[WORK, MOVE], [WORK]]);
 }
 
+// Rôle à créer en urgence, ou undefined : personne pour remplir spawn et extensions (ou haulers sans mineur pour les
+// alimenter, filler sans stock, `fed`). Mineur vivant et hauler voulu : le hauler suffit. Sinon récolteur.
+// Le 2026-11-24 sur E25S3, deux haulers morts ensemble pendant que les deux spawns créaient des transporteurs distants :
+// un harvester de 3 350 à la place d'un hauler de 1 050.
+function emergencyRole(counts, wanted, fed) {
+  if (counts.harvester || fed || (counts.hauler && counts.miner)) return undefined;
+  return counts.miner && wanted.hauler ? 'hauler' : 'harvester';
+}
+
+module.exports.emergencyRole = emergencyRole;
+
 module.exports.run = function () {
   // Effectifs actuels par salle puis par rôle, WORK et nombre de mineurs par source, capacité des haulers par salle.
   const counts = {};
@@ -449,14 +460,11 @@ module.exports.run = function () {
     const room = spawn.room;
     const roomCounts = counts[room.name] = counts[room.name] || {};
 
-    // Personne pour remplir spawn et extensions (ou haulers sans mineur pour les alimenter, filler sans stock) :
-    // récolteur avec l'énergie disponible.
     const fed = roomCounts.filler && room.storage && room.storage.store[RESOURCE_ENERGY] > 0;
-    const emergency = !roomCounts.harvester && !fed && (!roomCounts.hauler || !roomCounts.miner);
     const remoteNeed = remoteMining.missing(room, remote, reservers);
     const net = netIncome(room, miners, carry[room.name], remote, upkeep[room.name]);
     const wanted = targets(room, roomCounts, miners, carry[room.name], remoteNeed, net, work[room.name] || {});
-    const role = emergency ? 'harvester' : Object.keys(wanted).find((r) => (roomCounts[r] || 0) < wanted[r]);
+    const role = emergencyRole(roomCounts, wanted, fed) || Object.keys(wanted).find((r) => (roomCounts[r] || 0) < wanted[r]);
     if (!role) continue;
 
     const memory = { role, room: room.name };
@@ -480,13 +488,14 @@ module.exports.run = function () {
     // Premier mineur ou premier hauler de la salle : créé avec l'énergie disponible au lieu d'attendre la capacité
     // pleine, la récolte démarre plus tôt. Au moins l'énergie que le spawn régénère seul (300) : pas de corps minuscule.
     const startup = ['miner', 'hauler', 'filler'].includes(role) && !roomCounts[role];
-    let energy = emergency ? room.energyAvailable
+    // Harvester (urgence) : avec l'énergie disponible.
+    let energy = role === 'harvester' ? room.energyAvailable
       : startup ? Math.min(room.energyCapacityAvailable, Math.max(SPAWN_ENERGY_CAPACITY, room.energyAvailable))
         : room.energyCapacityAvailable;
     // Hauler plafonné au besoin de la source la plus exigeante, avec la marge HAUL_SHARE_MARGIN : à la capacité
     // pleine de la salle, il porte plusieurs fois la production et paie son entretien pour rien. Le renfort
     // (conteneur plein) couvre les écarts. Les sources liées (besoin nul) ne comptent pas.
-    if (role === 'hauler' && !emergency) {
+    if (role === 'hauler') {
       const share = HAUL_SHARE_MARGIN
         * Math.max(0, ...sources.list(room).map((s) => haulCapacity(room, s, (miners[s.id] || {}).work)));
       const ratio = haulerRatio(room);
@@ -507,7 +516,7 @@ module.exports.run = function () {
     }
     // Upgrader : corps au manque de WORK, pas à la capacité de la salle (deux corps pleins de 14 WORK dépensaient 28/tick
     // pour ~20 de revenu, jusqu'à la pause du stockage bas).
-    if (role === 'upgrader' && !emergency) {
+    if (role === 'upgrader') {
       const roomWork = work[room.name] || {};
       const lack = Math.floor(upgradeBudget(room, net, roomWork) / UPGRADE_SPEND - (roomWork.upgrader || 0));
       const parts = Math.max(lack, MIN_UPGRADER_WORK);
