@@ -108,18 +108,18 @@ function posts(room, depot) {
 }
 
 // Poste attribué à l'upgrader (creep.memory.post, case x * 50 + y) : gardé tant qu'il reste un poste
-// et qu'aucun autre upgrader de la salle ne l'a ; sinon un poste libre, ceux qui touchent le lien du hub d'abord
-// (lui seul le vide), puis le plus proche. undefined si tout est pris.
+// et qu'aucun autre upgrader de la salle ne l'a, quitté aussi si un poste qui touche le lien du hub se libère (lui seul
+// le vide) ; sinon un poste libre, ceux qui touchent ce lien d'abord, puis le plus proche. undefined si tout est pris.
 function post(creep, depot) {
   const list = posts(creep.room, depot);
   const taken = new Set(Object.values(Game.creeps)
     .filter((c) => c !== creep && c.memory.role === 'upgrader' && c.memory.room === creep.memory.room)
     .map((c) => c.memory.post));
   let k = creep.memory.post;
-  if (!list.includes(k) || taken.has(k)) {
+  const link = sources.hubLink(creep.room);
+  const far = (cell) => (link && link.pos.getRangeTo(Math.floor(cell / 50), cell % 50) > 1 ? 50 : 0);
+  if (!list.includes(k) || taken.has(k) || (far(k) && list.some((cell) => !far(cell) && !taken.has(cell)))) {
     const range = (cell) => creep.pos.getRangeTo(Math.floor(cell / 50), cell % 50);
-    const link = sources.hubLink(creep.room);
-    const far = (cell) => (link && link.pos.getRangeTo(Math.floor(cell / 50), cell % 50) > 1 ? 50 : 0);
     k = list.filter((cell) => !taken.has(cell)).sort((a, b) => far(a) + range(a) - far(b) - range(b))[0];
     creep.memory.post = k;
   }

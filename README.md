@@ -43,7 +43,7 @@ Pour un serveur privé sans token, remplacer `token` par `email` et `password`.
 | Commande | Effet |
 |----------|-------|
 | `npm run build` | Bundle `src/main.js` vers `dist/main.js`, sans envoi |
-| `npm test` | Vérifie hors du jeu la coupe minimale, le boost, la récolte des salles à keepers et le rôle créé en urgence |
+| `npm test` | Vérifie hors du jeu la coupe minimale, le boost, la récolte des salles à keepers, le rôle créé en urgence et la case du lien du hub |
 | `npm run deploy` | Build puis envoi du code sur le serveur défini dans `secrets.json` |
 | `npm run watch` | Rebuild et envoi à chaque modification de `src/` |
 
@@ -91,6 +91,7 @@ screeps-bot/
 │   ├── minCut.test.js       # vérifie que la coupe sépare la base des sorties
 │   ├── boost.test.js        # vérifie le choix des achats, des parties boostées et des trajets vers le lab
 │   ├── keeper.test.js       # vérifie le corps du tueur de keepers, le mineur et la sûreté des salles à keepers
+│   ├── planner.test.js      # vérifie la case du lien du hub
 │   └── spawner.test.js      # vérifie le rôle créé en urgence
 ├── docs/
 │   ├── architecture.md      # architecture prévue
