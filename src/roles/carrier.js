@@ -76,3 +76,4 @@ module.exports.run = function (creep) {
 };
 
 module.exports.RESERVE = RESERVE;
+module.exports.remains = remains;

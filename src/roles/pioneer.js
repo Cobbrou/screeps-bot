@@ -1,10 +1,18 @@
 const move = require('../move');
 const builder = require('./builder');
+const carrier = require('./carrier');
 
 // Créep d'amorçage : rejoint la salle revendiquée par le trajet sûr (move.travel) puis y récolte et construit comme un builder (spawn d'abord).
 module.exports.run = function (creep) {
   if (creep.room.name !== creep.memory.target) {
     move.travel(creep, creep.memory.target);
+    return;
+  }
+  // Ruines de l'ancien propriétaire d'abord : un plein en quelques ticks, contre ~25 à la source.
+  const ruin = !creep.memory.working && creep.store.getFreeCapacity() > 0
+    && carrier.remains(creep, (r) => r === RESOURCE_ENERGY);
+  if (ruin) {
+    if (creep.withdraw(ruin.from, ruin.resource) === ERR_NOT_IN_RANGE) move.to(creep, ruin.from);
     return;
   }
   // RCL 2 avant le spawn : 200 d'énergie, et le mode sans échec devient disponible (un par niveau gagné).
