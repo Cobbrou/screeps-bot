@@ -8,7 +8,7 @@ Object.assign(global, {
 });
 // Modules qui chargent le reste du bot : remplacés par des modules vides.
 for (const name of ['sources', 'defense', 'intel', 'expansion', 'roles/upgrader', 'roles/mineralMiner',
-  'roles/mineralHauler', 'roles/scout', 'remoteMining', 'boost']) {
+  'roles/mineralHauler', 'roles/carrier', 'roles/scout', 'remoteMining', 'boost']) {
   const path = require.resolve(`../src/${name}`);
   require.cache[path] = { id: path, filename: path, loaded: true, exports: {} };
 }

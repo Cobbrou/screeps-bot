@@ -13,16 +13,23 @@ function rampartNear(creep, enemy) {
   return enemy.pos.findClosestByRange(ramparts);
 }
 
+// Garde d'une salle jeune (rôle guard, creep.memory.target) : s'y rend d'abord, même avec des hostiles, puis agit comme
+// un défenseur, posté près du contrôleur sans spawn.
 // Défenseur à distance : se poste sur le rempart le plus proche de l'ennemi et tire depuis là.
 // Ennemi hors de portée de tout rempart : s'il est entré dans les murs (defense.inBase), le défenseur s'en approche
 // à portée 3, sous le feu des tours ; s'il est dehors, il ne sort jamais : il attend sur ce rempart.
 // Vise la cible des tours si elle est à portée (tir concentré), sinon l'hostile le plus proche. Reste près du spawn sinon.
 module.exports.run = function (creep) {
+  const { target } = creep.memory;
+  if (target && creep.room.name !== target) {
+    move.to(creep, new RoomPosition(25, 25, target), { range: 20, maxRooms: 2 });
+    return;
+  }
   const hostiles = defense.threats(creep.room);
   const enemy = creep.pos.findClosestByRange(hostiles);
   if (!enemy) {
-    const spawn = creep.pos.findClosestByRange(FIND_MY_SPAWNS);
-    if (spawn && !creep.pos.inRangeTo(spawn, 3)) move.to(creep, spawn);
+    const post = creep.pos.findClosestByRange(FIND_MY_SPAWNS) || creep.room.controller;
+    if (post && !creep.pos.inRangeTo(post, 3)) move.to(creep, post);
     return;
   }
   const rampart = rampartNear(creep, enemy);

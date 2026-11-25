@@ -218,7 +218,7 @@ function pickupNearby(creep) {
   if (pile) creep.pickup(pile);
 }
 
-// Livre au spawn, aux extensions et aux tours (s'il leur manque TOWER_REFILL, sauf hostiles : tours d'abord), puis aux builders (sans stockage), puis au dépôt des upgraders
+// Livre au spawn, aux extensions et aux tours (s'il leur manque TOWER_REFILL, sauf hostiles : tours d'abord), puis aux builders et pioneers (sans stockage), puis au dépôt des upgraders
 // (sources.depot), puis au stockage.
 // Sans conteneur, le dépôt est une case (RoomPosition) où l'énergie est posée au sol, jusqu'à DEPOT_MAX.
 // Structures et builders sont réservés (`creep.memory.deliverId`) : la place libre de chacun est comptée une fois
@@ -254,7 +254,7 @@ function deliveryTarget(creep, skip) {
   }
   if (!room.storage) {
     const builder = creep.pos.findClosestByRange(FIND_MY_CREEPS, {
-      filter: (c) => c !== skip && c.memory.role === 'builder' && free(c) >= c.store.getCapacity() / 2,
+      filter: (c) => c !== skip && ['builder', 'pioneer'].includes(c.memory.role) && free(c) >= c.store.getCapacity() / 2,
     });
     if (builder) {
       creep.memory.deliverId = builder.id;

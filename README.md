@@ -77,6 +77,7 @@ screeps-bot/
 │       ├── keeperKiller.js  # tue à distance les Source Keepers des sources d'une salle à keepers
 │       ├── hauler.js        # transporte l'énergie des conteneurs vers spawn, extensions, tours, dépôt du contrôleur
 │       ├── miner.js         # récolte statique sur une source (conteneur, ou au sol)
+│       ├── carrier.js       # apporte l'énergie à une salle voisine jeune, vide ses ruines
 │       ├── pioneer.js       # amorce la nouvelle salle (construit son spawn)
 │       ├── mineralHauler.js # vide le conteneur du minerai, alimente le terminal en minerai et en énergie
 │       ├── mineralMiner.js  # récolte le minerai depuis son conteneur (extracteur, RCL 6)

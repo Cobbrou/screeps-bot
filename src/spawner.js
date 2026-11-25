@@ -5,6 +5,7 @@ const expansion = require('./expansion');
 const upgraders = require('./roles/upgrader');
 const mineralMiner = require('./roles/mineralMiner');
 const mineralHauler = require('./roles/mineralHauler');
+const carrier = require('./roles/carrier');
 const scout = require('./roles/scout');
 const remoteMining = require('./remoteMining');
 const boost = require('./boost');
@@ -35,6 +36,12 @@ const REPAIR_SPEND = 0.4 + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPAR
 // à chaque vie pour ça, ~35 k d'énergie par jour sur E25S3 (relevé du 2026-11-13).
 // ponytail: plafond fixe, lent après une attaque (~3 énergie/tick de réparation) ; le tailler sur le déficit des murs si besoin.
 const REPAIR_BUILDER_UNITS = 3;
+// Soutien d'une salle voisine jeune (expansion.supported). Carrier : 1 250 d'énergie pour ~200 ticks d'aller-retour,
+// ~6 énergie/tick chacun. Pioneers : 16 WORK chacun, de quoi dépenser ces ~37 énergie/tick et les 20 de ses sources.
+// Garde : 12 RANGED_ATTACK (120 PV/tick), abat un claimer en quelques ticks tant que la salle n'a pas de tour.
+const CARRIERS = 6;
+const PIONEERS = 3;
+const GUARD_UNITS = 12;
 // Rôles dont l'entretien est déduit du revenu : ceux qui récoltent et transportent.
 const ECONOMY_ROLES = ['miner', 'hauler', 'filler', 'remoteMiner', 'remoteHauler', 'reserver', 'keeperKiller', 'mineralMiner', 'mineralHauler'];
 // Renseignements sur une salle voisine jugés périmés après ce nombre de ticks : un éclaireur va les rafraîchir.
@@ -188,6 +195,7 @@ function downgrading(room) {
 function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   const list = sources.list(room);
   const expanding = Memory.expansion && Memory.expansion.from === room.name;
+  const young = expansion.supported(room);
   // downgrading avant paused : il pose le drapeau qui lève la pause.
   const urgent = downgrading(room);
   const sites = room.find(FIND_MY_CONSTRUCTION_SITES);
@@ -232,6 +240,12 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
           && list.some((s) => { const box = sources.container(s); return box && !sources.sourceLink(s) && box.store.getFreeCapacity(RESOURCE_ENERGY) === 0; }))
         ? 1 : 0),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
+    // Expansion et soutien d'une salle jeune avant la récolte distante, qui ne prend alors que le temps de spawn restant.
+    // Le 2026-11-25, le claimer d'un voisin est entré dans E24S3 5 ticks après que nous l'avons prise.
+    claimer: expanding && !expansion.claimed() ? 1 : 0,
+    guard: young && !young.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length ? 1 : 0,
+    carrier: young && room.storage.store[RESOURCE_ENERGY] > carrier.RESERVE ? CARRIERS : 0,
+    pioneer: young ? PIONEERS : expanding && expansion.claimed() ? 2 : 0,
     // Après la récolte locale : il rend ses sources à la salle distante envahie.
     remoteDefender: remoteMining.invaded(room) ? 1 : 0,
     // Tueur de keepers avant builders et upgraders : son successeur part à temps (remplacé à l'avance selon son trajet).
@@ -243,8 +257,6 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     upgrader,
     // Un éclaireur suffit à tenir les renseignements à jour, et seulement s'il a encore une utilité.
     scout: needsScout(room) ? 1 : 0,
-    claimer: expanding && !expansion.claimed() ? 1 : 0,
-    pioneer: expanding && expansion.claimed() ? 2 : 0,
     // Récolte distante dès le RCL 2, en dernier : elle ne prend que le temps de spawn laissé libre par le reste.
     // Salle à keepers : mineurs et transporteurs n'y vont qu'avec son tueur, demandé plus haut (remoteMining.missing).
     // Transporteur avant mineur, comme dans la salle : les deux alternent source par source.
@@ -334,6 +346,8 @@ function buildBody(role, energy, room, sourceId, target) {
   // Cœur d'Invader (100 000 PV, sans créep ni tour) : ATTACK au contact, 3 fois les dégâts d'un RANGED_ATTACK.
   if (role === 'remoteDefender' && intel.get(target) && intel.get(target).core) return repeat([ATTACK, MOVE], energy);
   if (role === 'defender' || role === 'remoteDefender') return repeat([RANGED_ATTACK, MOVE], energy);
+  if (role === 'guard') return repeat([RANGED_ATTACK, MOVE], Math.min(energy, GUARD_UNITS * cost([RANGED_ATTACK, MOVE])));
+  if (role === 'carrier') return repeat([CARRY, MOVE], energy);
   if (role === 'scout') return [MOVE];
   // Claimer : 5 MOVE si l'énergie le permet (850), de quoi annuler la fatigue du CLAIM en marais (10) : une case
   // par tick sur tout terrain. Avec un seul MOVE (5 ticks par case de marais), il mourait avant d'arriver
@@ -476,7 +490,9 @@ module.exports.run = function () {
       if (!free) continue;
       memory.sourceId = free.id;
     }
-    if (role === 'claimer' || role === 'pioneer') memory.target = Memory.expansion.target;
+    const young = expansion.supported(room);
+    if (['pioneer', 'carrier', 'guard'].includes(role) && young) memory.target = young.name;
+    else if (role === 'claimer' || role === 'pioneer') memory.target = Memory.expansion.target;
     if (role === 'reserver') memory.target = remoteNeed.reserver;
     if (role === 'remoteBuilder') memory.target = remoteMining.roadWork(room);
     if (role === 'remoteDefender') memory.target = remoteMining.invaded(room);

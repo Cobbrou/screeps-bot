@@ -152,4 +152,14 @@ module.exports.run = function () {
   }
 };
 
+// Salle voisine à nous encore sans stockage (avant le RCL 4) : soutenue par `home` (carrier, pioneer, guard), ou undefined.
+// Son spawn seul (300 d'énergie par créep) mettrait des jours à atteindre la première tour (RCL 3).
+// ponytail: voisines directes seulement ; plus loin, seulement les deux pioneers de l'amorçage.
+function supported(home) {
+  if (!home.storage || home.controller.level < MIN_RCL) return undefined;
+  return Object.values(Game.map.describeExits(home.name) || {}).map((name) => Game.rooms[name])
+    .find((r) => r && r.controller && r.controller.my && !r.storage);
+}
+
 module.exports.claimed = claimed;
+module.exports.supported = supported;

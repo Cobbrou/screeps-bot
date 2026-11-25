@@ -324,11 +324,16 @@ function runTowers(room) {
 // de ses points de vie (le rempart qui le couvrait est tombé),
 // ou un claimer hostile approche du contrôleur. Activé avant son premier attackController : un contrôleur
 // `upgradeBlocked` peut refuser le mode sans échec (la doc le confirme pour les nukes) ; l'appel est tenté quand même.
+// Salle sans tour : activé dès qu'un joueur armé ou un claimer y entre, rien d'autre ne l'arrêterait (pioneers et
+// carriers meurent avant la première structure vitale) ; 20 000 ticks, de quoi atteindre la tour du RCL 3.
+// Un seul mode sans échec à la fois sur le compte : pendant ce temps, les autres salles n'ont plus le leur.
 function lastResort(room, hostiles) {
   const c = room.controller;
   if (c.safeMode || c.safeModeCooldown || !c.safeModeAvailable) return;
   const claimer = hostiles.some((h) => h.getActiveBodyparts(CLAIM) && h.pos.inRangeTo(c, CLAIMER_ALERT_RANGE));
-  if (claimer || room.find(FIND_MY_STRUCTURES, {
+  const bare = !room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length
+    && hostiles.some((h) => h.owner.username !== INVADER);
+  if (claimer || bare || room.find(FIND_MY_STRUCTURES, {
     filter: (s) => VITAL.includes(s.structureType) && s.hits < s.hitsMax / 2,
   }).length) c.activateSafeMode();
 }

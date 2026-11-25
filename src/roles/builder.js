@@ -98,10 +98,12 @@ function swapBarrier(creep) {
 }
 
 // Vrai si les haulers livrent les builders de la salle : pas de stockage (sinon le builder y puise lui-même)
-// et au moins un hauler vivant (sinon personne ne viendrait).
+// et au moins un hauler vivant (sinon personne ne viendrait), ou un carrier sur place avec de l'énergie
+// (entre deux voyages, le builder récolte lui-même).
 function fed(room) {
   if (room.storage) return false;
-  return Object.values(Game.creeps).some((c) => c.memory.role === 'hauler' && c.memory.room === room.name);
+  return Object.values(Game.creeps).some((c) => (c.memory.role === 'hauler' && c.memory.room === room.name)
+    || (c.memory.role === 'carrier' && c.room.name === room.name && c.store[RESOURCE_ENERGY] > 0));
 }
 
 // Builder vide qui attend un hauler : il ramasse l'énergie au sol adjacente (hors dépôt des upgraders)
@@ -140,11 +142,13 @@ module.exports.run = function (creep) {
 
   // Rétrogradation proche (drapeau posé par le spawner) : droit au contrôleur.
   if (!creep.room.memory.downgrade) {
-    if (repair(creep, URGENT_RATIO)) return;
+    // Pioneer : construit puis améliore, sans réparer les restes de l'ancien propriétaire (124 routes usées dans E24S3).
+    const pioneer = creep.memory.role === 'pioneer';
+    if (!pioneer && repair(creep, URGENT_RATIO)) return;
     if (build(creep)) return;
     if (swapBarrier(creep)) return;
-    if (fortify(creep)) return;
-    if (repair(creep, REPAIR_RATIO)) return;
+    if (!pioneer && fortify(creep)) return;
+    if (!pioneer && repair(creep, REPAIR_RATIO)) return;
     // Plus rien à construire ni à réparer : le builder devient upgrader s'il reste une place au dépôt
     // et que ses WORK entrent dans le budget des upgraders (room.memory.upgradeWork, posé par le spawner).
     // Sans ce budget, chaque builder finissait upgrader : 5 corps de 2 300 pour ~8 énergie/tick d'amélioration.
