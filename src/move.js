@@ -109,10 +109,12 @@ function to(creep, target, opts = {}) {
 const hops = {};
 
 // Rejoint la salle `roomName` salle par salle, par le trajet sûr d'intel.route (ni keepers, ni salles hostiles).
-// Faux si aucun trajet sûr : le créep reste sur place plutôt que de se faire tuer.
+// Faux si aucun trajet sûr : le créep reste sur place plutôt que de se faire tuer, et cherche à nouveau tous les
+// ROUTE_RETRY ticks (gardée telle quelle, l'absence de trajet le bloquait jusqu'au reset du global).
+const ROUTE_RETRY = 10;
 function travel(creep, roomName) {
   let hop = hops[creep.name];
-  if (!hop || hop.from !== creep.room.name || hop.to !== roomName) {
+  if (!hop || hop.from !== creep.room.name || hop.to !== roomName || (!hop.next && Game.time % ROUTE_RETRY === 0)) {
     const r = intel.route(creep.room.name, roomName);
     hop = hops[creep.name] = { from: creep.room.name, to: roomName, next: r && r.length ? r[0].room : null };
   }

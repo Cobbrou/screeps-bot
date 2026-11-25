@@ -134,8 +134,12 @@ function status(name) {
 
 // Vrai si un créep fragile (claimer, pioneer) ne doit pas traverser la salle : keepers, statut différent de `zone`
 // (zones séparées par des murs indestructibles), possédée par un autre joueur (tours), réservée par un ami ou hostiles récents.
+// Nos salles ne sont évitées que pendant que des hostiles y sont (hors mode sans échec) : nous les voyons. Le 2026-11-25, le claimer
+// d'un voisin, déjà reparti, fermait E24S3 1 500 ticks aux pioneers qui devaient y construire le spawn.
 function avoid(name, zone) {
   const i = get(name);
+  const room = Game.rooms[name];
+  if (room && room.controller && room.controller.my) return !room.controller.safeMode && threats(room).length > 0;
   return keeperRoom(name) || status(name) !== zone || friendly(name)
     || !!(i && i.owner && i.owner !== me()) || !!(i && Game.time - i.hostile < HOSTILE_COOLDOWN);
 }
