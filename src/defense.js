@@ -4,7 +4,7 @@
 // ponytail: un démanteleur joueur sans ATTACK est ignoré ; le compter au contact de nos structures s'il en vient un.
 const DANGEROUS = [ATTACK, RANGED_ATTACK, HEAL, CLAIM];
 const INVADER = 'Invader';
-// Joueurs amis : nos créeps n'entrent pas dans leurs salles (voir intel). Leurs créeps armés restent des menaces chez nous.
+// Joueurs amis : nos créeps n'entrent pas dans leurs salles, sauf l'éclaireur (voir intel). Leurs créeps armés restent des menaces chez nous.
 const FRIENDS = ['vKDeath'];
 // ponytail: plafond fixe des murs et remparts, à ajuster selon le budget énergie de la salle.
 // 50 000 par RCL, plafonné à 150 000 dès le RCL 3 : un casseur Invader (4 WORK, 2 ATTACK, ~260 PV/tick) hors de portée

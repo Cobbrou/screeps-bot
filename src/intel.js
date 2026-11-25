@@ -104,7 +104,7 @@ function me() {
 }
 
 // Vrai si la salle est possédée ou réservée par un ami (defense.FRIENDS) d'après le dernier renseignement :
-// aucun de nos créeps n'y va, pas même l'éclaireur.
+// aucun de nos créeps n'y va, sauf l'éclaireur, qui voit si l'ami l'a perdue.
 function friendly(name) {
   const i = get(name);
   return !!(i && (defense.FRIENDS.includes(i.owner) || defense.FRIENDS.includes(i.reserved)));

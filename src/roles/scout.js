@@ -2,14 +2,16 @@ const move = require('../move');
 const intel = require('../intel');
 
 // Voisines où l'éclaireur peut aller : même statut (zones novices ou fermées infranchissables),
-// salles des amis jamais visitées (intel.friendly), salles à keepers évitées (les keepers tuent l'éclaireur, qui n'y apprendrait rien d'utile) sauf s'il n'y a rien d'autre (éclaireur déjà dans un secteur de keepers).
+// nos salles exclues (déjà visibles), salles à keepers évitées (les keepers tuent l'éclaireur, qui n'y apprendrait rien d'utile) sauf s'il n'y a rien d'autre (éclaireur déjà dans un secteur de keepers).
+// Salles des amis visitées comme les autres : sans ça, E24S3, perdue par vKDeath, restait notée à son nom pour toujours.
 // getRoomStatus renvoie undefined dans le simulateur (salle « sim ») : pas de statut, pas de voisine.
 function exits(here) {
   const statusOf = (name) => (Game.map.getRoomStatus(name) || {}).status;
   const status = statusOf(here);
   if (!status) return [];
+  const mine = (name) => !!(Game.rooms[name] && Game.rooms[name].controller && Game.rooms[name].controller.my);
   const open = Object.values(Game.map.describeExits(here) || {})
-    .filter((name) => statusOf(name) === status && !intel.friendly(name));
+    .filter((name) => statusOf(name) === status && !mine(name));
   const calm = open.filter((name) => !intel.keeperRoom(name));
   return calm.length ? calm : open;
 }
