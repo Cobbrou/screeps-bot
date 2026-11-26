@@ -1,5 +1,6 @@
 const intel = require('./intel');
 const sources = require('./sources');
+const defense = require('./defense');
 
 // Choix de la cible et pose du spawn tous les INTERVAL ticks.
 const INTERVAL = 100;
@@ -19,6 +20,26 @@ const GIVE_UP = 5000;
 // Délai et non exclusion définitive : l'échec peut venir d'un spawn d'origine trop occupé pour créer le claimer.
 const RETRY_AFTER = 50000;
 
+// Cible écartée à cette distance (salles, vol d'oiseau) ou moins d'une salle possédée ou réservée par un autre joueur.
+// E24S3, prise le 2026-11-25 à 2 salles de E22S3 (réservée par deadlydd), a été rasée le lendemain.
+// ponytail: tout joueur non ami compte, même pacifique ; à affiner (attaques vues) si plus aucune cible ne reste.
+const PLAYER_RANGE = 2;
+
+// Salles possédées ou réservées par un autre joueur (ni nous, ni ami, ni Invader) d'après l'intel.
+function playerRooms() {
+  const me = intel.me();
+  return Object.keys(Memory.rooms || {}).filter((name) => {
+    const i = intel.get(name);
+    const who = i && (i.owner || i.reserved);
+    return !!who && who !== me && who !== defense.INVADER && !defense.FRIENDS.includes(who);
+  });
+}
+
+// Vrai si la salle est à PLAYER_RANGE ou moins d'une de ces salles de joueurs.
+function exposed(name, players) {
+  return players.some((p) => Game.map.getRoomLinearDistance(p, name) <= PLAYER_RANGE);
+}
+
 // Note l'abandon de la cible, hors de son intel (réécrit à chaque passage de l'éclaireur).
 function fail(name) {
   if (!Memory.rooms) Memory.rooms = {};
@@ -37,7 +58,7 @@ function ownedRooms() {
 }
 
 // Meilleure salle explorée à revendiquer : le plus de sources, puis la plus proche d'une salle d'origine
-// par un trajet sûr (sans trajet sûr, claimer et pioneers seraient tués en route).
+// par un trajet sûr (sans trajet sûr, claimer et pioneers seraient tués en route), loin des autres joueurs (exposed).
 function choose() {
   const owned = ownedRooms();
   if (owned.length >= Game.gcl.level) {
@@ -48,10 +69,11 @@ function choose() {
   }
   const homes = owned.filter((r) => r.controller.level >= MIN_RCL && r.storage);
   const maxDistance = Memory.enclosed ? ENCLOSED_DISTANCE : MAX_DISTANCE;
+  const players = playerRooms();
   let best = null;
   let bestScore = -Infinity;
   for (const name in Memory.rooms) {
-    if (!intel.safe(name) || !intel.get(name).sources || failed(name)) continue;
+    if (!intel.safe(name) || !intel.get(name).sources || failed(name) || exposed(name, players)) continue;
     for (const home of homes) {
       // Vol d'oiseau d'abord : findRoute seulement pour les salles assez proches, et seulement si le score
       // optimiste (trajet aussi court que le vol d'oiseau) peut battre le meilleur.
@@ -174,4 +196,5 @@ function raided(room) {
 
 module.exports.claimed = claimed;
 module.exports.raided = raided;
+module.exports.exposed = exposed;
 module.exports.supported = supported;

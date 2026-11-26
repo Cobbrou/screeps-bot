@@ -1,11 +1,11 @@
 // Vérifie la salle à soutenir hors du jeu : node test/expansion.test.js
 const assert = require('assert');
 
-for (const name of ['intel', 'sources']) {
+for (const name of ['intel', 'sources', 'defense']) {
   const path = require.resolve(`../src/${name}`);
   require.cache[path] = { id: path, filename: path, loaded: true, exports: {} };
 }
-const { supported, raided } = require('../src/expansion');
+const { supported, raided, exposed } = require('../src/expansion');
 const intel = require('../src/intel');
 Object.assign(global, { CLAIM: 'claim', MOVE: 'move', TOUGH: 'tough', WORK: 'work' });
 
@@ -35,5 +35,11 @@ Game.time = 2499;
 assert.ok(raided(young));
 Game.time = 2500;
 assert.ok(!raided(young));
+
+// Cible à 2 salles ou moins d'une salle d'un autre joueur : écartée ; à 3 : gardée.
+Game.map.getRoomLinearDistance = (a, b) => ({ 'E22S3:E24S3': 2, 'E22S3:E25S5': 3 })[a + ':' + b];
+assert.ok(exposed('E24S3', ['E22S3']));
+assert.ok(!exposed('E25S5', ['E22S3']));
+assert.ok(!exposed('E24S3', []));
 
 console.log('expansion : ok');
