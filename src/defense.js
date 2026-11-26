@@ -11,6 +11,10 @@ const FRIENDS = ['vKDeath'];
 // utile des tours met ~580 ticks à percer un mur (280 à 60 000) ; 300 000 coûtaient ~64 k d'énergie de plus au RCL 6.
 const WALL_HITS_PER_RCL = 50000;
 const WALL_HITS_MAX = 150000;
+// Au RCL 7 et 8, plafond relevé contre les joueurs : 6 démanteleurs à 25 WORK (7 500 PV/tick, deadlydd le 2026-11-26)
+// perçaient une case de 120 000 en 16 ticks, 67 à 500 000. Depuis 120 000, la coupe de E25S3 (31 cases) et ses
+// 11 remparts vitaux demandent ~16 M de PV, ~160 000 d'énergie, montés par le builder d'entretien (REPAIR_BUILDER_UNITS).
+const WALL_HITS_LATE = { 7: 500000, 8: 2000000 };
 // Sous cette énergie au stockage, murs et remparts attendent (sauf rempart mourant) : de quoi remplir les tours
 // plusieurs fois pendant une attaque. La sécurité passe avant l'amélioration : au-dessus, ils sont réparés.
 const DEFENSE_RESERVE = 5000;
@@ -59,10 +63,12 @@ function threats(room) {
   return room.find(FIND_HOSTILE_CREEPS, { filter: dangerous });
 }
 
-// Points de vie visés à la réparation : les murs et remparts sont plafonnés selon le RCL, puis à WALL_HITS_MAX.
+// Points de vie visés à la réparation : les murs et remparts sont plafonnés selon le RCL, puis à WALL_HITS_MAX
+// (WALL_HITS_LATE aux RCL 7 et 8).
 function repairTarget(s) {
   if (s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART) return s.hitsMax;
-  return Math.min(s.hitsMax, WALL_HITS_PER_RCL * s.room.controller.level, WALL_HITS_MAX);
+  const level = s.room.controller.level;
+  return Math.min(s.hitsMax, WALL_HITS_LATE[level] || Math.min(WALL_HITS_PER_RCL * level, WALL_HITS_MAX));
 }
 
 // Structure la plus abîmée par rapport à sa cible (sous REPAIR_RATIO), ou null ; un rempart sous RAMPART_DYING d'abord,

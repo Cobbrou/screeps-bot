@@ -34,8 +34,12 @@ const REPAIR_SPEND = 0.4 + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPAR
 // Builder créé sans chantier (entretien des murs et remparts de la coupe) : motifs WORK/CARRY/MOVE au plus.
 // Le decay des remparts lointains ne demande que ~0,1 énergie/tick : un corps de 2 300 (12 WORK) était recréé
 // à chaque vie pour ça, ~35 k d'énergie par jour sur E25S3 (relevé du 2026-11-13).
-// ponytail: plafond fixe, lent après une attaque (~3 énergie/tick de réparation) ; le tailler sur le déficit des murs si besoin.
+// Dès le RCL 7, 8 motifs (~3,2 énergie/tick, ~320 PV/tick) : les murs y montent à 500 000 (defense.WALL_HITS_LATE),
+// ~16 M de PV à rattraper sur E25S3, ~2 jours à ce rythme, 5 avec 3 motifs.
+// ponytail: plafond fixe ; le tailler sur le déficit des murs si la reprise après une attaque reste trop lente.
 const REPAIR_BUILDER_UNITS = 3;
+const REPAIR_BUILDER_UNITS_LATE = 8;
+const REPAIR_BUILDER_LATE_RCL = 7;
 // Soutien d'une salle voisine jeune (expansion.supported). Carrier : 1 250 d'énergie pour ~200 ticks d'aller-retour,
 // ~6 énergie/tick chacun. Pioneers : 16 WORK chacun, de quoi dépenser ces ~37 énergie/tick et les 20 de ses sources.
 // Garde : corps de tueur (remoteMining.KILLER_BODY) si la salle le paie, sinon 12 RANGED_ATTACK (120 PV/tick), de quoi
@@ -390,7 +394,8 @@ function buildBody(role, energy, room, sourceId, target) {
     return [CARRY, ...Array(work).fill(WORK), ...Array(moves(work)).fill(MOVE)];
   }
   if (role === 'builder' && room && !room.find(FIND_MY_CONSTRUCTION_SITES).length) {
-    energy = Math.min(energy, REPAIR_BUILDER_UNITS * cost([WORK, CARRY, MOVE]));
+    const units = room.controller.level >= REPAIR_BUILDER_LATE_RCL ? REPAIR_BUILDER_UNITS_LATE : REPAIR_BUILDER_UNITS;
+    energy = Math.min(energy, units * cost([WORK, CARRY, MOVE]));
   }
   // Polyvalent : le reste devient un WORK de plus (300 → 2 WORK, 550 → 3 WORK).
   return repeat([WORK, CARRY, MOVE], energy, [[WORK, MOVE], [WORK]]);
