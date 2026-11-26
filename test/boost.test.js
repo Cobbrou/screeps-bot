@@ -48,9 +48,12 @@ const gh2o = orders.splice(1, 1)[0];
 assert.strictEqual(boost.purchase(room({ GH2O: 7 }, { energy: 5000 })).order.id, 'x');
 assert.strictEqual(boost.purchase(room({ GH2O: 30 }, { energy: 5000 })), undefined);
 orders.splice(1, 0, gh2o);
-// Stock presque plein, stockage bas, crédits sous la réserve ou pas de lab : aucun achat.
+// Stock presque plein, stockage presque vide (sous 5 000), crédits sous la réserve ou pas de lab : aucun achat.
+// La pause des upgraders (storageLow, 100 000 au RCL 7) ne l'arrête pas.
+const poor = (r) => Object.assign(r, { storage: { store: store({ energy: 4000 }) } });
 assert.strictEqual(boost.purchase(room({ GH2O: 700 }, {})), undefined);
-assert.strictEqual(boost.purchase(room({}, {}, { storageLow: true })), undefined);
+assert.strictEqual(boost.purchase(poor(room({}, {}))), undefined);
+assert.ok(boost.purchase(room({}, {}, { storageLow: true })));
 assert.strictEqual(boost.purchase(room(undefined, {})), undefined);
 Game.market.credits = 1e6;
 assert.strictEqual(boost.purchase(room({}, {})), undefined);
@@ -71,7 +74,8 @@ assert.strictEqual(boost.labJob(r).resource, 'GH');
 assert.strictEqual(boost.labJob(r).from, r.terminal);
 r = room({ GH: 900, energy: 100 }, {});
 assert.strictEqual(boost.labJob(r).resource, 'energy');
-assert.strictEqual(boost.labJob(room({ GH: 900, energy: 100 }, {}, { storageLow: true })), undefined);
+assert.strictEqual(boost.labJob(poor(room({ GH: 900, energy: 100 }, {}))), undefined);
+assert.strictEqual(boost.labJob(room({ GH: 900, energy: 100 }, {}, { storageLow: true })).resource, 'energy');
 assert.strictEqual(boost.labJob(room({ GH: 900, energy: 2000 }, { GH: 500 })), undefined);
 // Reste d'un autre composé au lab : rendu au terminal d'abord. Sans rien à mettre à la place, il y reste.
 r = room({ GH2O: 7, energy: 2000 }, { XGH2O: 900 });
