@@ -89,8 +89,12 @@ const MAX_KILLERS = 3;
 // Force notée sans le détail par créep (intel d'avant) : un seul bloc, tous les PV sous tout le soin.
 // Plus forts (raid boosté de 5) : personne n'y va, ils meurent seuls (1 500 ticks de vie) avant la fin de HOSTILE_COOLDOWN.
 function huntable(name, hits = KILLER_HITS, n = 1) {
-  if (!intel.keeperInvaded(name)) return false;
-  const f = intel.get(name).force || { heal: 0, damage: 0, hits: 0 };
+  return intel.keeperInvaded(name) && beats(intel.get(name).force || { heal: 0, damage: 0, hits: 0 }, hits, n);
+}
+
+// Vrai si `n` créeps au corps de tueur (KILLER_BODY) abattent le groupe de force `f` (intel.force), selon l'estimation
+// de huntable. Sert aussi aux gardes d'une salle jeune (roles/guard).
+function beats(f, hits = KILLER_HITS, n = 1) {
   const order = (f.creeps || [f]).slice().sort((a, b) => b.heal - a.heal || b.damage - a.damage);
   let left = hits;
   for (let k = 0; k < order.length; k++) {
@@ -480,7 +484,7 @@ function roadWork(room) {
 }
 
 module.exports = {
-  RESERVER_UNIT, RESERVER_UNITS, KILLER_BODY, KILLER_DAMAGE, minerWork, keeperRooms, killersWanted, huntable, lairs, dodge, container, containable, missing, income, safe, invaded, retreat, recycle, goRecycle, ending, surplus,
+  RESERVER_UNIT, RESERVER_UNITS, KILLER_BODY, KILLER_DAMAGE, KILLER_HITS, minerWork, keeperRooms, killersWanted, huntable, beats, lairs, dodge, container, containable, missing, income, safe, invaded, retreat, recycle, goRecycle, ending, surplus,
   roads, paved, roadWork, roadCells, trip,
 };
 

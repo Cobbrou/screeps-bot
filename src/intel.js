@@ -204,4 +204,4 @@ function clear(name) {
   if (i) Object.assign(i, { hostile: 0, invader: false, force: null });
 }
 
-module.exports = { KEEPER, threats, get, record, watch, skip, safe, reopenIn, invaded, keeperInvaded, invaderReserved, core, clear, me, reservedByMe, keeperRoom, friendly, route };
+module.exports = { KEEPER, threats, force, get, record, watch, skip, safe, reopenIn, invaded, keeperInvaded, invaderReserved, core, clear, me, reservedByMe, keeperRoom, friendly, route };

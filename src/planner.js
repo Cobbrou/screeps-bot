@@ -794,7 +794,13 @@ module.exports.run = function () {
     blocked = false;
     waiting[room.name] = false;
     const spawn = sources.mainSpawn(room);
-    if (!spawn) return;
+    // Spawn perdu (salle rasée) : son chantier est reposé à sa place du plan, sinon les pioneers n'ont rien à construire
+    // et la salle ne repart jamais (E24S3, 2026-11-26). Sans plan, c'est l'expansion qui le pose (expansion.placeSpawn).
+    if (!spawn) {
+      const k = room.memory.plan && room.memory.plan.spawn && room.memory.plan.spawn[0];
+      if (k !== undefined) room.createConstructionSite(Math.floor(k / 50), k % 50, STRUCTURE_SPAWN);
+      return;
+    }
 
     // Plan d'avant le hub : refait (les structures construites sont reprises), avant costMatrix qui en bloquerait les cases.
     if (room.memory.plan && !('hub' in room.memory.plan)) delete room.memory.plan;

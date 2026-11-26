@@ -72,6 +72,7 @@ screeps-bot/
 │       ├── builder.js       # répare le très abîmé (< 50 %), construit, répare le reste sinon ; nourri par les haulers sans stockage
 │       ├── claimer.js       # revendique le contrôleur de la salle visée
 │       ├── defender.js      # tire à distance depuis le rempart le plus proche de l'ennemi
+│       ├── guard.js         # garde d'une salle voisine jeune : escouade groupée, attaque seulement un combat gagnable
 │       ├── filler.js        # remplit spawn, extensions et tours depuis le stockage quand les sources sont liées
 │       ├── harvester.js     # récolte et remplit spawn, extensions et tours, construit le surplus
 │       ├── keeperKiller.js  # tue à distance les Source Keepers des sources d'une salle à keepers

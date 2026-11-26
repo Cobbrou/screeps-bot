@@ -4,27 +4,6 @@ const remoteMining = require('../remoteMining');
 
 // Portée de RANGED_ATTACK.
 const RANGE = 3;
-// Contre des Invaders, les tueurs avancent groupés : chacun à cette portée au plus du meneur avant d'approcher.
-const GROUP_RANGE = 2;
-// Plus aucun ennemi à cette portée du meneur : le groupe se reforme (sinon le combat est engagé, chacun pour soi).
-const CONTACT_RANGE = 5;
-
-const onExit = (c) => c.pos.x === 0 || c.pos.x === 49 || c.pos.y === 0 || c.pos.y === 49;
-
-// Vrai si un des tueurs doit attendre ou rejoindre les autres avant d'avancer vers les Invaders. Le meneur (nom le plus
-// petit) attend tant qu'un autre est à plus de GROUP_RANGE ; les autres le rejoignent. Pas en plein combat (ennemi à
-// CONTACT_RANGE du meneur) : le recul de chacun à portée 3 les écarte un peu, ils restent sur la même cible.
-function regroup(creep, mates) {
-  const leader = mates[0];
-  if (leader.room.find(FIND_HOSTILE_CREEPS, { filter: (c) => leader.pos.inRangeTo(c, CONTACT_RANGE) }).length) return false;
-  const apart = mates.some((c) => c.room.name !== leader.room.name || !c.pos.inRangeTo(leader, GROUP_RANGE));
-  if (!apart) return false;
-  if (creep !== leader) move.to(creep, leader, { range: 1 });
-  // Meneur arrêté sur une case de sortie : le moteur le fait changer de salle à chaque tick et les autres ne le
-  // rejoignent jamais (le 2026-11-22, plus de 2 h de va-et-vient entre E25S3 et E25S4). Il attend 3 cases à l'intérieur.
-  else if (onExit(creep)) move.to(creep, new RoomPosition(25, 25, creep.room.name), { range: 22 });
-  return true;
-}
 
 // Tue les Source Keepers qui gardent les sources de sa salle (creep.memory.target), pour les mineurs distants.
 // Soigne à chaque tick le plus entamé de lui-même et des tueurs à son contact, tire à portée 3 et s'écarte
@@ -35,7 +14,7 @@ function regroup(creep, mates) {
 // même si le combat était jugé perdu.
 // Combat jugé sur les tueurs vivants de la salle et les PV du plus entamé (remoteMining.huntable, revu à chaque tick) :
 // perdu, ou salle dangereuse autrement (joueur, forteresse), ils rentrent, se soignent et attendent (le spawner envoie
-// les tueurs qui manquent), ou se recyclent s'ils mourront avant sa réouverture (remoteMining.recycle) ; gagnable, ils y vont groupés (regroup).
+// les tueurs qui manquent), ou se recyclent s'ils mourront avant sa réouverture (remoteMining.recycle) ; gagnable, ils y vont groupés (move.regroup).
 // Combat fini : ceux de trop se recyclent, le plus jeune sur place reste (remoteMining.surplus).
 // ponytail: il ignore le keeper du minerai.
 module.exports.run = function (creep) {
@@ -58,7 +37,7 @@ module.exports.run = function (creep) {
       if (!remoteMining.recycle(creep)) remoteMining.retreat(creep);
       return;
     }
-    if (mates.length > 1 && regroup(creep, mates)) return;
+    if (mates.length > 1 && move.regroup(creep, mates)) return;
   }
   if (creep.room.name !== name) {
     move.to(creep, new RoomPosition(25, 25, name), { range: 20 });

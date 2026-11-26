@@ -38,10 +38,12 @@ const REPAIR_SPEND = 0.4 + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPAR
 const REPAIR_BUILDER_UNITS = 3;
 // Soutien d'une salle voisine jeune (expansion.supported). Carrier : 1 250 d'énergie pour ~200 ticks d'aller-retour,
 // ~6 énergie/tick chacun. Pioneers : 16 WORK chacun, de quoi dépenser ces ~37 énergie/tick et les 20 de ses sources.
-// Garde : 12 RANGED_ATTACK (120 PV/tick), abat un claimer en quelques ticks tant que la salle n'a pas de tour.
+// Garde : corps de tueur (remoteMining.KILLER_BODY) si la salle le paie, sinon 12 RANGED_ATTACK (120 PV/tick), de quoi
+// abattre un claimer en quelques ticks tant que la salle n'a pas de tour. Au plus MAX_GUARDS ensemble (voir guards).
 const CARRIERS = 6;
 const PIONEERS = 3;
 const GUARD_UNITS = 12;
+const MAX_GUARDS = 3;
 // Rôles dont l'entretien est déduit du revenu : ceux qui récoltent et transportent.
 const ECONOMY_ROLES = ['miner', 'hauler', 'filler', 'remoteMiner', 'remoteHauler', 'reserver', 'keeperKiller', 'mineralMiner', 'mineralHauler'];
 // Renseignements sur une salle voisine jugés périmés après ce nombre de ticks : un éclaireur va les rafraîchir.
@@ -183,6 +185,19 @@ function downgrading(room) {
   return !!room.memory.downgrade;
 }
 
+// Gardes voulus pour la salle jeune `young` sans tour : 1 en poste sans hostile (contre un claimer qui viendrait), sinon
+// le plus petit nombre qui abat les hostiles présents (remoteMining.beats), aucun si même MAX_GUARDS perdent : ils
+// mourraient sans rien tuer (9 gardes envoyés un à un dans E24S3 face au raid de deadlydd, le 2026-11-26).
+// ponytail: beats compte des corps de tueur ; une salle d'origine sous 5 500 de capacité envoie des gardes plus faibles.
+function guards(young) {
+  if (young.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length) return 0;
+  const hostiles = intel.threats(young);
+  if (!hostiles.length) return 1;
+  const f = intel.force(hostiles);
+  for (let n = 1; n <= MAX_GUARDS; n++) if (remoteMining.beats(f, remoteMining.KILLER_HITS, n)) return n;
+  return 0;
+}
+
 // Effectifs voulus par rôle, dans l'ordre de priorité. Les harvesters ne servent plus qu'en urgence (voir run).
 // Haulers avant mineurs : ils suivent les WORK déjà posés, ce qui alterne mineur et hauler au démarrage
 // au lieu de payer tous les mineurs avant de pouvoir transporter.
@@ -196,6 +211,7 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   const list = sources.list(room);
   const expanding = Memory.expansion && Memory.expansion.from === room.name;
   const young = expansion.supported(room);
+  const contested = young && intel.threats(young).length > 0;
   // downgrading avant paused : il pose le drapeau qui lève la pause.
   const urgent = downgrading(room);
   const sites = room.find(FIND_MY_CONSTRUCTION_SITES);
@@ -243,9 +259,10 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     // Expansion et soutien d'une salle jeune avant la récolte distante, qui ne prend alors que le temps de spawn restant.
     // Le 2026-11-25, le claimer d'un voisin est entré dans E24S3 5 ticks après que nous l'avons prise.
     claimer: expanding && !expansion.claimed() ? 1 : 0,
-    guard: young && !young.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length ? 1 : 0,
-    carrier: young && room.storage.store[RESOURCE_ENERGY] > carrier.RESERVE ? CARRIERS : 0,
-    pioneer: young ? PIONEERS : expanding && expansion.claimed() ? 2 : 0,
+    guard: young ? guards(young) : 0,
+    // Salle jeune tenue par des hostiles : carriers et pioneers n'y entrent pas (intel.avoid), ils attendraient chez nous.
+    carrier: young && !contested && room.storage.store[RESOURCE_ENERGY] > carrier.RESERVE ? CARRIERS : 0,
+    pioneer: young ? (contested ? 0 : PIONEERS) : expanding && expansion.claimed() ? 2 : 0,
     // Après la récolte locale : il rend ses sources à la salle distante envahie.
     remoteDefender: remoteMining.invaded(room) ? 1 : 0,
     // Tueur de keepers avant builders et upgraders : son successeur part à temps (remplacé à l'avance selon son trajet).
@@ -346,7 +363,10 @@ function buildBody(role, energy, room, sourceId, target) {
   // Cœur d'Invader (100 000 PV, sans créep ni tour) : ATTACK au contact, 3 fois les dégâts d'un RANGED_ATTACK.
   if (role === 'remoteDefender' && intel.get(target) && intel.get(target).core) return repeat([ATTACK, MOVE], energy);
   if (role === 'defender' || role === 'remoteDefender') return repeat([RANGED_ATTACK, MOVE], energy);
-  if (role === 'guard') return repeat([RANGED_ATTACK, MOVE], Math.min(energy, GUARD_UNITS * cost([RANGED_ATTACK, MOVE])));
+  if (role === 'guard') {
+    return cost(remoteMining.KILLER_BODY) <= energy ? remoteMining.KILLER_BODY.slice()
+      : repeat([RANGED_ATTACK, MOVE], Math.min(energy, GUARD_UNITS * cost([RANGED_ATTACK, MOVE])));
+  }
   if (role === 'carrier') return repeat([CARRY, MOVE], energy);
   if (role === 'scout') return [MOVE];
   // Claimer : 5 MOVE si l'énergie le permet (850), de quoi annuler la fatigue du CLAIM en marais (10) : une case

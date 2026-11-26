@@ -227,4 +227,13 @@ remoteBuilder.run(inside);
 assert.strictEqual(inside.memory.role, 'builder');
 Object.assign(remoteMining, real);
 
+// Gardes face au reste du raid de deadlydd sur E24S3 (2026-11-26) : 2 tireurs (8 HEAL, 10 RANGED_ATTACK) et un soigneur
+// (17 HEAL). Trois gardes perdent ; le soigneur seul, deux l'abattent, un seul non (140 de tir contre 204 de soin).
+const ranger = { heal: 96, damage: 100, hits: 4400 };
+const medic = { heal: 204, damage: 0, hits: 5000 };
+const group = (creeps) => ({ creeps, heal: 0, damage: 0, hits: 0 });
+assert.ok(!remoteMining.beats(group([ranger, ranger, medic]), undefined, 3));
+assert.ok(!remoteMining.beats(group([medic]), undefined, 1));
+assert.ok(remoteMining.beats(group([medic]), undefined, 2));
+
 console.log('keeper : ok');

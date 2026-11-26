@@ -225,4 +225,26 @@ function forget(name) {
   delete hops[name];
 }
 
-module.exports = { to, step, travel, reachable, run, forget, PLAN_COSTS };
+// Groupe de combat (tueurs de keepers, gardes) : chacun à cette portée au plus du meneur avant d'approcher.
+const GROUP_RANGE = 2;
+// Plus aucun ennemi à cette portée du meneur : le groupe se reforme (sinon le combat est engagé, chacun pour soi).
+const CONTACT_RANGE = 5;
+
+const onExit = (c) => c.pos.x === 0 || c.pos.x === 49 || c.pos.y === 0 || c.pos.y === 49;
+
+// Vrai si un créep du groupe `mates` (triés par nom) doit attendre ou rejoindre les autres avant d'avancer. Le meneur
+// (nom le plus petit) attend tant qu'un autre est à plus de GROUP_RANGE ; les autres le rejoignent. Pas en plein combat
+// (ennemi à CONTACT_RANGE du meneur) : le recul de chacun à portée 3 les écarte un peu, ils restent sur la même cible.
+function regroup(creep, mates) {
+  const leader = mates[0];
+  if (leader.room.find(FIND_HOSTILE_CREEPS, { filter: (c) => leader.pos.inRangeTo(c, CONTACT_RANGE) }).length) return false;
+  const apart = mates.some((c) => c.room.name !== leader.room.name || !c.pos.inRangeTo(leader, GROUP_RANGE));
+  if (!apart) return false;
+  if (creep !== leader) to(creep, leader, { range: 1 });
+  // Meneur arrêté sur une case de sortie : le moteur le fait changer de salle à chaque tick et les autres ne le
+  // rejoignent jamais (le 2026-11-22, plus de 2 h de va-et-vient entre E25S3 et E25S4). Il attend 3 cases à l'intérieur.
+  else if (onExit(creep)) to(creep, new RoomPosition(25, 25, creep.room.name), { range: 22 });
+  return true;
+}
+
+module.exports = { to, step, travel, reachable, run, forget, regroup, PLAN_COSTS };
