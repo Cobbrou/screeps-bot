@@ -1,7 +1,7 @@
 // Parties qui rendent un créep hostile dangereux (les éclaireurs ne déclenchent rien).
-// WORK seulement chez l'Invader : chez un joueur, c'est presque toujours un mineur ou un réparateur de passage,
-// et le viser risque une guerre (tours, amélioration en pause, pixels bloqués).
-// ponytail: un démanteleur joueur sans ATTACK est ignoré ; le compter au contact de nos structures s'il en vient un.
+// WORK chez l'Invader, et chez un joueur seulement sans CARRY (démanteleur) : avec CARRY, c'est presque toujours
+// un mineur ou un réparateur de passage, et le viser risque une guerre (tours, amélioration en pause, pixels bloqués).
+// Le 2026-11-26, 6 démanteleurs de deadlydd (25 WORK, 25 MOVE) ont rasé E24S3 sans que la tour les vise.
 const DANGEROUS = [ATTACK, RANGED_ATTACK, HEAL, CLAIM];
 const INVADER = 'Invader';
 // Joueurs amis : nos créeps n'entrent pas dans leurs salles, sauf l'éclaireur (voir intel). Leurs créeps armés restent des menaces chez nous.
@@ -47,11 +47,16 @@ const repairCache = {};
 // Cible commune des tours et des défenseurs, par salle, recalculée à chaque tick.
 const targetCache = {};
 
+// Vrai si le créep hostile est dangereux (voir DANGEROUS).
+function dangerous(c) {
+  const types = c.body.map((p) => p.type);
+  if (types.some((t) => DANGEROUS.includes(t))) return true;
+  return types.includes(WORK) && (c.owner.username === INVADER || !types.includes(CARRY));
+}
+
 // Hostiles dangereux présents dans la salle.
 function threats(room) {
-  return room.find(FIND_HOSTILE_CREEPS, {
-    filter: (c) => c.body.some((p) => DANGEROUS.includes(p.type) || (p.type === WORK && c.owner.username === INVADER)),
-  });
+  return room.find(FIND_HOSTILE_CREEPS, { filter: dangerous });
 }
 
 // Points de vie visés à la réparation : les murs et remparts sont plafonnés selon le RCL, puis à WALL_HITS_MAX.
@@ -320,12 +325,21 @@ function runTowers(room) {
   if (!barrier || damaged.hits <= RAMPART_DYING || tower.pos.inRangeTo(damaged, TOWER_OPTIMAL_RANGE)) tower.repair(damaged);
 }
 
+// Vrai si un hostile joueur est à l'intérieur de la coupe (`cells`, voir insideCells) ; faux sans coupe.
+// Invaders exclus : les tours les achèvent, la règle des structures vitales reste pour eux.
+function breached(cells, hostiles) {
+  return !!cells && hostiles.some((h) => h.owner.username !== INVADER && cells.has(h.pos.x * 50 + h.pos.y));
+}
+
 // Mode sans échec en dernier recours : un spawn, une tour, le stockage ou le terminal est tombé sous la moitié
 // de ses points de vie (le rempart qui le couvrait est tombé),
 // ou un claimer hostile approche du contrôleur. Activé avant son premier attackController : un contrôleur
 // `upgradeBlocked` peut refuser le mode sans échec (la doc le confirme pour les nukes) ; l'appel est tenté quand même.
 // Salle sans tour : activé dès qu'un joueur armé ou un claimer y entre, rien d'autre ne l'arrêterait (pioneers et
 // carriers meurent avant la première structure vitale) ; 20 000 ticks, de quoi atteindre la tour du RCL 3.
+// Coupe percée (breached) : un joueur armé ou démanteleur à l'intérieur des murs. La moitié des PV ne suffit pas :
+// 6 démanteleurs à 25 WORK (7 500 PV/tick, E24S3 le 2026-11-26) abattent spawn, tour ou terminal en un tick une fois
+// leur rempart tombé, sans jamais passer sous la moitié.
 // Un seul mode sans échec à la fois sur le compte : pendant ce temps, les autres salles n'ont plus le leur.
 function lastResort(room, hostiles) {
   const c = room.controller;
@@ -333,7 +347,7 @@ function lastResort(room, hostiles) {
   const claimer = hostiles.some((h) => h.getActiveBodyparts(CLAIM) && h.pos.inRangeTo(c, CLAIMER_ALERT_RANGE));
   const bare = !room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length
     && hostiles.some((h) => h.owner.username !== INVADER);
-  if (claimer || bare || room.find(FIND_MY_STRUCTURES, {
+  if (claimer || bare || breached(insideCells(room), hostiles) || room.find(FIND_MY_STRUCTURES, {
     filter: (s) => VITAL.includes(s.structureType) && s.hits < s.hitsMax / 2,
   }).length) c.activateSafeMode();
 }
@@ -349,6 +363,8 @@ module.exports.run = function () {
 };
 
 module.exports.threats = threats;
+module.exports.dangerous = dangerous;
+module.exports.breached = breached;
 module.exports.FRIENDS = FRIENDS;
 module.exports.INVADER = INVADER;
 module.exports.target = target;
