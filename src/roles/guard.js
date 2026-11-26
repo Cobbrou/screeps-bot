@@ -1,14 +1,16 @@
 const move = require('../move');
 const intel = require('../intel');
 const remoteMining = require('../remoteMining');
+const expansion = require('../expansion');
 
 // Portée de RANGED_ATTACK.
 const RANGE = 3;
 
 // Garde d'une salle jeune (creep.memory.target), au corps de tueur (remoteMining.KILLER_BODY) quand la salle d'origine
 // le paie. Soigne le plus entamé de lui-même et des gardes à son contact, tire à portée 3, soigneurs d'abord.
-// Combat jugé à chaque tick sur les gardes vivants et les PV du plus entamé (remoteMining.beats) : perdu, ils attendent
-// chez eux (le spawner crée ceux qui manquent, aucun si même MAX_GUARDS perdent) ; gagnable, ils y vont groupés (move.regroup).
+// Combat jugé à chaque tick sur les gardes vivants et les PV du plus entamé (remoteMining.beats) : perdu, ou salle passée
+// par des hostiles armés qui n'y sont plus (expansion.raided), ils se recyclent chez eux (le spawner en recrée s'il le faut) ;
+// gagnable, ils y vont groupés (move.regroup).
 // Le 2026-11-26, envoyés un à un dans E24S3 tenue par deadlydd, 9 gardes y sont morts sans rien tuer.
 // Sans hostile : posté à portée 3 du contrôleur, là où un claimer doit venir.
 module.exports.run = function (creep) {
@@ -21,11 +23,14 @@ module.exports.run = function (creep) {
   if (hurt) creep.heal(hurt);
   const room = Game.rooms[name];
   const hostiles = room ? intel.threats(room) : [];
+  const lost = hostiles.length
+    ? !remoteMining.beats(intel.force(hostiles), Math.min(...mates.map((c) => c.hits)), mates.length)
+    : !!room && expansion.raided(room);
+  if (lost) {
+    if (!remoteMining.goRecycle(creep, Game.rooms[creep.memory.room])) remoteMining.retreat(creep);
+    return;
+  }
   if (hostiles.length) {
-    if (!remoteMining.beats(intel.force(hostiles), Math.min(...mates.map((c) => c.hits)), mates.length)) {
-      remoteMining.retreat(creep);
-      return;
-    }
     if (mates.length > 1 && move.regroup(creep, mates)) return;
   }
   if (creep.room.name !== name) {

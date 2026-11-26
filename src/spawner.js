@@ -185,14 +185,15 @@ function downgrading(room) {
   return !!room.memory.downgrade;
 }
 
-// Gardes voulus pour la salle jeune `young` sans tour : 1 en poste sans hostile (contre un claimer qui viendrait), sinon
+// Gardes voulus pour la salle jeune `young` sans tour : 1 en poste sans hostile (contre un claimer qui viendrait), aucun
+// si des hostiles armés y sont passés depuis peu (expansion.raided), sinon
 // le plus petit nombre qui abat les hostiles présents (remoteMining.beats), aucun si même MAX_GUARDS perdent : ils
 // mourraient sans rien tuer (9 gardes envoyés un à un dans E24S3 face au raid de deadlydd, le 2026-11-26).
 // ponytail: beats compte des corps de tueur ; une salle d'origine sous 5 500 de capacité envoie des gardes plus faibles.
 function guards(young) {
   if (young.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length) return 0;
   const hostiles = intel.threats(young);
-  if (!hostiles.length) return 1;
+  if (!hostiles.length) return expansion.raided(young) ? 0 : 1;
   const f = intel.force(hostiles);
   for (let n = 1; n <= MAX_GUARDS; n++) if (remoteMining.beats(f, remoteMining.KILLER_HITS, n)) return n;
   return 0;
@@ -211,7 +212,7 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   const list = sources.list(room);
   const expanding = Memory.expansion && Memory.expansion.from === room.name;
   const young = expansion.supported(room);
-  const contested = young && intel.threats(young).length > 0;
+  const contested = young && expansion.raided(young);
   // downgrading avant paused : il pose le drapeau qui lève la pause.
   const urgent = downgrading(room);
   const sites = room.find(FIND_MY_CONSTRUCTION_SITES);
@@ -260,8 +261,9 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     // Le 2026-11-25, le claimer d'un voisin est entré dans E24S3 5 ticks après que nous l'avons prise.
     claimer: expanding && !expansion.claimed() ? 1 : 0,
     guard: young ? guards(young) : 0,
-    // Salle jeune tenue par des hostiles : carriers et pioneers n'y entrent pas (intel.avoid), ils attendraient chez nous.
-    carrier: young && !contested && room.storage.store[RESOURCE_ENERGY] > carrier.RESERVE ? CARRIERS : 0,
+    // Salle jeune tenue par des hostiles ou passée par eux depuis peu (expansion.raided) : ni carrier ni pioneer.
+    // Carriers seulement au-dessus de la réserve du stockage (carrier.reserve).
+    carrier: young && !contested && room.storage.store[RESOURCE_ENERGY] > carrier.reserve(room) ? CARRIERS : 0,
     pioneer: young ? (contested ? 0 : PIONEERS) : expanding && expansion.claimed() ? 2 : 0,
     // Après la récolte locale : il rend ses sources à la salle distante envahie.
     remoteDefender: remoteMining.invaded(room) ? 1 : 0,

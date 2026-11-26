@@ -4,9 +4,12 @@ const mineralHauler = require('./mineralHauler');
 const remoteMining = require('../remoteMining');
 const expansion = require('../expansion');
 const intel = require('../intel');
+const upgraders = require('./upgrader');
 
-// Énergie laissée au stockage de la salle d'origine : de quoi remplir spawn, extensions et tours.
+// Énergie laissée au stockage de la salle d'origine : de quoi remplir spawn, extensions et tours, et au moins la réserve
+// qui fait reprendre l'amélioration (100 000 dès le RCL 7, upgrader.storageHigh) : le soutien ne la vide pas.
 const RESERVE = 10000;
+const reserve = (home) => Math.max(RESERVE, upgraders.storageHigh(home));
 // Sous cette vie, pas de nouveau chargement chez lui : il mourrait chargé avant d'arriver (~100 ticks).
 const LAST_TRIP = 150;
 
@@ -73,16 +76,16 @@ module.exports.run = function (creep) {
   // Salle soutenue sans trajet sûr : le 2026-11-26, 6 carriers ont attendu pleins dans E25S3 qu'E24S3 rouvre,
   // ~7 500 d'énergie sortie du stockage pour rien. L'énergie y retourne, puis le carrier se recycle (le spawner
   // n'en recrée pas tant que la salle est tenue).
-  const closed = young && young.name === target && !intel.route(home.name, target);
+  const closed = young && young.name === target && (!intel.route(home.name, target) || expansion.raided(young));
   if (!young || young.name !== target || closed || (!energy && creep.ticksToLive < LAST_TRIP)) {
     if (!energy || !home.storage) remoteMining.goRecycle(creep, home);
     else if (creep.transfer(home.storage, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, home.storage);
     return;
   }
   const { storage } = home;
-  if (storage.store[RESOURCE_ENERGY] > RESERVE) take(creep, storage, RESOURCE_ENERGY);
+  if (storage.store[RESOURCE_ENERGY] > reserve(home)) take(creep, storage, RESOURCE_ENERGY);
   else if (!creep.pos.inRangeTo(storage, 3)) move.to(creep, storage, { range: 3 });
 };
 
-module.exports.RESERVE = RESERVE;
+module.exports.reserve = reserve;
 module.exports.remains = remains;

@@ -1,11 +1,19 @@
 const move = require('../move');
 const builder = require('./builder');
 const carrier = require('./carrier');
+const expansion = require('../expansion');
+const remoteMining = require('../remoteMining');
 
 // Créep d'amorçage : rejoint la salle revendiquée par le trajet sûr (move.travel) puis y récolte et construit comme un builder (spawn d'abord).
+// Sans trajet sûr, ou salle à nous passée par des hostiles armés (expansion.raided) : se recycle chez lui au lieu
+// d'attendre sa mort (le spawner en recrée à la réouverture).
 module.exports.run = function (creep) {
   if (creep.room.name !== creep.memory.target) {
-    move.travel(creep, creep.memory.target);
+    const target = Game.rooms[creep.memory.target];
+    const held = target && target.controller && target.controller.my && expansion.raided(target);
+    if ((held || !move.travel(creep, creep.memory.target)) && Game.rooms[creep.memory.room]) {
+      remoteMining.goRecycle(creep, Game.rooms[creep.memory.room]);
+    }
     return;
   }
   // Ruines de l'ancien propriétaire d'abord : un plein en quelques ticks, contre ~25 à la source.

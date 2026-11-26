@@ -161,5 +161,17 @@ function supported(home) {
     .find((r) => r && r.controller && r.controller.my && !r.storage);
 }
 
+// Salle à nous vue avec des hostiles armés depuis moins de RAID_COOLDOWN ticks (room.memory.raided) : son soutien attend.
+// Armés : ATTACK, RANGED_ATTACK, HEAL ou démanteleur (intel.threats) ; un claimer seul ne compte pas (le 2026-11-25, un claimer
+// déjà reparti fermait E24S3 aux pioneers). Juger sur les seuls hostiles visibles relançait carriers, pioneers et garde dès
+// que deadlydd sortait se soigner, ~25 000 d'énergie pour une salle qu'il rase à volonté (2026-11-26).
+const RAID_COOLDOWN = 1500;
+function raided(room) {
+  const armed = intel.threats(room).some((c) => c.body.some((p) => ![CLAIM, MOVE, TOUGH].includes(p.type)));
+  if (armed) room.memory.raided = Game.time;
+  return room.memory.raided !== undefined && Game.time - room.memory.raided < RAID_COOLDOWN;
+}
+
 module.exports.claimed = claimed;
+module.exports.raided = raided;
 module.exports.supported = supported;
