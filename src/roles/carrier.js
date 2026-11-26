@@ -35,10 +35,12 @@ module.exports.run = function (creep) {
   else if (full) creep.memory.working = true;
 
   if (creep.memory.working) {
-    if (creep.room.name === target) hauler.deliver(creep);
-    // Aucun trajet sûr (salle tenue par des hostiles, voir intel.avoid) : il rentre rendre sa charge (plus bas).
-    else if (!move.travel(creep, target)) creep.memory.working = false;
-    return;
+    if (creep.room.name === target) {
+      hauler.deliver(creep);
+      return;
+    }
+    // Aucun trajet sûr (salle tenue par des hostiles, voir intel.avoid) : il rend sa charge chez lui (plus bas).
+    if (move.travel(creep, target)) return;
   }
   if (creep.room.name === target && !full) {
     // Minerai déjà à bord : pas d'énergie en plus, elle repartirait avec lui.
