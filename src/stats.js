@@ -63,9 +63,10 @@ function run() {
   modules = {};
 
   // generatePixel n'existe que sur le serveur officiel. Il vide le bucket : pas de pixel pendant une expansion
-  // (planner et expansion seraient sautés) ni face à des hostiles (plus de réserve pour un pic de CPU).
+  // (planner et expansion seraient sautés) ni face à des hostiles dans nos murs (plus de réserve pour un pic de CPU).
+  // Un hostile resté dehors (drainer au bord de la salle) ne bloque plus les pixels.
   const threatened = Object.values(Game.rooms)
-    .some((r) => r.controller && r.controller.my && defense.threats(r).length);
+    .some((r) => r.controller && r.controller.my && defense.intruders(r).length);
   if (typeof Game.cpu.generatePixel === 'function' && Game.cpu.bucket >= PIXEL_CPU_COST && !Memory.expansion
     && !threatened) {
     Game.cpu.generatePixel();

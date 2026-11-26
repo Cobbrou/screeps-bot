@@ -113,12 +113,13 @@ function damagedStructure(room) {
   return damaged;
 }
 
-// Vrai si la salle est sûre et ses chantiers finis : aucun hostile dangereux (hors mode sans échec), aucun chantier.
-// Sinon l'amélioration attend (voir upgrader.paused) : l'énergie va d'abord aux builders et aux tours.
+// Vrai si la salle est sûre et ses chantiers finis : aucun hostile dangereux dans les murs (intruders, hors mode
+// sans échec), aucun chantier. Sinon l'amélioration attend (voir upgrader.paused) : l'énergie va d'abord aux builders
+// et aux tours. Un hostile resté dehors (drainer au bord) n'atteint aucune structure (CUT_MARGIN du planner).
 // Les réparations ne la bloquent pas : murs et remparts restent presque toujours sous leur cible, la salle ne serait
 // jamais prête ; les tours et un builder les montent en parallèle de l'amélioration.
 function secure(room) {
-  if (!room.controller.safeMode && threats(room).length) return false;
+  if (!room.controller.safeMode && intruders(room).length) return false;
   return !room.find(FIND_MY_CONSTRUCTION_SITES).length;
 }
 
@@ -165,15 +166,24 @@ function hostileHeal(target, hostiles) {
   return heal;
 }
 
-// Vrai si les tours (et `extra` dégâts/tick sans coût d'énergie, ceux des défenseurs) tuent `h` avant de se vider :
-// dégâts moins soin hostile, multipliés par le nombre de salves que l'énergie moyenne des tours permet, au moins ses PV.
+// Vrai si les tours (et `extra` dégâts/tick sans coût d'énergie, ceux des défenseurs) tuent `h` avant de se vider
+// et avant qu'il quitte la salle : dégâts moins soin hostile, multipliés par le nombre de salves que l'énergie moyenne
+// des tours permet et par les ticks qu'il lui faut pour sortir (escape), au moins ses PV.
 // Dépasser le soin ne suffit pas : une paire d'Invaders au bord de la salle, à portée 30 des tours, prend 12 PV
 // nets par tick et vide les tours avant d'arriver au contact, où elles l'auraient tuée.
 function killable(h, hostiles, towers, extra) {
   const net = salvo(towers, h) + extra - hostileHeal(h, hostiles);
   const energy = towers.reduce((sum, t) => sum + t.store[RESOURCE_ENERGY], 0);
   const shots = towers.length ? energy / (TOWER_ENERGY_COST * towers.length) : Infinity;
-  return net > 0 && net * shots >= h.hits;
+  return net > 0 && net * Math.min(shots, escape(h)) >= h.hits;
+}
+
+// Salves que les tours ont avant que `h` sorte de la salle : sa distance à la case de sortie la plus proche, plus le tick
+// en cours. Un drainer (18 HEAL) entrait en (1, 27) dans E25S3, prenait ~9 salves et ressortait se soigner, toutes les
+// ~18 ticks : ~15 énergie/tick de tours pour rien, presque tout le revenu de la salle (2026-11-26).
+function escape(h) {
+  const exit = h.pos.findClosestByRange(FIND_EXIT);
+  return exit ? h.pos.getRangeTo(exit) + 1 : Infinity;
 }
 
 // Hostile visé par les tours (et en priorité par les défenseurs), ou null.
@@ -236,6 +246,11 @@ function insideCells(room) {
 function inBase(room, pos) {
   const cells = insideCells(room);
   return !cells || cells.has(pos.x * 50 + pos.y);
+}
+
+// Hostiles dangereux à l'intérieur des murs (tous sans coupe, voir inBase).
+function intruders(room) {
+  return threats(room).filter((h) => inBase(room, h.pos));
 }
 
 // Rempart où un créep peut se tenir (aucune structure bloquante dessous) : un défenseur dessus ne prend aucun coup
@@ -363,7 +378,9 @@ module.exports.run = function () {
 };
 
 module.exports.threats = threats;
+module.exports.intruders = intruders;
 module.exports.dangerous = dangerous;
+module.exports.killable = killable;
 module.exports.breached = breached;
 module.exports.FRIENDS = FRIENDS;
 module.exports.INVADER = INVADER;
