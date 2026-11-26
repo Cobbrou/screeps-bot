@@ -20,12 +20,13 @@ assert.ok(defense.dangerous(creep('Invader', [WORK, CARRY, MOVE])));
 assert.ok(defense.dangerous(creep('someone', [RANGED_ATTACK, MOVE])));
 assert.ok(!defense.dangerous(creep('someone', [MOVE])));
 
-// Coupe percée : joueur à l'intérieur des murs ; Invader dedans, joueur dehors ou salle sans coupe : non.
+// Coupe percée : joueur à l'intérieur des murs, ou dans une salle sans coupe ; Invader dedans ou joueur dehors : non.
 const cells = new Set([10 * 50 + 10]);
 assert.ok(defense.breached(cells, [creep('deadlydd', [WORK, MOVE])]));
 assert.ok(!defense.breached(cells, [creep('Invader', [ATTACK, MOVE])]));
 assert.ok(!defense.breached(cells, [creep('deadlydd', [WORK, MOVE], 1, 27)]));
-assert.ok(!defense.breached(null, [creep('deadlydd', [WORK, MOVE])]));
+assert.ok(defense.breached(null, [creep('deadlydd', [WORK, MOVE])]));
+assert.ok(!defense.breached(null, [creep('Invader', [ATTACK, MOVE])]));
 
 // Drainer (18 HEAL, 4 200 PV) à portée 25 de 3 tours (450 dégâts, 234 nets) : au bord de la salle, il ressort
 // avant de tomber, les tours gardent leur énergie ; à 20 cases de toute sortie, elles le tuent.

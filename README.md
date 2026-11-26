@@ -55,7 +55,7 @@ Sans `secrets.json`, `deploy` et `watch` se contentent du build et affichent un 
 screeps-bot/
 ├── src/
 │   ├── main.js              # point d'entrée (loop exécutée à chaque tick)
-│   ├── boost.js             # boost des upgraders (GH, GH2O, XGH2O) : achat, lab, application
+│   ├── boost.js             # boost au lab : upgraders (GH, GH2O, XGH2O), gardes en guerre (KO, KHO2, XKHO2) : achat, lab, application
 │   ├── defense.js           # tours, mode sans échec (coupe percée, structure vitale), détection des hostiles (démanteleurs compris)
 │   ├── expansion.js         # choix de la salle à revendiquer, pose de son premier spawn
 │   ├── intel.js             # renseignements sur les salles explorées (Memory.rooms[*].intel)

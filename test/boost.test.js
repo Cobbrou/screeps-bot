@@ -1,4 +1,4 @@
-// Vérifie le boost des upgraders hors du jeu : node test/boost.test.js
+// Vérifie le boost des upgraders et des gardes hors du jeu : node test/boost.test.js
 const assert = require('assert');
 
 // Constantes et objets du jeu utilisés par src/boost.js et src/move.js.
@@ -7,13 +7,22 @@ Object.assign(global, {
   RESOURCE_GHODIUM_HYDRIDE: 'GH',
   RESOURCE_GHODIUM_ACID: 'GH2O',
   RESOURCE_CATALYZED_GHODIUM_ACID: 'XGH2O',
+  RESOURCE_KEANIUM_OXIDE: 'KO',
+  RESOURCE_KEANIUM_ALKALIDE: 'KHO2',
+  RESOURCE_CATALYZED_KEANIUM_ALKALIDE: 'XKHO2',
+  WORK: 'work',
+  RANGED_ATTACK: 'ranged_attack',
   LAB_BOOST_MINERAL: 30,
   LAB_BOOST_ENERGY: 20,
   CREEP_LIFE_TIME: 1500,
   ORDER_SELL: 'sell',
   FIND_MY_STRUCTURES: 108,
   STRUCTURE_LAB: 'lab',
-  BOOSTS: { work: { GH: { upgradeController: 1.5 }, GH2O: { upgradeController: 1.8 }, XGH2O: { upgradeController: 2 } } },
+  BOOSTS: {
+    work: { GH: { upgradeController: 1.5 }, GH2O: { upgradeController: 1.8 }, XGH2O: { upgradeController: 2 } },
+    ranged_attack: { KO: { rangedAttack: 2 }, KHO2: { rangedAttack: 3 }, XKHO2: { rangedAttack: 4 } },
+  },
+  Memory: {},
 });
 // move charge tout le reste du bot (intel, defense) : remplacé par un module vide.
 const movePath = require.resolve('../src/move');
@@ -82,5 +91,21 @@ r = room({ GH2O: 7, energy: 2000 }, { XGH2O: 900 });
 assert.strictEqual(boost.labJob(r).resource, 'GH2O');
 assert.strictEqual(boost.labJob(r).to, r.terminal);
 assert.strictEqual(boost.labJob(room({ GH2O: 7, energy: 2000 }, {})), undefined);
+
+// Guerre (Memory.war) : composé de tir au moins cher par point, 42 RANGED_ATTACK visés (1 260), sans plafond de prix.
+Memory.war = { target: 'E24S3' };
+orders.push({ id: 'ko', resourceType: 'KO', price: 675, amount: 5000, roomName: 'E1S1' },
+  { id: 'kho2', resourceType: 'KHO2', price: 2281, amount: 8000, roomName: 'E2S2' });
+assert.deepStrictEqual(boost.purchase(room({}, { energy: 5000 })), { order: orders[3], amount: 1260 });
+// GH resté au lab : rendu au terminal dès que le KO est là, puis KO porté au lab.
+r = room({ GH: 910, energy: 180 }, { KO: 1260 });
+assert.strictEqual(boost.labJob(r).resource, 'GH');
+r = room({ energy: 840 }, { KO: 1260 });
+assert.strictEqual(boost.labJob(r).resource, 'KO');
+// Garde de 14 RANGED_ATTACK : boosté ×2 si le lab couvre ses 14 parties, ×1 sinon ; le GH ne compte plus.
+assert.strictEqual(boost.factor(room({ KO: 1260, energy: 840 }, {}), 14), 2);
+assert.strictEqual(boost.factor(room({ KO: 300, energy: 840 }, {}), 14), 1);
+assert.strictEqual(boost.parts(room({ GH: 900, energy: 840 }, {}), 14), 0);
+delete Memory.war;
 
 console.log('boost : OK');

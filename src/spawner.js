@@ -189,17 +189,24 @@ function downgrading(room) {
   return !!room.memory.downgrade;
 }
 
-// Gardes voulus pour la salle jeune `young` sans tour : 1 en poste sans hostile (contre un claimer qui viendrait), aucun
-// si des hostiles armés y sont passés depuis peu (expansion.raided), sinon
+// Gardes voulus pour la salle jeune `young` sans tour, envoyés par `home` : 1 en poste sans hostile (contre un claimer
+// qui viendrait), aucun si des hostiles armés y sont passés depuis peu (expansion.raided). Salle en mode sans échec :
+// les hostiles n'y font rien, assez de gardes pour que leur tir dépasse le soin hostile (reprise d'E24S3). Sinon
 // le plus petit nombre qui abat les hostiles présents (remoteMining.beats), aucun si même MAX_GUARDS perdent : ils
 // mourraient sans rien tuer (9 gardes envoyés un à un dans E24S3 face au raid de deadlydd, le 2026-11-26).
 // ponytail: beats compte des corps de tueur ; une salle d'origine sous 5 500 de capacité envoie des gardes plus faibles.
-function guards(young) {
+function guards(young, home) {
   if (young.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length) return 0;
   const hostiles = intel.threats(young);
   if (!hostiles.length) return expansion.raided(young) ? 0 : 1;
   const f = intel.force(hostiles);
-  for (let n = 1; n <= MAX_GUARDS; n++) if (remoteMining.beats(f, remoteMining.KILLER_HITS, n)) return n;
+  // Tir d'un garde neuf, boost du lab compris (boost.factor, mode guerre).
+  const ranged = remoteMining.KILLER_BODY.filter((p) => p === RANGED_ATTACK).length;
+  const unit = ranged * RANGED_ATTACK_POWER * boost.factor(home, ranged);
+  const safe = young.controller.safeMode;
+  for (let n = 1; n <= MAX_GUARDS; n++) {
+    if (safe ? n * unit > f.heal : remoteMining.beats(f, remoteMining.KILLER_HITS, n, n * unit)) return n;
+  }
   return 0;
 }
 
@@ -264,7 +271,7 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     // Expansion et soutien d'une salle jeune avant la récolte distante, qui ne prend alors que le temps de spawn restant.
     // Le 2026-11-25, le claimer d'un voisin est entré dans E24S3 5 ticks après que nous l'avons prise.
     claimer: expanding && !expansion.claimed() ? 1 : 0,
-    guard: young ? guards(young) : 0,
+    guard: young ? guards(young, room) : 0,
     // Salle jeune tenue par des hostiles ou passée par eux depuis peu (expansion.raided) : ni carrier ni pioneer.
     // Carriers seulement au-dessus de la réserve du stockage (carrier.reserve).
     carrier: young && !contested && room.storage.store[RESOURCE_ENERGY] > carrier.reserve(room) ? CARRIERS : 0,
@@ -568,7 +575,9 @@ module.exports.run = function () {
     const body = buildBody(role, energy, room, memory.sourceId, memory.target);
     if (!body.length) continue;
     // Upgrader boosté au lab s'il a de quoi (composé et énergie) : il y passe avant son poste.
+    // Garde boosté au tir pendant une guerre (lab en mode tir, voir boost).
     if (role === 'upgrader' && boost.parts(room, body.filter((p) => p === WORK).length)) memory.boost = true;
+    if (role === 'guard' && Memory.war && boost.parts(room, body.filter((p) => p === RANGED_ATTACK).length)) memory.boost = true;
     if (spawn.spawnCreep(body, `${role}-${spawn.name}-${Game.time}`, { memory }) === OK) {
       roomCounts[role] = (roomCounts[role] || 0) + 1;
       if (role === 'miner') addMiner(memory.sourceId, body);

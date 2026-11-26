@@ -36,9 +36,11 @@ function storageLow(room) {
 
 // Vrai si l'amélioration doit attendre : stockage bas, hostiles hors mode sans échec ou chantiers en cours
 // (voir defense.secure). Les réparations ne la bloquent pas.
+// Toujours pendant une guerre (Memory.war, voir expansion) : l'énergie va à la défense et à l'attaque.
 // Jamais en cas de rétrogradation proche (drapeau room.memory.downgrade posé par le spawner).
 function paused(room) {
   if (room.memory.downgrade) return false;
+  if (Memory.war) return true;
   if (storageLow(room)) return true;
   return !defense.secure(room);
 }

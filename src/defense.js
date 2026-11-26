@@ -346,18 +346,19 @@ function runTowers(room) {
   if (!barrier || damaged.hits <= RAMPART_DYING || tower.pos.inRangeTo(damaged, TOWER_OPTIMAL_RANGE)) tower.repair(damaged);
 }
 
-// Vrai si un hostile joueur est à l'intérieur de la coupe (`cells`, voir insideCells) ; faux sans coupe.
-// Invaders exclus : les tours les achèvent, la règle des structures vitales reste pour eux.
+// Vrai si un hostile joueur est à l'intérieur de la coupe (`cells`, voir insideCells), ou dans la salle si elle n'a pas
+// de coupe (null : sans spawn, ou avant tour et stockage) : rien ne l'y arrêterait, une tour seule non plus
+// (7 500 PV/tick de démanteleurs). Invaders exclus : les tours les achèvent, la règle des structures vitales reste pour eux.
 function breached(cells, hostiles) {
-  return !!cells && hostiles.some((h) => h.owner.username !== INVADER && cells.has(h.pos.x * 50 + h.pos.y));
+  return hostiles.some((h) => h.owner.username !== INVADER && (!cells || cells.has(h.pos.x * 50 + h.pos.y)));
 }
 
 // Mode sans échec en dernier recours : un spawn, une tour, le stockage ou le terminal est tombé sous la moitié
 // de ses points de vie (le rempart qui le couvrait est tombé),
 // ou un claimer hostile approche du contrôleur. Activé avant son premier attackController : un contrôleur
 // `upgradeBlocked` peut refuser le mode sans échec (la doc le confirme pour les nukes) ; l'appel est tenté quand même.
-// Salle sans tour : activé dès qu'un joueur armé ou un claimer y entre, rien d'autre ne l'arrêterait (pioneers et
-// carriers meurent avant la première structure vitale) ; 20 000 ticks, de quoi atteindre la tour du RCL 3.
+// Salle sans coupe (breached) : activé dès qu'un joueur armé y entre, rien d'autre ne l'arrêterait (pioneers et
+// carriers meurent avant la première structure vitale, une tour seule tombe face aux démanteleurs).
 // Coupe percée (breached) : un joueur armé ou démanteleur à l'intérieur des murs. La moitié des PV ne suffit pas :
 // 6 démanteleurs à 25 WORK (7 500 PV/tick, E24S3 le 2026-11-26) abattent spawn, tour ou terminal en un tick une fois
 // leur rempart tombé, sans jamais passer sous la moitié.
@@ -366,9 +367,7 @@ function lastResort(room, hostiles) {
   const c = room.controller;
   if (c.safeMode || c.safeModeCooldown || !c.safeModeAvailable) return;
   const claimer = hostiles.some((h) => h.getActiveBodyparts(CLAIM) && h.pos.inRangeTo(c, CLAIMER_ALERT_RANGE));
-  const bare = !room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length
-    && hostiles.some((h) => h.owner.username !== INVADER);
-  if (claimer || bare || breached(insideCells(room), hostiles) || room.find(FIND_MY_STRUCTURES, {
+  if (claimer || breached(insideCells(room), hostiles) || room.find(FIND_MY_STRUCTURES, {
     filter: (s) => VITAL.includes(s.structureType) && s.hits < s.hitsMax / 2,
   }).length) c.activateSafeMode();
 }

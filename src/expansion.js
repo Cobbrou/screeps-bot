@@ -135,7 +135,22 @@ function claimed() {
   return !!(room && room.controller && room.controller.my);
 }
 
+// Guerre (Memory.war = { target }) : reprise d'une salle à nous tenue par un joueur, décidée le 2026-11-26 pour E24S3.
+// Pendant ce temps, l'amélioration est en pause partout (upgrader.paused), le lab boost le tir des gardes (boost),
+// les gardes attaquent dès que la salle est en mode sans échec (spawner.guards) et les carriers puisent jusqu'à leur
+// réserve minimale (carrier.reserve). Finie (rien que la défense ensuite) dès que la salle a un spawn et toutes les tours
+// de son RCL, ou si elle n'est plus à nous. Posée à la main : Memory.war = { target: 'E24S3' }.
+function endWar() {
+  const room = Game.rooms[Memory.war.target];
+  const mine = room && room.controller && room.controller.my;
+  const towers = mine && room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length;
+  if (mine && (!room.find(FIND_MY_SPAWNS).length || towers < CONTROLLER_STRUCTURES[STRUCTURE_TOWER][room.controller.level])) return;
+  console.log(`[expansion] guerre finie : ${Memory.war.target} ${mine ? 'reprise' : 'perdue'}`);
+  delete Memory.war;
+}
+
 module.exports.run = function () {
+  if (Memory.war && Game.time % INTERVAL === 0) endWar();
   const exp = Memory.expansion;
   if (!exp) {
     if (Game.time % INTERVAL === 0) choose();
@@ -184,6 +199,7 @@ function supported(home) {
 }
 
 // Salle à nous vue avec des hostiles armés depuis moins de RAID_COOLDOWN ticks (room.memory.raided) : son soutien attend.
+// Pas en mode sans échec : les hostiles n'y peuvent rien contre nos créeps ni nos structures, la reconstruction y va.
 // Armés : ATTACK, RANGED_ATTACK, HEAL ou démanteleur (intel.threats) ; un claimer seul ne compte pas (le 2026-11-25, un claimer
 // déjà reparti fermait E24S3 aux pioneers). Juger sur les seuls hostiles visibles relançait carriers, pioneers et garde dès
 // que deadlydd sortait se soigner, ~25 000 d'énergie pour une salle qu'il rase à volonté (2026-11-26).
@@ -191,6 +207,7 @@ const RAID_COOLDOWN = 1500;
 function raided(room) {
   const armed = intel.threats(room).some((c) => c.body.some((p) => ![CLAIM, MOVE, TOUGH].includes(p.type)));
   if (armed) room.memory.raided = Game.time;
+  if (room.controller && room.controller.safeMode) return false;
   return room.memory.raided !== undefined && Game.time - room.memory.raided < RAID_COOLDOWN;
 }
 

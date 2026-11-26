@@ -765,6 +765,16 @@ function buildCut(room, plan, costs) {
   if (old.every((s) => s.destroy() === OK)) delete plan.clear;
 }
 
+// Remparts sur les structures vitales (CORE) dès qu'une tour existe pour les entretenir, stockage ou non : un attaquant
+// qui passe la coupe ne les détruit pas d'emblée, et une salle reprise (E24S3) protège tour et spawn avant sa coupe.
+function coverCore(room) {
+  const core = room.find(FIND_MY_STRUCTURES, { filter: (o) => CORE.includes(o.structureType) });
+  if (!core.some((s) => s.structureType === STRUCTURE_TOWER)) return;
+  for (const s of core) {
+    if (!s.pos.lookFor(LOOK_STRUCTURES).some((o) => o.structureType === STRUCTURE_RAMPART)) place(room, s.pos, STRUCTURE_RAMPART);
+  }
+}
+
 // Retire les chantiers restés à 0 de progression plus de SITE_TTL ticks, sur tout le compte.
 // Memory.sites garde le tick où chaque chantier a été vu pour la première fois : âge pour ce retrait,
 // et ordre de construction des builders (les plus anciens d'abord).
@@ -803,9 +813,12 @@ module.exports.run = function () {
     const spawn = sources.mainSpawn(room);
     // Spawn perdu (salle rasée) : son chantier est reposé à sa place du plan, sinon les pioneers n'ont rien à construire
     // et la salle ne repart jamais (E24S3, 2026-11-26). Sans plan, c'est l'expansion qui le pose (expansion.placeSpawn).
+    // Tours du plan aussi, avec leurs remparts (coverCore) : la salle reprise se défend avant d'avoir son spawn.
     if (!spawn) {
       const k = room.memory.plan && room.memory.plan.spawn && room.memory.plan.spawn[0];
       if (k !== undefined) room.createConstructionSite(Math.floor(k / 50), k % 50, STRUCTURE_SPAWN);
+      if (room.memory.plan) buildPlan(room, room.memory.plan, STRUCTURE_TOWER);
+      coverCore(room);
       return;
     }
 
@@ -886,11 +899,8 @@ module.exports.run = function () {
       && room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_TOWER }).length) {
       planCut(room, plan, costs);
       buildCut(room, plan, costs);
-      // Remparts aussi sur les structures vitales : un attaquant qui passe la coupe ne les détruit pas d'emblée.
-      for (const s of room.find(FIND_MY_STRUCTURES, { filter: (o) => CORE.includes(o.structureType) })) {
-        if (!s.pos.lookFor(LOOK_STRUCTURES).some((o) => o.structureType === STRUCTURE_RAMPART)) place(room, s.pos, STRUCTURE_RAMPART);
-      }
     }
+    coverCore(room);
     waiting[room.name] = blocked;
   };
   // Une salle en erreur ne doit pas empêcher de planifier les autres.

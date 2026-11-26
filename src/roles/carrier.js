@@ -9,7 +9,8 @@ const upgraders = require('./upgrader');
 // Énergie laissée au stockage de la salle d'origine : de quoi remplir spawn, extensions et tours, et au moins la réserve
 // qui fait reprendre l'amélioration (100 000 dès le RCL 7, upgrader.storageHigh) : le soutien ne la vide pas.
 const RESERVE = 10000;
-const reserve = (home) => Math.max(RESERVE, upgraders.storageHigh(home));
+// Pendant une guerre (Memory.war), RESERVE seule : la reconstruction de la salle reprise passe avant l'amélioration, en pause.
+const reserve = (home) => (Memory.war ? RESERVE : Math.max(RESERVE, upgraders.storageHigh(home)));
 // Sous cette vie, pas de nouveau chargement chez lui : il mourrait chargé avant d'arriver (~100 ticks).
 const LAST_TRIP = 150;
 

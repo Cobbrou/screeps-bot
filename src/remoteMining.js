@@ -93,13 +93,13 @@ function huntable(name, hits = KILLER_HITS, n = 1) {
 }
 
 // Vrai si `n` créeps au corps de tueur (KILLER_BODY) abattent le groupe de force `f` (intel.force), selon l'estimation
-// de huntable. Sert aussi aux gardes d'une salle jeune (roles/guard).
-function beats(f, hits = KILLER_HITS, n = 1) {
+// de huntable. Sert aussi aux gardes d'une salle jeune (roles/guard) ; `damage` : leur tir cumulé, boosts compris.
+function beats(f, hits = KILLER_HITS, n = 1, damage = n * KILLER_DAMAGE) {
   const order = (f.creeps || [f]).slice().sort((a, b) => b.heal - a.heal || b.damage - a.damage);
   let left = hits;
   for (let k = 0; k < order.length; k++) {
     const rest = order.slice(k);
-    const net = n * KILLER_DAMAGE - rest.reduce((sum, c) => sum + c.heal, 0);
+    const net = damage - rest.reduce((sum, c) => sum + c.heal, 0);
     if (net <= 0) return false;
     left -= (order[k].hits / net) * Math.max(0, rest.reduce((sum, c) => sum + c.damage, 0) - KILLER_HEAL);
     if (left <= 0) return false;
