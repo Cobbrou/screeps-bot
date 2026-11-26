@@ -15,6 +15,16 @@ const STOCK = 30 * LAB_BOOST_MINERAL;
 // Énergie gardée dans le lab : de quoi booster 30 WORK.
 const LAB_ENERGY = 30 * LAB_BOOST_ENERGY;
 
+// Stockage sous ce seuil : achats de boost, énergie du lab, du terminal et récolte du minerai attendent (scarce).
+// Seuil propre, pas celui des upgraders (room.memory.storageLow, 100 000 dès le RCL 7) : sous lui, le minerai (H vendu
+// ~500 crédits l'unité) et le boost s'arrêtaient aussi, pour quelques centaines d'énergie (2026-11-26).
+const LOW_STORED = 5000;
+
+// Vrai si le stockage de la salle est sous LOW_STORED (faux sans stockage).
+function scarce(room) {
+  return !!room.storage && room.storage.store[RESOURCE_ENERGY] < LOW_STORED;
+}
+
 // Lab de boost de la salle (le premier construit), ou undefined.
 function lab(room) {
   return room.find(FIND_MY_STRUCTURES, { filter: (s) => s.structureType === STRUCTURE_LAB })[0];
@@ -47,9 +57,9 @@ function wanted(room) {
 }
 
 // Achat à faire : { order, amount } sur l'ordre de vente le moins cher par point (composé en stock imposé),
-// sous MAX_PRICE_PER_POINT, ou undefined. Rien tant que le stockage est bas (upgraders en pause).
+// sous MAX_PRICE_PER_POINT, ou undefined. Rien tant que le stockage est presque vide (scarce).
 function purchase(room) {
-  if (!lab(room) || !wanted(room) || room.memory.storageLow) return undefined;
+  if (!lab(room) || !wanted(room) || scarce(room)) return undefined;
   const current = held(room);
   const missing = STOCK - (current ? stock(room, current) : 0);
   if (missing < STOCK / 3) return undefined;
@@ -78,7 +88,7 @@ function labJob(room) {
   if (compound && l.store[compound] < STOCK && room.terminal.store[compound] > 0) {
     return { from: room.terminal, resource: compound, to: l };
   }
-  if (compound && l.store[RESOURCE_ENERGY] < LAB_ENERGY && !room.memory.storageLow) {
+  if (compound && l.store[RESOURCE_ENERGY] < LAB_ENERGY && !scarce(room)) {
     return { from: room.storage, resource: RESOURCE_ENERGY, to: l };
   }
   return undefined;
@@ -110,4 +120,4 @@ function apply(creep) {
   return true;
 }
 
-module.exports = { COMPOUNDS, CREDIT_RESERVE, lab, wanted, purchase, labJob, parts, apply };
+module.exports = { COMPOUNDS, CREDIT_RESERVE, scarce, lab, wanted, purchase, labJob, parts, apply };

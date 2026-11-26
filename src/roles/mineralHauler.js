@@ -59,7 +59,7 @@ function job(room, alive) {
   if (!storage) return undefined;
   // Terminal sous la moitié de sa réserve : rechargé avant le minerai. Le conteneur du minerai a toujours LOAD
   // à chaque retour, il passait devant à chaque voyage et le terminal restait à 0, sans plus aucune vente.
-  if (terminal && terminal.store[RESOURCE_ENERGY] < TERMINAL_ENERGY / 2 && !room.memory.storageLow) {
+  if (terminal && terminal.store[RESOURCE_ENERGY] < TERMINAL_ENERGY / 2 && !boost.scarce(room)) {
     return { from: storage, resource: RESOURCE_ENERGY };
   }
   const fromBox = boxJob(room, alive);
@@ -71,7 +71,7 @@ function job(room, alive) {
   const mineral = Object.keys(storage.store).find((r) => r !== RESOURCE_ENERGY && storage.store[r] > 0);
   if (mineral) return { from: storage, resource: mineral };
   const low = alive ? TERMINAL_ENERGY : TERMINAL_ENERGY / 2;
-  if (terminal.store[RESOURCE_ENERGY] < low && !room.memory.storageLow) return { from: storage, resource: RESOURCE_ENERGY };
+  if (terminal.store[RESOURCE_ENERGY] < low && !boost.scarce(room)) return { from: storage, resource: RESOURCE_ENERGY };
   return undefined;
 }
 

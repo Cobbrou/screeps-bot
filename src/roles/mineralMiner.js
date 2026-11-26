@@ -1,16 +1,17 @@
 const move = require('../move');
 const sources = require('../sources');
 const remoteMining = require('../remoteMining');
+const boost = require('../boost');
 
 // Au-delà de ce stock (stockage et terminal), plus de nouveau mineur : les ventes ne suivent pas.
 const MINERAL_STOCK = 100000;
 
 const extractor = (mineral) => mineral.pos.lookFor(LOOK_STRUCTURES).find((s) => s.structureType === STRUCTURE_EXTRACTOR);
 
-// Vrai s'il faut un mineur de minerai : extracteur et conteneur construits, gisement non épuisé, stock d'énergie sain.
+// Vrai s'il faut un mineur de minerai : extracteur et conteneur construits, gisement non épuisé, stockage pas vide (boost.scarce).
 function wanted(room) {
   const mineral = room.find(FIND_MINERALS)[0];
-  return !!mineral && mineral.mineralAmount > 0 && !!room.storage && !room.memory.storageLow
+  return !!mineral && mineral.mineralAmount > 0 && !!room.storage && !boost.scarce(room)
     && !!extractor(mineral) && !!sources.container(mineral)
     && (room.storage.store[mineral.mineralType] || 0)
       + ((room.terminal && room.terminal.store[mineral.mineralType]) || 0) < MINERAL_STOCK;
