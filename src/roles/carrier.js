@@ -3,6 +3,7 @@ const hauler = require('./hauler');
 const mineralHauler = require('./mineralHauler');
 const remoteMining = require('../remoteMining');
 const expansion = require('../expansion');
+const intel = require('../intel');
 
 // Énergie laissée au stockage de la salle d'origine : de quoi remplir spawn, extensions et tours.
 const RESERVE = 10000;
@@ -35,7 +36,8 @@ module.exports.run = function (creep) {
 
   if (creep.memory.working) {
     if (creep.room.name === target) hauler.deliver(creep);
-    else move.travel(creep, target);
+    // Aucun trajet sûr (salle tenue par des hostiles, voir intel.avoid) : il rentre rendre sa charge (plus bas).
+    else if (!move.travel(creep, target)) creep.memory.working = false;
     return;
   }
   if (creep.room.name === target && !full) {
@@ -66,8 +68,13 @@ module.exports.run = function (creep) {
     return;
   }
   const young = expansion.supported(home);
-  if (!young || young.name !== target || (!energy && creep.ticksToLive < LAST_TRIP)) {
-    remoteMining.goRecycle(creep, home);
+  // Salle soutenue sans trajet sûr : le 2026-11-26, 6 carriers ont attendu pleins dans E25S3 qu'E24S3 rouvre,
+  // ~7 500 d'énergie sortie du stockage pour rien. L'énergie y retourne, puis le carrier se recycle (le spawner
+  // n'en recrée pas tant que la salle est tenue).
+  const closed = young && young.name === target && !intel.route(home.name, target);
+  if (!young || young.name !== target || closed || (!energy && creep.ticksToLive < LAST_TRIP)) {
+    if (!energy || !home.storage) remoteMining.goRecycle(creep, home);
+    else if (creep.transfer(home.storage, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) move.to(creep, home.storage);
     return;
   }
   const { storage } = home;
