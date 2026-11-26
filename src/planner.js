@@ -35,6 +35,8 @@ const CUT_MARGIN = 3;
 // plus qu'une ligne de 8 cases sous le feu des tours : la coupe se resserre autour de la base.
 // ponytail: exposant réglé à la main sur E25S3 (2 garde le goulot du bord) ; à revoir si une salle fait une coupe trop longue.
 const CUT_TOWER_EXPONENT = 3;
+// Côté de la salle (numérotation de minCut) par direction de sortie (Game.map.describeExits).
+const SIDES = { [LEFT]: 0, [TOP]: 1, [RIGHT]: 2, [BOTTOM]: 3 };
 
 // Chantier non entamé depuis ce nombre de ticks retiré (inaccessible, salle perdue, plan obsolète) :
 // il libère une place sur MAX_CONSTRUCTION_SITES. Rien n'est perdu ; le planner le repose s'il est toujours voulu.
@@ -666,13 +668,27 @@ function planRemoteRoad(name, cells, posted) {
 // Portes (plan.doors) : un rempart s'use et coûte en réparation, un mur non. Seulement ce qu'il faut pour relier la base
 // à chaque côté de la salle (minCut.gates), d'abord par les cases forcément en rempart (routes), puis les remparts
 // construits, puis les cases sans mur.
+// Côtés menant à une de nos salles (plan.open) : pas séparés de la base. S'ils changent (salle prise ou perdue), la coupe
+// est recalculée et plan.clear demande de démolir ses anciens murs (buildCut). Plan d'avant plan.open : coupe gardée.
 function planCut(room, plan, costs) {
   const terrain = room.getTerrain();
   const walkable = (x, y) => terrain.get(x, y) !== TERRAIN_MASK_WALL;
   const key = (s) => s.pos.x * 50 + s.pos.y;
   const barriers = room.find(FIND_STRUCTURES, { filter: (s) => isBarrier(s.structureType) });
+  const exits = Game.map.describeExits(room.name);
+  const open = Object.keys(exits).filter((dir) => {
+    const next = Game.rooms[exits[dir]];
+    return next && next.controller && next.controller.my;
+  }).map((dir) => SIDES[dir]).sort();
+  if (plan.open && plan.cut && plan.open.join() !== open.join()) {
+    delete plan.cut;
+    delete plan.doors;
+    delete room.memory.swapBarrier;
+    plan.clear = true;
+  }
+  plan.open = open;
   if (!plan.cut) {
-    const skip = [STRUCTURE_EXTRACTOR, 'cut', 'doors'];
+    const skip = [STRUCTURE_EXTRACTOR, 'cut', 'doors', 'open'];
     const cells = Object.entries(plan).filter(([type, v]) => Array.isArray(v) && !skip.includes(type)).flatMap(([, v]) => v);
     if (plan.hub) cells.push(plan.hub.container);
     const base = new Set();
@@ -690,7 +706,7 @@ function planCut(room, plan, costs) {
     plan.cut = minCut(walkable, base, (x, y) => {
       const damage = towers.reduce((sum, t) => sum + defense.towerDamage(range(t, x * 50 + y)), 0);
       return damage ? Math.max(1, Math.round(Math.pow(best / damage, CUT_TOWER_EXPONENT))) : 1;
-    });
+    }, open);
   }
   if (plan.doors) return;
   // Plan d'avant plan.doors : ses portes (une par tronçon) sont oubliées, buildCut remet des murs à la place des inutiles.
@@ -707,7 +723,10 @@ function planCut(room, plan, costs) {
 // pour une structure (coût non nul), qu'un mur bloquerait. Barrière du mauvais type (mur sur une porte, rempart ailleurs
 // sans raison) : un chantier est retiré ; une structure est signalée (room.memory.swapBarrier, une à la fois) et le builder
 // la remplace une fois sur place, pour ne pas ouvrir la base en attendant. Un mur compte 255 dans costs : coût non lu pour lui.
+// Coupe recalculée (plan.clear) : une fois chaque case fermée, les murs hors coupe (ancienne coupe, murs d'un ancien
+// propriétaire) sont démolis, ils barraient le passage. Pas ceux du bord (murs indestructibles des zones novices).
 function buildCut(room, plan, costs) {
+  let closed = true;
   for (const k of plan.cut) {
     const pos = new RoomPosition(Math.floor(k / 50), k % 50, room.name);
     const barrier = pos.lookFor(LOOK_STRUCTURES).find((s) => isBarrier(s.structureType));
@@ -715,6 +734,7 @@ function buildCut(room, plan, costs) {
     const door = plan.doors.includes(k);
     const free = costs.get(pos.x, pos.y) === 0;
     const current = barrier || site;
+    if (!barrier) closed = false;
     if (!current) {
       place(room, pos, !free || door ? STRUCTURE_RAMPART : STRUCTURE_WALL);
       continue;
@@ -728,6 +748,14 @@ function buildCut(room, plan, costs) {
       room.memory.swapBarrier = { k, type: door ? STRUCTURE_RAMPART : STRUCTURE_WALL };
     }
   }
+  if (!plan.clear || !closed) return;
+  const cut = new Set(plan.cut);
+  const old = room.find(FIND_STRUCTURES, {
+    filter: (s) => s.structureType === STRUCTURE_WALL && s.hits && !cut.has(s.pos.x * 50 + s.pos.y)
+      && s.pos.x > 0 && s.pos.x < 49 && s.pos.y > 0 && s.pos.y < 49,
+  });
+  // Refusé tant qu'un hostile est dans la salle : repris au passage suivant.
+  if (old.every((s) => s.destroy() === OK)) delete plan.clear;
 }
 
 // Retire les chantiers restés à 0 de progression plus de SITE_TTL ticks, sur tout le compte.

@@ -54,16 +54,21 @@ function push(g, node, sink, flow, level, cursor) {
 // Cases (x * 50 + y) à couper pour séparer `base` des sorties, de coût total minimal.
 // `walkable(x, y)` : case sans mur naturel. `cost(x, y)` : coût entier (au moins 1) d'une barrière sur cette case.
 // Les sorties sont les cases praticables du bord ; on ne peut rien bâtir à portée 1 d'elles (createConstructionSite).
-// Une case de `base` à portée 2 d'une sortie est ignorée : aucune barrière ne pourrait la séparer de cette sortie.
+// `open` : côtés sûrs (0 : x = 0, 1 : y = 0, 2 : x = 49, 3 : y = 49, comme dans gates), menant à une de nos salles :
+// leurs sorties ne sont pas séparées de la base (toujours rien à bâtir à portée 1 d'elles).
+// Une case de `base` à portée 2 d'une sortie dangereuse est ignorée : aucune barrière ne pourrait l'en séparer.
 // La coupe renvoyée est celle au plus près de la base. Coûte quelques dizaines de ms : à garder en mémoire.
-function minCut(walkable, base, cost) {
+function minCut(walkable, base, cost, open = []) {
   const exits = [];
   for (let i = 0; i < SIZE; i++) {
     for (const [x, y] of [[i, 0], [i, SIZE - 1], [0, i], [SIZE - 1, i]]) if (walkable(x, y)) exits.push([x, y]);
   }
-  const nearExit = (r) => (x, y) => exits.some((e) => Math.max(Math.abs(e[0] - x), Math.abs(e[1] - y)) <= r);
-  const forbidden = nearExit(1);
-  const close = nearExit(2);
+  const side = ([x, y]) => (x === 0 ? 0 : y === 0 ? 1 : x === SIZE - 1 ? 2 : 3);
+  const danger = exits.filter((e) => !open.includes(side(e)));
+  const near = (list, r) => (x, y) => list.some((e) => Math.max(Math.abs(e[0] - x), Math.abs(e[1] - y)) <= r);
+  const forbidden = near(exits, 1);
+  const exposed = near(danger, 1);
+  const close = near(danger, 2);
   const sourceNode = 2 * SIZE * SIZE;
   const sinkNode = sourceNode + 1;
   const g = graph(sinkNode + 1);
@@ -75,7 +80,7 @@ function minCut(walkable, base, cost) {
       const inBase = base.has(k) && !close(x, y);
       g.add(2 * k, 2 * k + 1, blocked || inBase ? INF : cost(x, y));
       if (inBase) g.add(sourceNode, 2 * k, INF);
-      if (blocked) g.add(2 * k + 1, sinkNode, INF);
+      if (exposed(x, y)) g.add(2 * k + 1, sinkNode, INF);
       for (const [dx, dy] of NEIGHBORS) {
         const nx = x + dx;
         const ny = y + dy;

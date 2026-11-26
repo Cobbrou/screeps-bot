@@ -4,6 +4,7 @@ const assert = require('assert');
 // Constantes du jeu utilisées au chargement de src/planner.js.
 for (const type of ['STORAGE', 'TOWER', 'EXTENSION', 'SPAWN', 'FACTORY', 'POWER_SPAWN', 'NUKER', 'OBSERVER', 'LINK',
   'TERMINAL', 'EXTRACTOR', 'LAB']) global[`STRUCTURE_${type}`] = type.toLowerCase();
+Object.assign(global, { TOP: 1, RIGHT: 3, BOTTOM: 5, LEFT: 7 });
 // Modules qui chargent le reste du bot : remplacés par des modules vides.
 for (const name of ['sources', 'remoteMining', 'minCut', 'defense', 'boost', 'roles/upgrader', 'move']) {
   const path = require.resolve(`../src/${name}`);

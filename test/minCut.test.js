@@ -66,4 +66,12 @@ const twoSides = (x, y) => {
 };
 assert.strictEqual(minCut.gates(twoSides, [20 * 50 + 10, 30 * 50 + 10]).length, 2);
 
+// Côté sûr (salle à nous) : sorties à gauche et à droite, cloisons percées à x = 20 et x = 30, base entre les deux.
+// Droite ouverte (côté 2) : seule la cloison de gauche est fermée.
+const between = new Set([25 * 50 + 25]);
+const bothCut = minCut(twoSides, between, one);
+assert(bothCut.some((k) => Math.floor(k / 50) === 30));
+const leftCut = minCut(twoSides, between, one, [2]);
+assert.deepStrictEqual(leftCut, [20 * 50 + 10]);
+
 console.log('minCut : ok');
