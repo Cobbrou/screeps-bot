@@ -390,4 +390,6 @@ module.exports.defenders = defenders;
 module.exports.damagedStructure = damagedStructure;
 module.exports.secure = secure;
 module.exports.inBase = inBase;
+module.exports.insideCells = insideCells;
+module.exports.VITAL_RAMPART_FLOOR = VITAL_RAMPART_FLOOR;
 module.exports.standable = standable;
