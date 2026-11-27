@@ -8,6 +8,7 @@ const expansion = require('./expansion');
 const market = require('./market');
 const stats = require('./stats');
 const move = require('./move');
+const { attempt } = require('./errors');
 const roles = {
   harvester: require('./roles/harvester'),
   upgrader: require('./roles/upgrader'),
@@ -41,12 +42,8 @@ module.exports.loop = function () {
       const creep = Game.creeps[name];
       const role = roles[creep.memory.role];
       if (!role) continue;
-      // Un créep en erreur ne doit pas empêcher les autres de jouer.
-      try {
-        role.run(creep);
-      } catch (e) {
-        console.log(`[${name}] ${e.stack || e}`);
-      }
+      // Un créep en erreur ne doit pas empêcher les autres de jouer. Signalé par rôle : un e-mail pour tous les créeps du rôle.
+      attempt(`creep ${creep.memory.role}`, () => role.run(creep));
     }
     // Pas notés par les rôles, exécutés ensemble pour pousser les créeps qui barrent la route.
     move.run();
@@ -57,9 +54,5 @@ module.exports.loop = function () {
     stats.measure('expansion', expansion.run);
     stats.measure('market', market.run);
   }
-  try {
-    stats.run();
-  } catch (e) {
-    console.log(`[stats] ${e.stack || e}`);
-  }
+  attempt('stats', stats.run);
 };

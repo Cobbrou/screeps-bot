@@ -9,6 +9,7 @@ const carrier = require('./roles/carrier');
 const scout = require('./roles/scout');
 const remoteMining = require('./remoteMining');
 const boost = require('./boost');
+const { attempt } = require('./errors');
 
 const MAX_MINER_WORK = 5;
 // Plus petit upgrader créé : au-dessous, il occupe un poste et du temps de spawn pour presque rien.
@@ -498,13 +499,21 @@ module.exports.run = function () {
   // ponytail: les réparations des autres builders sont ignorées (un seul hors chantier, voir targets).
   for (const room of Object.values(Game.rooms)) {
     if (!room.controller || !room.controller.my) continue;
-    const net = netIncome(room, miners, carry[room.name], remote, upkeep[room.name]);
-    room.memory.upgradeWork = Math.floor(net / UPGRADE_SPEND);
+    attempt(`spawner ${room.name}`, () => {
+      const net = netIncome(room, miners, carry[room.name], remote, upkeep[room.name]);
+      room.memory.upgradeWork = Math.floor(net / UPGRADE_SPEND);
+    });
   }
 
+  // Un spawn en erreur (une salle) ne doit pas empêcher les autres salles de créer leurs créeps.
   for (const name in Game.spawns) {
     const spawn = Game.spawns[name];
     if (spawn.spawning) continue;
+    attempt(`spawner ${spawn.room.name}`, () => spawnFrom(spawn));
+  }
+
+  // Choisit le rôle manquant de la salle du spawn et le crée.
+  function spawnFrom(spawn) {
     const room = spawn.room;
     const roomCounts = counts[room.name] = counts[room.name] || {};
 
@@ -513,7 +522,7 @@ module.exports.run = function () {
     const net = netIncome(room, miners, carry[room.name], remote, upkeep[room.name]);
     const wanted = targets(room, roomCounts, miners, carry[room.name], remoteNeed, net, work[room.name] || {});
     const role = emergencyRole(roomCounts, wanted, fed) || Object.keys(wanted).find((r) => (roomCounts[r] || 0) < wanted[r]);
-    if (!role) continue;
+    if (!role) return;
 
     const memory = { role, room: room.name };
     if (role === 'miner') {
@@ -521,7 +530,7 @@ module.exports.run = function () {
       // (jusqu'à MAX_MINER_WORK ou ses cases libres) avant que la seconde n'en reçoive un.
       const work = (s) => (miners[s.id] || { work: 0 }).work;
       const free = sources.list(room).filter((s) => needsMiner(s, miners)).sort((a, b) => work(a) - work(b))[0];
-      if (!free) continue;
+      if (!free) return;
       memory.sourceId = free.id;
     }
     const young = expansion.supported(room);
@@ -573,7 +582,7 @@ module.exports.run = function () {
       energy = Math.min(energy, BODYPART_COST[CARRY] + parts * BODYPART_COST[WORK] + Math.ceil(parts / upgraderRatio(room)) * BODYPART_COST[MOVE]);
     }
     const body = buildBody(role, energy, room, memory.sourceId, memory.target);
-    if (!body.length) continue;
+    if (!body.length) return;
     // Upgrader boosté au lab s'il a de quoi (composé et énergie) : il y passe avant son poste.
     // Garde boosté au tir pendant une guerre (lab en mode tir, voir boost).
     if (role === 'upgrader' && boost.parts(room, body.filter((p) => p === WORK).length)) memory.boost = true;

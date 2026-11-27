@@ -1,3 +1,5 @@
+const { attempt } = require('./errors');
+
 // Parties qui rendent un créep hostile dangereux (les éclaireurs ne déclenchent rien).
 // WORK chez l'Invader, et chez un joueur seulement sans CARRY (démanteleur) : avec CARRY, c'est presque toujours
 // un mineur ou un réparateur de passage, et le viser risque une guerre (tours, amélioration en pause, pixels bloqués).
@@ -376,9 +378,12 @@ module.exports.run = function () {
   for (const name in Game.rooms) {
     const room = Game.rooms[name];
     if (!room.controller || !room.controller.my) continue;
-    runTowers(room);
-    const hostiles = threats(room);
-    if (hostiles.length) lastResort(room, hostiles);
+    // Une salle en erreur ne doit pas couper les tours ni le mode sans échec des autres.
+    attempt(`defense ${name}`, () => {
+      runTowers(room);
+      const hostiles = threats(room);
+      if (hostiles.length) lastResort(room, hostiles);
+    });
   }
 };
 

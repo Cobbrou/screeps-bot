@@ -43,7 +43,7 @@ Pour un serveur privé sans token, remplacer `token` par `email` et `password`.
 | Commande | Effet |
 |----------|-------|
 | `npm run build` | Bundle `src/main.js` vers `dist/main.js`, sans envoi |
-| `npm test` | Vérifie hors du jeu la détection des démanteleurs et de la coupe percée, la coupe minimale, le boost, la récolte des salles à keepers, le rôle créé en urgence et la case du lien du hub |
+| `npm test` | Vérifie hors du jeu l'isolation des erreurs, la détection des démanteleurs et de la coupe percée, la coupe minimale, le boost, la récolte des salles à keepers, le rôle créé en urgence et la case du lien du hub |
 | `npm run deploy` | Build puis envoi du code sur le serveur défini dans `secrets.json` |
 | `npm run watch` | Rebuild et envoi à chaque modification de `src/` |
 
@@ -57,6 +57,7 @@ screeps-bot/
 │   ├── main.js              # point d'entrée (loop exécutée à chaque tick)
 │   ├── boost.js             # boost au lab : upgraders (GH, GH2O, XGH2O), gardes en guerre (KO, KHO2, XKHO2) : achat, lab, application
 │   ├── defense.js           # tours, mode sans échec (coupe percée, structure vitale), détection des hostiles (démanteleurs compris)
+│   ├── errors.js            # isolation des erreurs (salle, module, créep) : console et Game.notify, un e-mail par étiquette tous les 1 500 ticks
 │   ├── expansion.js         # choix de la salle à revendiquer, pose de son premier spawn
 │   ├── intel.js             # renseignements sur les salles explorées (Memory.rooms[*].intel)
 │   ├── market.js            # vente du minerai au meilleur ordre d'achat, achat des composés de boost, équilibrage de l'énergie entre salles
@@ -90,6 +91,7 @@ screeps-bot/
 │       ├── scout.js         # explore les salles voisines
 │       └── upgrader.js      # posté au dépôt du contrôleur, améliore sans aller chercher l'énergie
 ├── test/
+│   ├── errors.test.js       # vérifie l'isolation des erreurs et la limite des e-mails
 │   ├── defense.test.js      # vérifie la détection des démanteleurs et de la coupe percée
 │   ├── minCut.test.js       # vérifie que la coupe sépare la base des sorties
 │   ├── boost.test.js        # vérifie le choix des achats, des parties boostées et des trajets vers le lab

@@ -1,4 +1,5 @@
 const defense = require('./defense');
+const { attempt } = require('./errors');
 
 // Sous ce seuil de bucket, les modules non essentiels (planner) sont sautés.
 // Bas pour que la génération de pixels (bucket vidé à 0) ne les fasse sauter que quelques dizaines de ticks.
@@ -8,14 +9,10 @@ const LOW_BUCKET = 500;
 let modules = {};
 
 // Exécute `fn` et note le CPU qu'il consomme sous `name`.
-// Une erreur est affichée sans interrompre le reste du tick.
+// Une erreur est affichée et signalée sans interrompre le reste du tick.
 function measure(name, fn) {
   const start = Game.cpu.getUsed();
-  try {
-    fn();
-  } catch (e) {
-    console.log(`[${name}] ${e.stack || e}`);
-  }
+  attempt(name, fn);
   modules[name] = Game.cpu.getUsed() - start;
 }
 

@@ -5,6 +5,7 @@ const defense = require('./defense');
 const boost = require('./boost');
 const upgraders = require('./roles/upgrader');
 const { PLAN_COSTS } = require('./move');
+const { attempt } = require('./errors');
 
 // Le plan est recalculé tous les INTERVAL ticks : les chantiers manquants sont recréés.
 const INTERVAL = 100;
@@ -904,13 +905,7 @@ module.exports.run = function () {
     waiting[room.name] = blocked;
   };
   // Une salle en erreur ne doit pas empêcher de planifier les autres.
-  for (const room of rooms) {
-    try {
-      planRoom(room);
-    } catch (e) {
-      console.log(`[planner] ${room.name} : ${e.stack || e}`);
-    }
-  }
+  for (const room of rooms) attempt(`planner ${room.name}`, () => planRoom(room));
 };
 
 module.exports.priority = priority;
