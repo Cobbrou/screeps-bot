@@ -37,6 +37,13 @@ const RAMPART_DYING = 2 * RAMPART_DECAY_AMOUNT;
 // Un attaquant qui passe la coupe ne le perce pas d'emblée (~550 ticks pour un Invader hybride à ~90 dégâts/tick).
 const VITAL_RAMPART_FLOOR = 50000;
 
+// Vigilance (vigil) : dès ce RCL, des gardiens au contact (rôle warden) tiennent la coupe quand le mode sans échec
+// n'est pas disponible. Plus tôt, le corps est trop petit et la salle trop pauvre pour les payer en continu.
+const VIGIL_RCL = 7;
+// Ticks avant la fin du mode sans échec où la vigilance commence : de quoi créer les gardiens (144 ticks de spawn chacun)
+// et acheter puis porter au lab leur boost.
+const VIGIL_LEAD = 1000;
+
 // Structures dont la perte déclenche le mode sans échec (lastResort).
 const VITAL = [STRUCTURE_SPAWN, STRUCTURE_TOWER, STRUCTURE_STORAGE, STRUCTURE_TERMINAL];
 
@@ -150,16 +157,31 @@ function salvo(towers, creep) {
   return towers.reduce((sum, t) => sum + towerDamage(t.pos.getRangeTo(creep)), 0);
 }
 
-// Dégâts à distance des défenseurs à portée de `creep` : comptés avec la salve, sinon les tours restent muettes
-// face à un soigneur que tours et défenseurs ensemble pourraient battre.
+// Dégâts par tick des parties `type` actives de `c` pour `action`, boosts compris.
+function partDamage(c, type, action, power) {
+  return c.body.reduce((sum, p) => sum + (p.type === type && p.hits
+    ? power * (p.boost ? BOOSTS[type][p.boost][action] : 1) : 0), 0);
+}
+
+// Dégâts des défenseurs à portée de `creep` (tir à portée 3) et des gardiens à son contact, boosts compris :
+// comptés avec la salve, sinon les tours restent muettes face à un soigneur que tours et défenseurs ensemble
+// pourraient battre.
 function defenderDamage(creep) {
-  return creep.pos.findInRange(FIND_MY_CREEPS, 3, { filter: (c) => c.memory.role === 'defender' })
-    .reduce((sum, c) => sum + c.getActiveBodyparts(RANGED_ATTACK) * RANGED_ATTACK_POWER, 0);
+  return creep.pos.findInRange(FIND_MY_CREEPS, 3, { filter: (c) => c.memory.role === 'defender' || c.memory.role === 'warden' })
+    .reduce((sum, c) => sum + (c.memory.role === 'warden'
+      ? (c.pos.isNearTo(creep) ? partDamage(c, ATTACK, 'attack', ATTACK_POWER) : 0)
+      : partDamage(c, RANGED_ATTACK, 'rangedAttack', RANGED_ATTACK_POWER)), 0);
+}
+
+// Part des dégâts que `h` encaisse : celle de sa TOUGH boostée active la plus résistante (XGHO2 : 0,3), 1 sans.
+// ponytail: la réserve de PV des TOUGH est ignorée (une fois détruites, les dégâts sont pleins) ; la compter si les tours
+// restent muettes face à un hostile qu'elles auraient tué.
+function toughFactor(h) {
+  return h.body.reduce((f, p) => (p.type === TOUGH && p.hits && p.boost ? Math.min(f, BOOSTS[TOUGH][p.boost].damage) : f), 1);
 }
 
 // Soin par tick que les hostiles peuvent rendre à `target` : HEAL_POWER au contact (lui-même compris),
 // RANGED_HEAL_POWER à portée 3, boosts compris.
-// ponytail: les TOUGH boostés de la cible (dégâts réduits) sont ignorés ; les compter si les tours se vident quand même.
 function hostileHeal(target, hostiles) {
   let heal = 0;
   for (const h of hostiles) {
@@ -175,12 +197,13 @@ function hostileHeal(target, hostiles) {
 }
 
 // Vrai si les tours (et `extra` dégâts/tick sans coût d'énergie, ceux des défenseurs) tuent `h` avant de se vider
-// et avant qu'il quitte la salle : dégâts moins soin hostile, multipliés par le nombre de salves que l'énergie moyenne
-// des tours permet et par les ticks qu'il lui faut pour sortir (escape), au moins ses PV.
+// et avant qu'il quitte la salle : dégâts réduits par ses TOUGH boostées (toughFactor), moins soin hostile,
+// multipliés par le nombre de salves que l'énergie moyenne des tours permet et par les ticks qu'il lui faut
+// pour sortir (escape), au moins ses PV.
 // Dépasser le soin ne suffit pas : une paire d'Invaders au bord de la salle, à portée 30 des tours, prend 12 PV
 // nets par tick et vide les tours avant d'arriver au contact, où elles l'auraient tuée.
 function killable(h, hostiles, towers, extra) {
-  const net = salvo(towers, h) + extra - hostileHeal(h, hostiles);
+  const net = (salvo(towers, h) + extra) * toughFactor(h) - hostileHeal(h, hostiles);
   const energy = towers.reduce((sum, t) => sum + t.store[RESOURCE_ENERGY], 0);
   const shots = towers.length ? energy / (TOWER_ENERGY_COST * towers.length) : Infinity;
   return net > 0 && net * Math.min(shots, escape(h)) >= h.hits;
@@ -254,6 +277,23 @@ function insideCells(room) {
 function inBase(room, pos) {
   const cells = insideCells(room);
   return !cells || cells.has(pos.x * 50 + pos.y);
+}
+
+// Créeps de joueurs qui attaquent la salle : démanteleurs ou armés (pas les Invaders, que les tours achèvent,
+// ni un drainer fait que de HEAL).
+function raiders(room) {
+  return threats(room).filter((h) => h.owner.username !== INVADER
+    && h.body.some((p) => p.type === WORK || p.type === ATTACK || p.type === RANGED_ATTACK));
+}
+
+// Vrai si la salle ne peut pas compter sur le mode sans échec : recharge en cours ou plus aucun en réserve,
+// ou mode sans échec qui finit dans moins de VIGIL_LEAD ticks. Des gardiens tiennent alors la coupe (rôle warden).
+// Le 2026-11-27, le mode sans échec activé contre deadlydd laissait ensuite E25S3 32 h sans recours.
+function vigil(room) {
+  const c = room.controller;
+  if (!c || !c.my || c.level < VIGIL_RCL) return false;
+  if (c.safeMode) return c.safeMode < VIGIL_LEAD;
+  return !!c.safeModeCooldown || !c.safeModeAvailable;
 }
 
 // Hostiles dangereux à l'intérieur des murs (tous sans coupe, voir inBase).
@@ -389,6 +429,9 @@ module.exports.run = function () {
 
 module.exports.threats = threats;
 module.exports.intruders = intruders;
+module.exports.raiders = raiders;
+module.exports.vigil = vigil;
+module.exports.toughFactor = toughFactor;
 module.exports.dangerous = dangerous;
 module.exports.killable = killable;
 module.exports.breached = breached;

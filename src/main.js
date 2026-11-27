@@ -17,6 +17,7 @@ const roles = {
   hauler: require('./roles/hauler'),
   filler: require('./roles/filler'),
   defender: require('./roles/defender'),
+  warden: require('./roles/warden'),
   guard: require('./roles/guard'),
   carrier: require('./roles/carrier'),
   scout: require('./roles/scout'),

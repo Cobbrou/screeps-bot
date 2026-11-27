@@ -48,6 +48,10 @@ const REPAIR_BUILDER_LATE_RCL = 7;
 // ponytail: effectif fixe ; le tailler sur le déficit si 3 builders vident trop vite le stockage.
 const FORTIFY_BUILDERS = 3;
 const FORTIFY_FLOOR = 30000;
+// Gardiens (rôle warden) pendant la vigilance (defense.vigil), et pendant un raid (defense.raiders) : les renforts
+// arrivent après la première brèche, mais un raid abat ensuite les remparts vitaux un à un (~55 ticks chacun à 400 000).
+const WARDENS = 2;
+const WARDENS_RAID = 4;
 // Soutien d'une salle voisine jeune (expansion.supported). Carrier : 1 250 d'énergie pour ~200 ticks d'aller-retour,
 // ~6 énergie/tick chacun. Pioneers : 16 WORK chacun, de quoi dépenser ces ~37 énergie/tick et les 20 de ses sources.
 // Garde : corps de tueur (remoteMining.KILLER_BODY) si la salle le paie, sinon 12 RANGED_ATTACK (120 PV/tick), de quoi
@@ -285,6 +289,8 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
           && list.some((s) => { const box = sources.container(s); return box && !sources.sourceLink(s) && box.store.getFreeCapacity(RESOURCE_ENERGY) === 0; }))
         ? 1 : 0),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
+    // Juste après l'économie de base : sans mode sans échec, la coupe ne tient que par eux face à un raid boosté.
+    warden: defense.vigil(room) ? (defense.raiders(room).length ? WARDENS_RAID : WARDENS) : 0,
     // Expansion et soutien d'une salle jeune avant la récolte distante, qui ne prend alors que le temps de spawn restant.
     // Le 2026-11-25, le claimer d'un voisin est entré dans E24S3 5 ticks après que nous l'avons prise.
     claimer: expanding && !expansion.claimed() ? 1 : 0,
@@ -393,6 +399,8 @@ function buildBody(role, energy, room, sourceId, target) {
   // Cœur d'Invader (100 000 PV, sans créep ni tour) : ATTACK au contact, 3 fois les dégâts d'un RANGED_ATTACK.
   if (role === 'remoteDefender' && intel.get(target) && intel.get(target).core) return repeat([ATTACK, MOVE], energy);
   if (role === 'defender' || role === 'remoteDefender') return repeat([RANGED_ATTACK, MOVE], energy);
+  // Gardien : 2 ATTACK par MOVE (une case par tick sur route, deux en plaine), 32 ATTACK au plus.
+  if (role === 'warden') return repeat([ATTACK, ATTACK, MOVE], energy);
   if (role === 'guard') {
     return cost(remoteMining.KILLER_BODY) <= energy ? remoteMining.KILLER_BODY.slice()
       : repeat([RANGED_ATTACK, MOVE], Math.min(energy, GUARD_UNITS * cost([RANGED_ATTACK, MOVE])));

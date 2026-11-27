@@ -10,7 +10,11 @@ Object.assign(global, {
   RESOURCE_KEANIUM_OXIDE: 'KO',
   RESOURCE_KEANIUM_ALKALIDE: 'KHO2',
   RESOURCE_CATALYZED_KEANIUM_ALKALIDE: 'XKHO2',
+  RESOURCE_UTRIUM_HYDRIDE: 'UH',
+  RESOURCE_UTRIUM_ACID: 'UH2O',
+  RESOURCE_CATALYZED_UTRIUM_ACID: 'XUH2O',
   WORK: 'work',
+  ATTACK: 'attack',
   RANGED_ATTACK: 'ranged_attack',
   LAB_BOOST_MINERAL: 30,
   LAB_BOOST_ENERGY: 20,
@@ -21,12 +25,17 @@ Object.assign(global, {
   BOOSTS: {
     work: { GH: { upgradeController: 1.5 }, GH2O: { upgradeController: 1.8 }, XGH2O: { upgradeController: 2 } },
     ranged_attack: { KO: { rangedAttack: 2 }, KHO2: { rangedAttack: 3 }, XKHO2: { rangedAttack: 4 } },
+    attack: { UH: { attack: 2 }, UH2O: { attack: 3 }, XUH2O: { attack: 4 } },
   },
   Memory: {},
 });
 // move charge tout le reste du bot (intel, defense) : remplacé par un module vide.
 const movePath = require.resolve('../src/move');
 require.cache[movePath] = { id: movePath, filename: movePath, loaded: true, exports: { to() {} } };
+// defense : vigilance pilotée par le test (salle dont le nom est dans `vigilant`).
+const vigilant = new Set();
+const defensePath = require.resolve('../src/defense');
+require.cache[defensePath] = { id: defensePath, filename: defensePath, loaded: true, exports: { vigil: (r) => vigilant.has(r.name) } };
 const boost = require('../src/boost');
 
 const store = (o) => new Proxy(o, { get: (t, k) => t[k] || 0 });
@@ -36,6 +45,7 @@ const orders = [
   { id: 'x', resourceType: 'XGH2O', price: 7355, amount: 5747, roomName: 'E16S58' },
 ];
 global.Game = {
+  rooms: {},
   market: { credits: 55e6, getAllOrders: ({ resourceType }) => orders.filter((o) => o.resourceType === resourceType) },
 };
 const room = (lab, terminal, memory = {}) => ({
@@ -107,5 +117,15 @@ assert.strictEqual(boost.factor(room({ KO: 1260, energy: 840 }, {}), 14), 2);
 assert.strictEqual(boost.factor(room({ KO: 300, energy: 840 }, {}), 14), 1);
 assert.strictEqual(boost.parts(room({ GH: 900, energy: 840 }, {}), 14), 0);
 delete Memory.war;
+
+// Vigilance (mode sans échec indisponible) : le lab passe en attaque, achat d'UH pour 64 ATTACK (1 920 unités).
+Game.rooms = { E25S3: { name: 'E25S3' } };
+vigilant.add('E25S3');
+orders.push({ id: 'uh', resourceType: 'UH', price: 643, amount: 1000, roomName: 'E20S5' });
+assert.deepStrictEqual(boost.purchase(room({}, { energy: 5000 })), { order: orders[orders.length - 1], amount: 1000 });
+assert.ok(boost.attackReady(room({ UH: 960, energy: 1280 }, {}), 32));
+assert.ok(!boost.attackReady(room({ GH: 960, energy: 1280 }, {}), 32));
+vigilant.clear();
+assert.ok(!boost.attackReady(room({ UH: 960, energy: 1280 }, {}), 32));
 
 console.log('boost : OK');
