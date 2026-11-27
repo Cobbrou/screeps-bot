@@ -58,6 +58,8 @@ const DEFENDER_RANGE = 3;
 
 // Intérieur de la coupe par salle ({ cut, cells }), gardé jusqu'au reset du global, recalculé si plan.cut change.
 const insideCache = {};
+// Côtés de sortie protégés par chaque case de la coupe, par salle ({ cut, sides }), comme insideCache.
+const sidesCache = {};
 // Structure à réparer par salle et tick de la dernière recherche, gardés jusqu'au reset du global.
 const repairCache = {};
 // Cible commune des tours et des défenseurs, par salle, recalculée à chaque tick.
@@ -92,6 +94,8 @@ function repairTarget(s) {
 // Murs hors de la coupe (room.memory.plan.cut) ignorés : ils ne s'usent pas, l'ancienne ceinture reste telle quelle.
 // Remparts hors de la coupe ignorés aussi, s'ils ne couvrent pas une structure : ils disparaissent avec le decay.
 // Stockage sous DEFENSE_RESERVE : murs et remparts attendent, sauf rempart mourant, pour garder l'énergie des tours.
+// Murs et remparts de la coupe tournés vers des sorties calmes (room.memory.quietSides, voir quiet) ignorés aussi,
+// sauf rempart mourant : ils restent debout sans être montés.
 // La cible est reprise jusqu'à la prochaine recherche, qui a lieu tous les REPAIR_SCAN_INTERVAL ticks et prend
 // la pire structure : un mur s'arrête donc vers REPAIR_RATIO de sa cible, dès qu'un autre est plus abîmé.
 function damagedStructure(room) {
@@ -113,11 +117,13 @@ function damagedStructure(room) {
   const structures = room.find(FIND_STRUCTURES);
   const key = (s) => s.pos.x * 50 + s.pos.y;
   const covered = new Set(structures.filter((s) => !UNCOVERED.includes(s.structureType)).map(key));
+  const idle = quiet(room);
   for (const s of structures) {
     if (s.structureType === STRUCTURE_WALL && !cut.has(key(s))) continue;
     if (planned && s.structureType === STRUCTURE_RAMPART && !cut.has(key(s)) && !covered.has(key(s))) continue;
     const dying = s.structureType === STRUCTURE_RAMPART && s.hits <= RAMPART_DYING;
-    if (saving && !dying && (s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART)) continue;
+    const barrier = s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART;
+    if (!dying && barrier && (saving || idle.has(key(s)))) continue;
     const ratio = dying ? -1 : s.hits / repairTarget(s);
     let slot = worst.other;
     if (s.structureType === STRUCTURE_WALL) slot = worst.wall;
@@ -275,6 +281,83 @@ function insideCells(room) {
   }
   insideCache[room.name] = { cut: id, cells };
   return cells;
+}
+
+// Appelle `fn` pour chaque case voisine de `k` (x * 50 + y) dans la salle.
+function around(k, fn) {
+  const x = Math.floor(k / 50);
+  const y = k % 50;
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      if ((dx || dy) && x + dx >= 0 && x + dx <= 49 && y + dy >= 0 && y + dy <= 49) fn((x + dx) * 50 + y + dy);
+    }
+  }
+}
+
+// Côté de sortie (FIND_EXIT_*) de la case `k` si elle est au bord de la salle, sinon undefined.
+function edge(k) {
+  const x = Math.floor(k / 50);
+  const y = k % 50;
+  if (y === 0) return FIND_EXIT_TOP;
+  if (x === 49) return FIND_EXIT_RIGHT;
+  if (y === 49) return FIND_EXIT_BOTTOM;
+  if (x === 0) return FIND_EXIT_LEFT;
+  return undefined;
+}
+
+// Côtés de sortie que protège chaque case de la coupe (Map clé → Set de FIND_EXIT_*) : ceux qu'atteint, sans traverser
+// la coupe, l'extérieur collé à elle. null sans coupe ni intérieur (voir insideCells).
+// Sur E25S3, la rangée nord (y 2) ne mène qu'à la sortie haut, la colonne est (x 47) qu'à la sortie droite.
+function cutSides(room) {
+  const cut = room.memory.plan && room.memory.plan.cut;
+  const inside = insideCells(room);
+  if (!cut || !inside) return null;
+  const id = cut.join();
+  const cached = sidesCache[room.name];
+  if (cached && cached.cut === id) return cached.sides;
+  const terrain = room.getTerrain();
+  const closed = new Set(cut);
+  const open = (k) => !inside.has(k) && !closed.has(k) && terrain.get(Math.floor(k / 50), k % 50) !== TERRAIN_MASK_WALL;
+  // Zone extérieure de chaque case dehors : un même Set des côtés atteints, partagé par toute la zone.
+  const zone = new Map();
+  const sides = new Map();
+  for (const c of cut) {
+    const mine = new Set();
+    around(c, (n) => {
+      if (!open(n)) return;
+      if (!zone.has(n)) {
+        const reached = new Set();
+        const queue = [n];
+        zone.set(n, reached);
+        for (let i = 0; i < queue.length; i++) {
+          const side = edge(queue[i]);
+          if (side) reached.add(side);
+          around(queue[i], (m) => {
+            if (open(m) && !zone.has(m)) {
+              zone.set(m, reached);
+              queue.push(m);
+            }
+          });
+        }
+      }
+      for (const side of zone.get(n)) mine.add(side);
+    });
+    sides.set(c, mine);
+  }
+  sidesCache[room.name] = { cut: id, sides };
+  return sides;
+}
+
+// Cases de la coupe à ne plus monter : celles dont tous les côtés protégés (cutSides) sont dans room.memory.quietSides
+// (FIND_EXIT_* : 1 haut, 3 droite, 5 bas, 7 gauche), posé à la main. Le 2026-11-27 sur E25S3, nord et est :
+// E25S2 et E26S3, réservées par GT500, n'ont jamais envoyé personne ; les raids de deadlydd viennent de l'ouest.
+function quiet(room) {
+  const calm = room.memory.quietSides;
+  const sides = calm && calm.length ? cutSides(room) : null;
+  const idle = new Set();
+  if (!sides) return idle;
+  for (const [k, s] of sides) if ([...s].every((d) => calm.includes(d))) idle.add(k);
+  return idle;
 }
 
 // Vrai si `pos` est à l'intérieur des murs (voir insideCells).
@@ -444,6 +527,8 @@ module.exports.intruders = intruders;
 module.exports.raiders = raiders;
 module.exports.vigil = vigil;
 module.exports.exposed = exposed;
+module.exports.cutSides = cutSides;
+module.exports.quiet = quiet;
 module.exports.toughFactor = toughFactor;
 module.exports.dangerous = dangerous;
 module.exports.killable = killable;

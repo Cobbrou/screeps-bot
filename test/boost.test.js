@@ -126,10 +126,10 @@ vigilant.add('E25S3');
 orders.push({ id: 'uh', resourceType: 'UH', price: 643, amount: 1000, roomName: 'E20S5' });
 assert.deepStrictEqual(boost.purchase(room({}, { energy: 5000 })), { order: orders[orders.length - 1], amount: 1000 });
 // Marché du 2026-11-27 : UH trop rare pour tout le stock, le composé qui le couvre au meilleur prix par point (XUH2O).
-// Aucune réserve de crédits : 2 M de crédits paient 783 XUH2O.
+// Réserve abaissée à 2 M : 4 M de crédits paient 783 XUH2O.
 orders.push({ id: 'uh2o', resourceType: 'UH2O', price: 1863, amount: 38176, roomName: 'E7S24' },
   { id: 'xuh2o', resourceType: 'XUH2O', price: 2554, amount: 5577, roomName: 'E15S51' });
-Game.market.credits = 2e6;
+Game.market.credits = 4e6;
 assert.deepStrictEqual(boost.purchase(room({}, { energy: 5000 })), { order: orders[orders.length - 1], amount: 783 });
 // UH déjà en stock : on rachète de l'UH, même rare.
 assert.strictEqual(boost.purchase(room({ UH: 300 }, {})).order.id, 'uh');

@@ -8,6 +8,7 @@ Object.assign(global, {
   STRUCTURE_TERMINAL: 'terminal', STRUCTURE_WALL: 'constructedWall', STRUCTURE_RAMPART: 'rampart', STRUCTURE_ROAD: 'road',
   STRUCTURE_CONTAINER: 'container', FIND_EXIT: 10, TOWER_OPTIMAL_RANGE: 5, TOWER_FALLOFF_RANGE: 20, TOWER_FALLOFF: 0.75,
   TOWER_POWER_ATTACK: 600, TOWER_ENERGY_COST: 10, HEAL_POWER: 12, RANGED_HEAL_POWER: 4, RESOURCE_ENERGY: 'energy',
+  FIND_EXIT_TOP: 1, FIND_EXIT_RIGHT: 3, FIND_EXIT_BOTTOM: 5, FIND_EXIT_LEFT: 7, TERRAIN_MASK_WALL: 1, FIND_MY_SPAWNS: 112,
   TOUGH: 'tough', BOOSTS: { tough: { XGHO2: { damage: 0.3 } }, heal: { LHO2: { heal: 3 } } },
 });
 const defense = require('../src/defense');
@@ -72,5 +73,20 @@ assert.ok(!defense.exposed(room({ level: 6, safeModeCooldown: 30000 })));
 const wall = (c) => ({ structureType: STRUCTURE_WALL, hitsMax: 300e6, room: room(c) });
 assert.strictEqual(defense.repairTarget(wall({})), 500000);
 assert.strictEqual(defense.repairTarget(wall({ safeModeCooldown: 30000 })), 2e6);
+
+// Côtés protégés par la coupe : couloir y 25 (le reste en murs naturels), spawn en (25, 25), coupe en x 10 et x 40.
+// La case x 10 ne mène qu'à la sortie gauche, x 40 qu'à la droite ; sortie droite calme : x 40 n'est plus montée.
+const corridor = {
+  name: 'T1',
+  memory: { plan: { cut: [10 * 50 + 25, 40 * 50 + 25] } },
+  getTerrain: () => ({ get: (x, y) => (y === 25 ? 0 : 1) }),
+  find: (type) => (type === FIND_MY_SPAWNS ? [{ pos: { x: 25, y: 25 } }] : []),
+};
+const sides = defense.cutSides(corridor);
+assert.deepStrictEqual([...sides.get(10 * 50 + 25)], [7]);
+assert.deepStrictEqual([...sides.get(40 * 50 + 25)], [3]);
+assert.strictEqual(defense.quiet(corridor).size, 0);
+corridor.memory.quietSides = [3];
+assert.deepStrictEqual([...defense.quiet(corridor)], [40 * 50 + 25]);
 
 console.log('defense : ok');

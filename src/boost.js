@@ -14,10 +14,12 @@ const defense = require('./defense');
 // Tir sans plafond : la reprise d'E24S3 passe avant les crédits (KO ~675 l'unité le 2026-11-26, ~850 000 pour 3 gardes).
 // Stock visé (lab et terminal) : 30 WORK (deux upgraders de 15), 42 RANGED_ATTACK (3 gardes à 14, spawner.MAX_GUARDS),
 // 128 ATTACK (quatre gardiens de 32, spawner.WARDENS ; le marché de shard0 n'avait que ~2 200 UH le 2026-11-27).
-// En vigilance, aucune réserve de crédits (reserve 0) : la survie de la salle passe avant la caisse.
+// En vigilance, réserve de crédits abaissée à 2 M (WAR_RESERVE) : la survie passe avant la caisse, mais une deuxième
+// série de boosts reste payable (UH ~640, ~600 000 par gardien).
 // ponytail: plafond fixe de l'amélioration, à revoir si les prix bougent ou si les crédits fondent.
 // Crédits gardés en caisse (reserve du mode) : aucun achat ni lab en dessous.
 const CREDIT_RESERVE = 5000000;
+const WAR_RESERVE = 2000000;
 const MODES = {
   upgrade: {
     part: WORK, action: 'upgradeController', parts: 30, maxPrice: 250, reserve: CREDIT_RESERVE,
@@ -28,7 +30,7 @@ const MODES = {
     compounds: [RESOURCE_KEANIUM_OXIDE, RESOURCE_KEANIUM_ALKALIDE, RESOURCE_CATALYZED_KEANIUM_ALKALIDE],
   },
   attack: {
-    part: ATTACK, action: 'attack', parts: 128, maxPrice: Infinity, reserve: 0,
+    part: ATTACK, action: 'attack', parts: 128, maxPrice: Infinity, reserve: WAR_RESERVE,
     compounds: [RESOURCE_UTRIUM_HYDRIDE, RESOURCE_UTRIUM_ACID, RESOURCE_CATALYZED_UTRIUM_ACID],
   },
 };
