@@ -41,6 +41,13 @@ const REPAIR_SPEND = 0.4 + (BODYPART_COST[WORK] + BODYPART_COST[CARRY] + BODYPAR
 const REPAIR_BUILDER_UNITS = 3;
 const REPAIR_BUILDER_UNITS_LATE = 8;
 const REPAIR_BUILDER_LATE_RCL = 7;
+// Dès REPAIR_BUILDER_LATE_RCL, builders d'entretien tant qu'un mur ou rempart de la coupe est sous sa cible et que
+// le stockage dépasse FORTIFY_FLOOR : la coupe passe avant la réserve de l'amélioration (100 000).
+// Le 2026-11-27, deux démanteleurs boostés de deadlydd (7 200 PV/tick) ont percé en 30 ticks un mur de 150 000 :
+// la coupe d'E25S3 était à ~180 000 au lieu de 500 000, il manquait ~9 M de PV (~90 000 d'énergie).
+// ponytail: effectif fixe ; le tailler sur le déficit si 3 builders vident trop vite le stockage.
+const FORTIFY_BUILDERS = 3;
+const FORTIFY_FLOOR = 30000;
 // Soutien d'une salle voisine jeune (expansion.supported). Carrier : 1 250 d'énergie pour ~200 ticks d'aller-retour,
 // ~6 énergie/tick chacun. Pioneers : 16 WORK chacun, de quoi dépenser ces ~37 énergie/tick et les 20 de ses sources.
 // Garde : corps de tueur (remoteMining.KILLER_BODY) si la salle le paie, sinon 12 RANGED_ATTACK (120 PV/tick), de quoi
@@ -160,6 +167,13 @@ function netIncome(room, miners, carry, remote, upkeep) {
   return local + remoteMining.income(room, remote) + stored - (upkeep || 0);
 }
 
+// Vrai si la salle monte sa coupe avec FORTIFY_BUILDERS : `damaged` (defense.damagedStructure) est un mur ou rempart.
+function fortifying(room, damaged) {
+  return !!damaged && room.controller.level >= REPAIR_BUILDER_LATE_RCL
+    && (damaged.structureType === STRUCTURE_WALL || damaged.structureType === STRUCTURE_RAMPART)
+    && !!room.storage && room.storage.store[RESOURCE_ENERGY] > FORTIFY_FLOOR;
+}
+
 // Vrai si une structure (hors murs et remparts) est sous REPAIR_RATIO de ses points de vie et qu'aucune tour
 // ne l'entretiendra : un builder vient alors la réparer.
 function needsRepair(room) {
@@ -247,8 +261,10 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   const bd = roomCounts.builder || 0;
   // Au moins un builder pendant les chantiers, même à revenu nul. Sans chantier, un seul s'il reste à réparer
   // (murs et remparts montés en parallèle de l'amélioration) ou une barrière à remplacer.
+  const damaged = defense.damagedStructure(room);
   const builder = building ? bd + (!bd || (work.builder || 0) < net / BUILD_SPEND ? 1 : 0)
-    : (defense.damagedStructure(room) || room.memory.swapBarrier || needsRepair(room) ? 1 : 0);
+    : fortifying(room, damaged) ? FORTIFY_BUILDERS
+      : (damaged || room.memory.swapBarrier || needsRepair(room) ? 1 : 0);
   return {
     // Selon la menace que les tours ne couvrent pas (voir defense.defenders).
     defender: defense.defenders(room),
@@ -419,6 +435,7 @@ function emergencyRole(counts, wanted, fed) {
 }
 
 module.exports.emergencyRole = emergencyRole;
+module.exports.fortifying = fortifying;
 
 module.exports.run = function () {
   // Effectifs actuels par salle puis par rôle, WORK et nombre de mineurs par source, capacité des haulers par salle.

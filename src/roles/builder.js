@@ -43,10 +43,21 @@ function repair(creep, ratio) {
   return true;
 }
 
+// Gain qu'une barrière reçoit avant que le builder en change (un peu plus d'un plein de 8 CARRY).
+// damagedStructure renvoie la pire toutes les 10 ticks : avec des murs au même niveau, le builder changeait de côté
+// de la salle en continu et la coupe d'E25S3 ne montait que de ~150 PV/tick (raid de deadlydd du 2026-11-27).
+const FORTIFY_STEP = 50000;
+
 // Répare la structure que les tours entretiennent (defense.damagedStructure : murs et remparts de la coupe compris) :
-// la défense passe avant l'amélioration. Vrai si le créep a de quoi réparer.
+// la défense passe avant l'amélioration. La cible est gardée jusqu'à FORTIFY_STEP PV de plus (ou sa cible).
+// Vrai si le créep a de quoi réparer.
 function fortify(creep) {
-  const damaged = defense.damagedStructure(creep.room);
+  let damaged = Game.getObjectById(creep.memory.fortifyId);
+  if (!damaged || damaged.hits >= creep.memory.fortifyUntil) {
+    damaged = defense.damagedStructure(creep.room);
+    creep.memory.fortifyId = damaged ? damaged.id : undefined;
+    creep.memory.fortifyUntil = damaged ? Math.min(defense.repairTarget(damaged), damaged.hits + FORTIFY_STEP) : undefined;
+  }
   if (!damaged) return false;
   const result = creep.repair(damaged);
   if (result === ERR_NOT_IN_RANGE) move.to(creep, damaged, { range: 3 });

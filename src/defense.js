@@ -398,6 +398,7 @@ module.exports.target = target;
 module.exports.towerDamage = towerDamage;
 module.exports.defenders = defenders;
 module.exports.damagedStructure = damagedStructure;
+module.exports.repairTarget = repairTarget;
 module.exports.secure = secure;
 module.exports.inBase = inBase;
 module.exports.insideCells = insideCells;
