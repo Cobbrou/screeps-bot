@@ -87,17 +87,16 @@ function hungryTower(room, threatened) {
 // Le stockage remplace une source trop maigre quand spawn, extensions ou une tour attendent : sans ça, une tour
 // loin des sources reste vide pendant une attaque, stockage plein.
 // Retourne l'objet où puiser, ou { wait, range } : où attendre que la source produise.
-// L'énergie posée près du contrôleur (par les remoteHauler) est laissée aux upgraders et aux builders.
+// Le tas du dépôt des upgraders (sources.depotReserved, dépôt sans conteneur) leur est laissé.
 // Tas, pierres tombales et ruines près d'un hostile (DANGER_RANGE) sont laissés.
 function pickupTarget(creep) {
   const room = creep.room;
   const hostiles = defense.threats(room);
   const safe = (o) => !hostiles.some((h) => h.pos.inRangeTo(o, DANGER_RANGE));
-  const controller = room.controller;
   const roomSources = sources.list(room);
   const dropped = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
     filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50
-      && !(controller && r.pos.inRangeTo(controller, 3)) && !roomSources.some((s) => r.pos.inRangeTo(s, 1))
+      && !sources.depotReserved(r) && !roomSources.some((s) => r.pos.inRangeTo(s, 1))
       && safe(r) && move.reachable(creep, r),
   });
   if (dropped) return dropped;
@@ -208,12 +207,11 @@ function fillNearby(creep) {
 }
 
 // En chemin vers sa livraison, ramasse l'énergie au sol adjacente s'il reste de la place (pickup, transfer
-// et déplacement passent au même tick). Le dépôt des upgraders, près du contrôleur, n'est pas repris.
+// et déplacement passent au même tick). Le tas du dépôt des upgraders n'est pas repris.
 function pickupNearby(creep) {
   if (!creep.store.getFreeCapacity(RESOURCE_ENERGY)) return;
-  const controller = creep.room.controller;
   const pile = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, {
-    filter: (r) => r.resourceType === RESOURCE_ENERGY && !(controller && r.pos.inRangeTo(controller, 3)),
+    filter: (r) => r.resourceType === RESOURCE_ENERGY && !sources.depotReserved(r),
   })[0];
   if (pile) creep.pickup(pile);
 }

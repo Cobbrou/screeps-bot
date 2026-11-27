@@ -110,9 +110,8 @@ function fed(room) {
 // et se poste à portée de sa cible, pour que l'énergie livrée serve sans nouveau trajet.
 function wait(creep) {
   if (sources.goBack(creep)) return;
-  const controller = creep.room.controller;
   const pile = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, {
-    filter: (r) => r.resourceType === RESOURCE_ENERGY && !(controller && r.pos.inRangeTo(controller, 3)),
+    filter: (r) => r.resourceType === RESOURCE_ENERGY && !sources.depotReserved(r),
   })[0];
   if (pile) creep.pickup(pile);
   const target = Game.getObjectById(creep.memory.siteId) || Game.getObjectById(creep.memory.repairId);

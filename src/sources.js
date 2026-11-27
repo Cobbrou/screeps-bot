@@ -173,6 +173,14 @@ function linked(source) {
   return !!sourceLink(source) && !!hubLink(source.room) && container(source).store[RESOURCE_ENERGY] <= HAUL_BACKLOG;
 }
 
+// Vrai si ce tas est le dépôt des upgraders : la case du dépôt tant qu'il n'a pas de conteneur (avant le conteneur du hub).
+// Le reste de l'énergie au sol près du contrôleur est à ramasser : avec le stockage, les upgraders ne prennent plus
+// rien au sol, et les remboursements des créeps recyclés au spawn voisin s'y perdaient (833 en 44,24 sur E25S3, 2026-11-27).
+function depotReserved(r) {
+  const d = depot(r.room);
+  return Boolean(d && !d.container && r.pos.isEqualTo(d.pos));
+}
+
 // Énergie posée au sol sur la case du dépôt, ou undefined.
 function depotPile(d) {
   return d.pos.lookFor(LOOK_RESOURCES).find((r) => r.resourceType === RESOURCE_ENERGY);
@@ -332,12 +340,11 @@ function stepAway(creep) {
 // (retrait partiel accepté) ; récolte sinon. L'énergie au sol passe en premier : elle se perd si personne ne la ramasse.
 // La réserve est gardée en mémoire tant qu'elle suffit ; sans réserve, la salle n'est fouillée
 // qu'une fois tous les WITHDRAW_SCAN_INTERVAL ticks.
-// Comme le conteneur du contrôleur, l'énergie au sol près du contrôleur (dépôt) est réservée aux upgraders.
+// Comme le conteneur du contrôleur, le tas du dépôt (depotReserved) est réservé aux upgraders.
 function collect(creep) {
-  const controller = creep.room.controller;
   const pile = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
     filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount >= 50
-      && !(controller && r.pos.inRangeTo(controller, 3)) && move.reachable(creep, r),
+      && !depotReserved(r) && move.reachable(creep, r),
   });
   if (pile) {
     if (creep.pickup(pile) === ERR_NOT_IN_RANGE) move.to(creep, pile);
@@ -369,4 +376,4 @@ function pickFrom(pile, box, free) {
   return inBox ? box : undefined;
 }
 
-module.exports = { list, spots, container, waitSpot, depot, depotPile, mainSpawn, hubLink, sourceLink, linked, HAUL_BACKLOG, harvest, harvestSource, collect, goBack, stepAway, forget, pickFrom };
+module.exports = { list, spots, container, waitSpot, depot, depotPile, depotReserved, mainSpawn, hubLink, sourceLink, linked, HAUL_BACKLOG, harvest, harvestSource, collect, goBack, stepAway, forget, pickFrom };
