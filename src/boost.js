@@ -13,26 +13,27 @@ const defense = require('./defense');
 // relevé du 2026-11-17 pour l'amélioration, GH ~160, GH2O ~110, XGH2O ~160 crédits par point de contrôleur.
 // Tir sans plafond : la reprise d'E24S3 passe avant les crédits (KO ~675 l'unité le 2026-11-26, ~850 000 pour 3 gardes).
 // Stock visé (lab et terminal) : 30 WORK (deux upgraders de 15), 42 RANGED_ATTACK (3 gardes à 14, spawner.MAX_GUARDS),
-// 64 ATTACK (deux gardiens de 32 ; le marché de shard0 n'avait que ~2 200 UH le 2026-11-27).
+// 128 ATTACK (quatre gardiens de 32, spawner.WARDENS ; le marché de shard0 n'avait que ~2 200 UH le 2026-11-27).
+// En vigilance, aucune réserve de crédits (reserve 0) : la survie de la salle passe avant la caisse.
 // ponytail: plafond fixe de l'amélioration, à revoir si les prix bougent ou si les crédits fondent.
+// Crédits gardés en caisse (reserve du mode) : aucun achat ni lab en dessous.
+const CREDIT_RESERVE = 5000000;
 const MODES = {
   upgrade: {
-    part: WORK, action: 'upgradeController', parts: 30, maxPrice: 250,
+    part: WORK, action: 'upgradeController', parts: 30, maxPrice: 250, reserve: CREDIT_RESERVE,
     compounds: [RESOURCE_GHODIUM_HYDRIDE, RESOURCE_GHODIUM_ACID, RESOURCE_CATALYZED_GHODIUM_ACID],
   },
   ranged: {
-    part: RANGED_ATTACK, action: 'rangedAttack', parts: 42, maxPrice: Infinity,
+    part: RANGED_ATTACK, action: 'rangedAttack', parts: 42, maxPrice: Infinity, reserve: CREDIT_RESERVE,
     compounds: [RESOURCE_KEANIUM_OXIDE, RESOURCE_KEANIUM_ALKALIDE, RESOURCE_CATALYZED_KEANIUM_ALKALIDE],
   },
   attack: {
-    part: ATTACK, action: 'attack', parts: 64, maxPrice: Infinity,
+    part: ATTACK, action: 'attack', parts: 128, maxPrice: Infinity, reserve: 0,
     compounds: [RESOURCE_UTRIUM_HYDRIDE, RESOURCE_UTRIUM_ACID, RESOURCE_CATALYZED_UTRIUM_ACID],
   },
 };
 // Tous les composés achetés : jamais revendus (market.sell).
 const COMPOUNDS = [...MODES.upgrade.compounds, ...MODES.ranged.compounds, ...MODES.attack.compounds];
-// Crédits gardés en caisse : aucun achat ni lab en dessous.
-const CREDIT_RESERVE = 5000000;
 
 // Stockage sous ce seuil : achats de boost, énergie du lab, du terminal et récolte du minerai attendent (scarce).
 // Seuil propre, pas celui des upgraders (room.memory.storageLow, 100 000 dès le RCL 7) : sous lui, le minerai (H vendu
@@ -80,9 +81,9 @@ function held(room) {
   return usable.find((c) => l && l.store[c] > 0) || usable[0];
 }
 
-// Vrai si la salle peut booster : terminal, crédits au-dessus de la réserve.
+// Vrai si la salle peut booster : terminal, crédits au-dessus de la réserve du mode.
 function wanted(room) {
-  return !!room.terminal && Game.market.credits >= CREDIT_RESERVE;
+  return !!room.terminal && Game.market.credits >= mode().reserve;
 }
 
 // Achat à faire : { order, amount } sur l'ordre de vente le moins cher par point gagné (composé en stock imposé),
@@ -94,15 +95,20 @@ function purchase(room) {
   const current = held(room);
   const missing = target - (current ? stock(room, current) : 0);
   if (missing < target / 3) return undefined;
-  const best = (current ? [current] : m.compounds)
+  const offers = (current ? [current] : m.compounds)
     .flatMap((c) => Game.market.getAllOrders({ type: ORDER_SELL, resourceType: c })
       .filter((o) => o.amount > 0 && o.roomName)
       .map((order) => ({ order, cost: order.price / gainPerUnit(m, c) })))
-    .filter((o) => o.cost <= m.maxPrice)
+    .filter((o) => o.cost <= m.maxPrice);
+  // Premier achat : un composé dont le marché couvre tout le manque, s'il y en a. Un lab n'en garde qu'un (held) :
+  // le 2026-11-27, les ~2 200 UH du marché auraient bloqué le lab sous les 3 840 voulus, malgré 38 000 UH2O en vente.
+  const supply = (c) => offers.filter((o) => o.order.resourceType === c).reduce((sum, o) => sum + o.order.amount, 0);
+  const deep = offers.filter((o) => supply(o.order.resourceType) >= missing);
+  const best = (current || !deep.length ? offers : deep)
     .sort((a, b) => a.cost - b.cost)[0];
   if (!best) return undefined;
   // Achat plafonné pour que la caisse reste au-dessus de la réserve après paiement ; rien sous une partie boostée.
-  const affordable = Math.floor((Game.market.credits - CREDIT_RESERVE) / best.order.price);
+  const affordable = Math.floor((Game.market.credits - m.reserve) / best.order.price);
   const amount = Math.min(best.order.amount, missing, affordable);
   if (amount < LAB_BOOST_MINERAL) return undefined;
   return { order: best.order, amount };
@@ -110,6 +116,8 @@ function purchase(room) {
 
 // Chargement à porter au lab pour le mineralHauler ({ from, resource, to }), ou undefined :
 // reste d'un autre composé rendu au terminal (un lab n'en garde qu'un), composé du terminal, puis énergie du stockage.
+// Plein au plus jusqu'à sa capacité (3 000 de composé, 2 000 d'énergie, 100 parties) : les 128 ATTACK du mode attaque
+// la dépassent, le reste attend au terminal que les premiers boosts libèrent de la place.
 function labJob(room) {
   const l = lab(room);
   if (!l || !room.terminal || !room.storage) return undefined;
@@ -117,10 +125,11 @@ function labJob(room) {
   const compound = held(room);
   const rest = compound && COMPOUNDS.find((c) => c !== compound && l.store[c] > 0);
   if (rest) return { from: l, resource: rest, to: room.terminal };
-  if (compound && l.store[compound] < m.parts * LAB_BOOST_MINERAL && room.terminal.store[compound] > 0) {
+  if (compound && l.store[compound] < Math.min(m.parts * LAB_BOOST_MINERAL, LAB_MINERAL_CAPACITY)
+    && room.terminal.store[compound] > 0) {
     return { from: room.terminal, resource: compound, to: l };
   }
-  if (compound && l.store[RESOURCE_ENERGY] < m.parts * LAB_BOOST_ENERGY && !scarce(room)) {
+  if (compound && l.store[RESOURCE_ENERGY] < Math.min(m.parts * LAB_BOOST_ENERGY, LAB_ENERGY_CAPACITY) && !scarce(room)) {
     return { from: room.storage, resource: RESOURCE_ENERGY, to: l };
   }
   return undefined;

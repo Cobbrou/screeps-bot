@@ -47,11 +47,13 @@ const REPAIR_BUILDER_LATE_RCL = 7;
 // la coupe d'E25S3 était à ~180 000 au lieu de 500 000, il manquait ~9 M de PV (~90 000 d'énergie).
 // ponytail: effectif fixe ; le tailler sur le déficit si 3 builders vident trop vite le stockage.
 const FORTIFY_BUILDERS = 3;
+// Au pied de guerre (defense.exposed : coupe visée à 2 M, ~50 M de PV à monter sur E25S3), 5 builders.
+const FORTIFY_BUILDERS_WAR = 5;
 const FORTIFY_FLOOR = 30000;
-// Gardiens (rôle warden) pendant la vigilance (defense.vigil), et pendant un raid (defense.raiders) : les renforts
-// arrivent après la première brèche, mais un raid abat ensuite les remparts vitaux un à un (~55 ticks chacun à 400 000).
-const WARDENS = 2;
-const WARDENS_RAID = 4;
+// Gardiens (rôle warden) pendant toute la vigilance (defense.vigil) : 4 d'emblée. Créés au premier raid, les renforts
+// (144 ticks de spawn chacun) arrivaient après la brèche (~60 ticks par case à 435 000). Il en faut 4 boostés pour
+// dépasser le soin de deux soigneurs T3 (1 440/tick) à travers les TOUGH XGHO2 (×0,3) du démanteleur.
+const WARDENS = 4;
 // Soutien d'une salle voisine jeune (expansion.supported). Carrier : 1 250 d'énergie pour ~200 ticks d'aller-retour,
 // ~6 énergie/tick chacun. Pioneers : 16 WORK chacun, de quoi dépenser ces ~37 énergie/tick et les 20 de ses sources.
 // Garde : corps de tueur (remoteMining.KILLER_BODY) si la salle le paie, sinon 12 RANGED_ATTACK (120 PV/tick), de quoi
@@ -267,7 +269,7 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
   // (murs et remparts montés en parallèle de l'amélioration) ou une barrière à remplacer.
   const damaged = defense.damagedStructure(room);
   const builder = building ? bd + (!bd || (work.builder || 0) < net / BUILD_SPEND ? 1 : 0)
-    : fortifying(room, damaged) ? FORTIFY_BUILDERS
+    : fortifying(room, damaged) ? (defense.exposed(room) ? FORTIFY_BUILDERS_WAR : FORTIFY_BUILDERS)
       : (damaged || room.memory.swapBarrier || needsRepair(room) ? 1 : 0);
   return {
     // Selon la menace que les tours ne couvrent pas (voir defense.defenders).
@@ -290,7 +292,7 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
         ? 1 : 0),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
     // Juste après l'économie de base : sans mode sans échec, la coupe ne tient que par eux face à un raid boosté.
-    warden: defense.vigil(room) ? (defense.raiders(room).length ? WARDENS_RAID : WARDENS) : 0,
+    warden: defense.vigil(room) ? WARDENS : 0,
     // Expansion et soutien d'une salle jeune avant la récolte distante, qui ne prend alors que le temps de spawn restant.
     // Le 2026-11-25, le claimer d'un voisin est entré dans E24S3 5 ticks après que nous l'avons prise.
     claimer: expanding && !expansion.claimed() ? 1 : 0,

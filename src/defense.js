@@ -17,6 +17,9 @@ const WALL_HITS_MAX = 150000;
 // perçaient une case de 120 000 en 16 ticks, 67 à 500 000. Depuis 120 000, la coupe de E25S3 (31 cases) et ses
 // 11 remparts vitaux demandent ~16 M de PV, ~160 000 d'énergie, montés par le builder d'entretien (REPAIR_BUILDER_UNITS).
 const WALL_HITS_LATE = { 7: 500000, 8: 2000000 };
+// Pied de guerre (exposed) : coupe montée au plafond du RCL 8 dès le RCL 7. Contre deux démanteleurs boostés
+// (7 200 PV/tick, deadlydd le 2026-11-27), une case de 2 M tient ~280 ticks au lieu de ~70 à 500 000.
+const WALL_HITS_WAR = 2000000;
 // Sous cette énergie au stockage, murs et remparts attendent (sauf rempart mourant) : de quoi remplir les tours
 // plusieurs fois pendant une attaque. La sécurité passe avant l'amélioration : au-dessus, ils sont réparés.
 const DEFENSE_RESERVE = 5000;
@@ -77,6 +80,7 @@ function threats(room) {
 function repairTarget(s) {
   if (s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART) return s.hitsMax;
   const level = s.room.controller.level;
+  if (exposed(s.room)) return Math.min(s.hitsMax, Math.max(WALL_HITS_WAR, WALL_HITS_LATE[level]));
   return Math.min(s.hitsMax, WALL_HITS_LATE[level] || Math.min(WALL_HITS_PER_RCL * level, WALL_HITS_MAX));
 }
 
@@ -296,6 +300,14 @@ function vigil(room) {
   return !!c.safeModeCooldown || !c.safeModeAvailable;
 }
 
+// Vrai si la salle est au pied de guerre : RCL VIGIL_RCL ou plus et recharge du mode sans échec en cours.
+// La recharge court 50 000 ticks dès l'activation : elle couvre le mode sans échec lui-même (la coupe monte pendant
+// qu'il protège) puis les ~30 000 ticks sans recours qui suivent (repairTarget, spawner.FORTIFY_BUILDERS_WAR).
+function exposed(room) {
+  const c = room.controller;
+  return !!c && !!c.my && c.level >= VIGIL_RCL && !!c.safeModeCooldown;
+}
+
 // Hostiles dangereux à l'intérieur des murs (tous sans coupe, voir inBase).
 function intruders(room) {
   return threats(room).filter((h) => inBase(room, h.pos));
@@ -431,6 +443,7 @@ module.exports.threats = threats;
 module.exports.intruders = intruders;
 module.exports.raiders = raiders;
 module.exports.vigil = vigil;
+module.exports.exposed = exposed;
 module.exports.toughFactor = toughFactor;
 module.exports.dangerous = dangerous;
 module.exports.killable = killable;

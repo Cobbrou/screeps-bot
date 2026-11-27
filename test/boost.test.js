@@ -18,6 +18,8 @@ Object.assign(global, {
   RANGED_ATTACK: 'ranged_attack',
   LAB_BOOST_MINERAL: 30,
   LAB_BOOST_ENERGY: 20,
+  LAB_MINERAL_CAPACITY: 3000,
+  LAB_ENERGY_CAPACITY: 2000,
   CREEP_LIFE_TIME: 1500,
   ORDER_SELL: 'sell',
   FIND_MY_STRUCTURES: 108,
@@ -118,11 +120,23 @@ assert.strictEqual(boost.factor(room({ KO: 300, energy: 840 }, {}), 14), 1);
 assert.strictEqual(boost.parts(room({ GH: 900, energy: 840 }, {}), 14), 0);
 delete Memory.war;
 
-// Vigilance (mode sans échec indisponible) : le lab passe en attaque, achat d'UH pour 64 ATTACK (1 920 unités).
+// Vigilance (mode sans échec indisponible) : le lab passe en attaque, achat pour 128 ATTACK (3 840 unités).
 Game.rooms = { E25S3: { name: 'E25S3' } };
 vigilant.add('E25S3');
 orders.push({ id: 'uh', resourceType: 'UH', price: 643, amount: 1000, roomName: 'E20S5' });
 assert.deepStrictEqual(boost.purchase(room({}, { energy: 5000 })), { order: orders[orders.length - 1], amount: 1000 });
+// Marché du 2026-11-27 : UH trop rare pour tout le stock, le composé qui le couvre au meilleur prix par point (XUH2O).
+// Aucune réserve de crédits : 2 M de crédits paient 783 XUH2O.
+orders.push({ id: 'uh2o', resourceType: 'UH2O', price: 1863, amount: 38176, roomName: 'E7S24' },
+  { id: 'xuh2o', resourceType: 'XUH2O', price: 2554, amount: 5577, roomName: 'E15S51' });
+Game.market.credits = 2e6;
+assert.deepStrictEqual(boost.purchase(room({}, { energy: 5000 })), { order: orders[orders.length - 1], amount: 783 });
+// UH déjà en stock : on rachète de l'UH, même rare.
+assert.strictEqual(boost.purchase(room({ UH: 300 }, {})).order.id, 'uh');
+Game.market.credits = 55e6;
+// Lab rempli jusqu'à sa capacité, pas jusqu'aux 128 parties : plein, il ne réclame plus rien.
+assert.strictEqual(boost.labJob(room({ UH: 3000, energy: 2000 }, { UH: 840 })), undefined);
+assert.strictEqual(boost.labJob(room({ UH: 2900, energy: 2000 }, { UH: 840 })).resource, 'UH');
 assert.ok(boost.attackReady(room({ UH: 960, energy: 1280 }, {}), 32));
 assert.ok(!boost.attackReady(room({ GH: 960, energy: 1280 }, {}), 32));
 vigilant.clear();

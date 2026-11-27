@@ -65,5 +65,12 @@ assert.ok(defense.vigil(room({ safeModeAvailable: 0 })));
 assert.ok(!defense.vigil(room({ safeMode: 13000, safeModeCooldown: 43000 })));
 assert.ok(defense.vigil(room({ safeMode: 900, safeModeCooldown: 30900 })));
 assert.ok(!defense.vigil(room({ level: 6, safeModeCooldown: 30000 })));
+// Pied de guerre : recharge en cours (mode sans échec actif compris) au RCL 7 et plus, coupe visée à 2 M au lieu de 500 000.
+assert.ok(defense.exposed(room({ safeMode: 13000, safeModeCooldown: 43000 })));
+assert.ok(!defense.exposed(room({})));
+assert.ok(!defense.exposed(room({ level: 6, safeModeCooldown: 30000 })));
+const wall = (c) => ({ structureType: STRUCTURE_WALL, hitsMax: 300e6, room: room(c) });
+assert.strictEqual(defense.repairTarget(wall({})), 500000);
+assert.strictEqual(defense.repairTarget(wall({ safeModeCooldown: 30000 })), 2e6);
 
 console.log('defense : ok');
