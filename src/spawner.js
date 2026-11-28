@@ -54,6 +54,13 @@ const FORTIFY_FLOOR = 30000;
 // (144 ticks de spawn chacun) arrivaient après la brèche (~60 ticks par case à 435 000). Il en faut 4 boostés pour
 // dépasser le soin de deux soigneurs T3 (1 440/tick) à travers les TOUGH XGHO2 (×0,3) du démanteleur.
 const WARDENS = 4;
+// Hors raid (aucun defense.raiders), 2 seulement : à 3 360 d'énergie le gardien, les 4 vidaient le stockage d'E25S3
+// (17 000 le 2026-11-28, contre 105 000 la veille). Les 2 autres sortent dès qu'un raid entre.
+// ponytail: les renforts (144 ticks de spawn) arrivent après ~90 ticks de brèche par mur à 650 000 ; repasser à 4 fixes si un raid perce.
+const WARDENS_CALM = 2;
+// Stockage bas (room.memory.storageLow) : au moins 2 haulers, pour qu'un hauler mort ne laisse pas spawn et
+// extensions vides (E25S3, 2026-11-28 : un seul hauler, extensions à 13 %).
+const STORAGE_LOW_HAULERS = 2;
 // Soutien d'une salle voisine jeune (expansion.supported). Carrier : 1 250 d'énergie pour ~200 ticks d'aller-retour,
 // ~6 énergie/tick chacun. Pioneers : 16 WORK chacun, de quoi dépenser ces ~37 énergie/tick et les 20 de ses sources.
 // Garde : corps de tueur (remoteMining.KILLER_BODY) si la salle le paie, sinon 12 RANGED_ATTACK (120 PV/tick), de quoi
@@ -285,14 +292,14 @@ function targets(room, roomCounts, miners, carry, remoteNeed, net, work) {
     // de source sans lien est plein (à moitié plein, le seuil créait un hauler de trop ; trajets plus lents ou plus longs que prévu : fatigue hors route, livraisons au contrôleur),
     // dans la limite de HAUL_BACKLOG_RATIO fois le besoin. Source liée exclue : un hauler de plus coûterait plus que ce stock,
     // ramassé en passant par ceux qui existent.
-    hauler: (roomCounts.hauler || 0)
+    hauler: Math.max(need && room.memory.storageLow ? STORAGE_LOW_HAULERS : 0, (roomCounts.hauler || 0)
       + (need > (carry || 0)
         || ((carry || 0) < need * HAUL_BACKLOG_RATIO
           && list.some((s) => { const box = sources.container(s); return box && !sources.sourceLink(s) && box.store.getFreeCapacity(RESOURCE_ENERGY) === 0; }))
-        ? 1 : 0),
+        ? 1 : 0)),
     miner: (roomCounts.miner || 0) + (list.some((s) => needsMiner(s, miners)) ? 1 : 0),
     // Juste après l'économie de base : sans mode sans échec, la coupe ne tient que par eux face à un raid boosté.
-    warden: defense.vigil(room) ? WARDENS : 0,
+    warden: defense.vigil(room) ? (defense.raiders(room).length ? WARDENS : WARDENS_CALM) : 0,
     // Expansion et soutien d'une salle jeune avant la récolte distante, qui ne prend alors que le temps de spawn restant.
     // Le 2026-11-25, le claimer d'un voisin est entré dans E24S3 5 ticks après que nous l'avons prise.
     claimer: expanding && !expansion.claimed() ? 1 : 0,
